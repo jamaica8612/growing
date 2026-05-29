@@ -27,10 +27,13 @@ import {
   MessageSquare,
   ShieldCheck,
   Sprout,
+  Menu,
+  X,
 } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Core States
   const [students, setStudents] = useState<Student[]>([]);
@@ -410,8 +413,8 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      {/* Sidebar Navigation (Desktop only) */}
+      <aside className="sidebar desktop-sidebar">
         <div className="logo-container">
           <div className="logo-icon">
             <Sprout size={24} />
@@ -491,6 +494,105 @@ function App() {
           </button>
         </div>
       </aside>
+
+      {/* Mobile Top Header (Mobile only) */}
+      <header className="mobile-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="logo-icon" style={{ padding: '0.35rem', borderRadius: '6px' }}>
+            <Sprout size={18} />
+          </div>
+          <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>그로잉영어</span>
+        </div>
+        <button className="menu-toggle-btn" onClick={() => setIsMobileMenuOpen(true)}>
+          <Menu size={24} />
+        </button>
+      </header>
+
+      {/* Mobile Menu Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="mobile-menu-drawer" onClick={e => e.stopPropagation()}>
+            <div className="mobile-menu-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sprout size={20} className="text-primary" />
+                <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#ffffff' }}>그로잉영어</span>
+              </div>
+              <button className="btn-icon-only" style={{ color: '#ffffff' }} onClick={() => setIsMobileMenuOpen(false)}>
+                <X size={22} />
+              </button>
+            </div>
+            
+            <nav style={{ flexGrow: 1 }}>
+              <ul className="nav-menu" style={{ gap: '0.5rem' }}>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
+                  >
+                    <LayoutDashboard size={18} /> 대시보드
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('students'); setIsMobileMenuOpen(false); }}
+                  >
+                    <Users size={18} /> 학생 관리
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'classes' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('classes'); setIsMobileMenuOpen(false); }}
+                  >
+                    <BookOpen size={18} /> 반/시간표 관리
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('attendance'); setIsMobileMenuOpen(false); }}
+                  >
+                    <CalendarCheck size={18} /> 출결 관리
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'payments' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('payments'); setIsMobileMenuOpen(false); }}
+                  >
+                    <CreditCard size={18} /> 수납 관리
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'counsel' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('counsel'); setIsMobileMenuOpen(false); }}
+                  >
+                    <MessageSquare size={18} /> 상담/진도 일지
+                  </button>
+                </li>
+              </ul>
+            </nav>
+
+            <div className="sidebar-footer" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem' }}>
+              <button
+                className={`nav-item ${activeTab === 'backup' ? 'active' : ''}`}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                onClick={() => { setActiveTab('backup'); setIsMobileMenuOpen(false); }}
+              >
+                <ShieldCheck size={18} /> 안전 백업 설정
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Panel Content */}
       <main className="main-content">

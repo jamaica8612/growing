@@ -147,65 +147,67 @@ export const Classes: React.FC<ClassesProps> = ({
           </button>
         </div>
 
-        <div className="timetable-grid">
-          {/* Times column */}
-          <div className="timetable-header-cell" style={{ background: '#f4f7f4' }}>시간</div>
-          {daysOfWeek.map(day => (
-            <div key={day} className="timetable-header-cell">
-              {day}요일
+        <div className="timetable-wrapper">
+          <div className="timetable-grid">
+            {/* Times column */}
+            <div className="timetable-header-cell" style={{ background: '#f4f7f4' }}>시간</div>
+            {daysOfWeek.map(day => (
+              <div key={day} className="timetable-header-cell">
+                {day}요일
+              </div>
+            ))}
+
+            {/* Time markers on the left */}
+            <div className="timetable-time-col">
+              <div style={{ height: '60px', padding: '4px' }}>13:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>14:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>15:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>16:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>17:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>18:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>19:00</div>
+              <div style={{ height: '60px', padding: '4px' }}>20:00</div>
             </div>
-          ))}
 
-          {/* Time markers on the left */}
-          <div className="timetable-time-col">
-            <div style={{ height: '60px', padding: '4px' }}>13:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>14:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>15:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>16:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>17:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>18:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>19:00</div>
-            <div style={{ height: '60px', padding: '4px' }}>20:00</div>
-          </div>
+            {/* Day columns */}
+            {daysOfWeek.map(day => (
+              <div key={day} className="timetable-day-col">
+                {classes
+                  .filter(cls => cls.days.includes(day))
+                  .map(cls => {
+                    const startMins = getMinutesFromStart(cls.startTime);
+                    const duration = getDurationMinutes(cls.startTime, cls.endTime);
 
-          {/* Day columns */}
-          {daysOfWeek.map(day => (
-            <div key={day} className="timetable-day-col">
-              {classes
-                .filter(cls => cls.days.includes(day))
-                .map(cls => {
-                  const startMins = getMinutesFromStart(cls.startTime);
-                  const duration = getDurationMinutes(cls.startTime, cls.endTime);
+                    // Calculate percentage style
+                    const topPercent = (startMins / TOTAL_MINUTES) * 100;
+                    const heightPercent = (duration / TOTAL_MINUTES) * 100;
 
-                  // Calculate percentage style
-                  const topPercent = (startMins / TOTAL_MINUTES) * 100;
-                  const heightPercent = (duration / TOTAL_MINUTES) * 100;
-
-                  return (
-                    <div
-                      key={`${cls.id}-${day}`}
-                      className="class-slot"
-                      style={{
-                        top: `${topPercent}%`,
-                        height: `${heightPercent}%`,
-                      }}
-                      onClick={() => handleOpenEdit(cls)}
-                      title={`${cls.name} (${cls.startTime} - ${cls.endTime})`}
-                    >
-                      <div>
-                        <div className="class-slot-name">{cls.name}</div>
-                        <div className="class-slot-time">
-                          {cls.startTime} - {cls.endTime}
+                    return (
+                      <div
+                        key={`${cls.id}-${day}`}
+                        className="class-slot"
+                        style={{
+                          top: `${topPercent}%`,
+                          height: `${heightPercent}%`,
+                        }}
+                        onClick={() => handleOpenEdit(cls)}
+                        title={`${cls.name} (${cls.startTime} - ${cls.endTime})`}
+                      >
+                        <div>
+                          <div className="class-slot-name">{cls.name}</div>
+                          <div className="class-slot-time">
+                            {cls.startTime} - {cls.endTime}
+                          </div>
+                        </div>
+                        <div className="class-slot-count">
+                          👤 {cls.studentIds.length}명
                         </div>
                       </div>
-                      <div className="class-slot-count">
-                        👤 {cls.studentIds.length}명
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          ))}
+                    );
+                  })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
