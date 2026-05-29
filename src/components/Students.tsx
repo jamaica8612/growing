@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
 import { UserPlus, Search, Edit2, Trash2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone } from 'lucide-react';
 
@@ -30,6 +30,8 @@ export const Students: React.FC<StudentsProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
 
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -62,21 +64,24 @@ export const Students: React.FC<StudentsProps> = ({
   });
   const [reportComment, setReportComment] = useState('');
 
-  // Sync comment when selected student or month changes
-  useEffect(() => {
-    if (!activeDetailStudent) return;
-    const existingLog = counselLogs.find(
-      log =>
-        log.studentId === activeDetailStudent.id &&
-        log.type === 'progress' &&
-        log.title.includes(`${reportMonth} 월간 학습 리포트`)
-    );
-    if (existingLog) {
-      setReportComment(existingLog.content);
-    } else {
-      setReportComment('');
-    }
-  }, [activeDetailStudent?.id, reportMonth, counselLogs]);
+  // Load the saved comment into the editable field whenever the selected
+  // student or month changes. Done during render (not in an effect) so the
+  // field is correct on first paint and in-progress edits aren't clobbered by
+  // unrelated counsel-log updates.
+  const reportSyncKey = `${activeDetailStudent?.id ?? ''}|${reportMonth}`;
+  const [syncedReportKey, setSyncedReportKey] = useState(reportSyncKey);
+  if (reportSyncKey !== syncedReportKey) {
+    setSyncedReportKey(reportSyncKey);
+    const existingLog = activeDetailStudent
+      ? counselLogs.find(
+          log =>
+            log.studentId === activeDetailStudent.id &&
+            log.type === 'progress' &&
+            log.title.includes(`${reportMonth} 월간 학습 리포트`)
+        )
+      : undefined;
+    setReportComment(existingLog?.content ?? '');
+  }
 
   const handleSaveReportComment = () => {
     if (!activeDetailStudent) return;
@@ -205,6 +210,18 @@ export const Students: React.FC<StudentsProps> = ({
     }
   };
 
+  // Students belonging to the selected class (when a class filter is active).
+  const filterClassMemberIds =
+    classFilter === 'all'
+      ? null
+      : new Set(classes.find(c => c.id === classFilter)?.studentIds ?? []);
+
+  // Students with an unpaid bill in the current billing month.
+  const currentBillingMonth = new Date().toISOString().substring(0, 7);
+  const unpaidStudentIds = new Set(
+    payments.filter(p => p.billingMonth === currentBillingMonth && p.status === 'unpaid').map(p => p.studentId)
+  );
+
   // Filter students
   const filteredStudents = students.filter(student => {
     const matchesSearch =
@@ -216,8 +233,10 @@ export const Students: React.FC<StudentsProps> = ({
 
     const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
     const matchesGrade = gradeFilter === 'all' || student.grade === gradeFilter;
+    const matchesClass = !filterClassMemberIds || filterClassMemberIds.has(student.id);
+    const matchesUnpaid = !unpaidOnly || unpaidStudentIds.has(student.id);
 
-    return matchesSearch && matchesStatus && matchesGrade;
+    return matchesSearch && matchesStatus && matchesGrade && matchesClass && matchesUnpaid;
   });
 
   // Calculations for Student Details
@@ -282,6 +301,26 @@ export const Students: React.FC<StudentsProps> = ({
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
+
+          <select
+            className="form-control"
+            style={{ width: '150px' }}
+            value={classFilter}
+            onChange={e => setClassFilter(e.target.value)}
+          >
+            <option value="all">전체 반</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <button
+            className={`btn ${unpaidOnly ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setUnpaidOnly(v => !v)}
+            title="이번 달 교육비가 미납된 학생만 보기"
+          >
+            미납자만 {unpaidOnly ? '✓' : ''}
+          </button>
 
           <button className="btn btn-primary" onClick={handleOpenAdd}>
             <UserPlus size={16} /> 학생 등록
@@ -727,7 +766,7 @@ export const Students: React.FC<StudentsProps> = ({
                           <select
                             className="form-control"
                             value={logType}
-                            onChange={e => setLogType(e.target.value as any)}
+                            onChange={e => setLogType(e.target.value as 'counsel' | 'progress' | 'test')}
                           >
                             <option value="counsel">상담 일지</option>
                             <option value="progress">수업/진도 일지</option>

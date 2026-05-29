@@ -258,7 +258,7 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
                     <select
                       className="form-control"
                       value={formType}
-                      onChange={e => setFormType(e.target.value as any)}
+                      onChange={e => setFormType(e.target.value as CounselLogType)}
                     >
                       <option value="counsel">학부모 상담 일지</option>
                       <option value="progress">학생 진도/학습 일지</option>

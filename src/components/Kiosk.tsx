@@ -5,11 +5,13 @@ import { Sprout, Home, Lock, Search, CheckCircle, Volume2 } from 'lucide-react';
 interface KioskProps {
   students: Student[];
   classes: Class[];
+  kioskPin: string;
   onSaveAttendance: (attendanceData: { studentId: string; classId: string; date: string; status: 'present'; memo: string }) => void;
+  onQueueAlert: (studentId: string, kind: 'in' | 'out', date: string, time: string) => void;
   onExitKiosk: () => void;
 }
 
-export const Kiosk: React.FC<KioskProps> = ({ students, classes, onSaveAttendance, onExitKiosk }) => {
+export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSaveAttendance, onQueueAlert, onExitKiosk }) => {
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
@@ -28,7 +30,9 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, onSaveAttendanc
   // Web Audio API Chime sound generator (Fully self-contained, works offline!)
   const playSynthesizedChime = (type: 'in' | 'out') => {
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContext =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof window.AudioContext }).webkitAudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
       const now = ctx.currentTime;
@@ -103,6 +107,9 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, onSaveAttendanc
       memo: memoText,
     });
 
+    // Queue a parent check-in/out notification for later sending.
+    onQueueAlert(selectedStudent.id, type, todayDateStr, currentTimeStr);
+
     // Play chime sound
     playSynthesizedChime(type);
 
@@ -125,10 +132,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, onSaveAttendanc
   // Exit Kiosk Mode configuration
   const handleExitSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === '1234') {
+    if (passcode === kioskPin) {
       onExitKiosk();
     } else {
-      alert('비밀번호가 올바르지 않습니다. (기본: 1234)');
+      alert('비밀번호가 올바르지 않습니다.');
       setPasscode('');
     }
   };

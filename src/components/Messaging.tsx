@@ -1,82 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import type { Student } from '../types';
-import { MessageSquare, Copy, Check, Send, User } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import type { Student, KioskAlert } from '../types';
+import { MessageSquare, Copy, Check, Send, User, Bell, Trash2 } from 'lucide-react';
 
 interface MessagingProps {
   students: Student[];
+  kioskAlerts: KioskAlert[];
+  onDismissAlert: (id: string) => void;
+  onClearAlerts: () => void;
 }
 
 type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test';
 
-export const Messaging: React.FC<MessagingProps> = ({ students }) => {
+// Shared check-in / check-out message body, reused by both the manual
+// composer and the kiosk auto-queue so the wording stays in one place.
+const buildCheckMessage = (studentName: string, kind: 'in' | 'out', time: string) =>
+  kind === 'in'
+    ? `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 ${time}에 안전하게 등원하였습니다.\n오늘도 밝은 분위기 속에서 즐겁고 성실하게 공부하고 귀가할 수 있도록 지도하겠습니다. 감사합니다.`
+    : `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 금일 개별 학습 일정을 건강하게 마치고 ${time}에 하원하였습니다.\n가정에서도 숙제 수행 및 오늘 배운 단어를 복습할 수 있도록 격려와 지도 유도 부탁드립니다. 조은 하루 보내세요!`;
+
+// Build an SMS deep link prefilled with the message, tailored for iOS / Android.
+const buildSMSLink = (parentContact: string, message: string): string => {
+  if (!parentContact) return '#';
+  const cleanPhone = parentContact.replace(/[^0-9]/g, '');
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const encodedBody = encodeURIComponent(message);
+  return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
+};
+
+export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('in');
   
-  // Dynamic parameters for templates
-  const [paramTime, setParamTime] = useState('');
-  const [paramDate, setParamDate] = useState('');
+  // Dynamic parameters for templates (defaults computed once on mount)
+  const [paramTime, setParamTime] = useState(() =>
+    new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  );
+  const [paramDate, setParamDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  });
   const [paramTestName, setParamTestName] = useState('단어 단원 평가');
   const [paramScore, setParamScore] = useState('95/100');
-  
-  const [compiledMessage, setCompiledMessage] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
 
-  // Set default parameters
-  useEffect(() => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    setParamTime(timeStr);
-    
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    setParamDate(tomorrow.toISOString().split('T')[0]);
-  }, [selectedTemplate]);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Find active students
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
-  // Compile message text automatically when selections/parameters change
-  useEffect(() => {
+  // Compiled message is derived directly from the current selections/parameters.
+  const compiledMessage = useMemo(() => {
     if (!selectedStudentId) {
-      setCompiledMessage('학생을 선택하시면 알림장 메시지가 이곳에 조립됩니다. 🌱');
-      return;
+      return '학생을 선택하시면 알림장 메시지가 이곳에 조립됩니다. 🌱';
     }
 
     const student = students.find(s => s.id === selectedStudentId);
-    if (!student) return;
+    if (!student) return '';
 
     const studentName = student.name;
     const parentName = `${studentName} 학부모님`;
 
-    let msg = '';
-
     switch (selectedTemplate) {
       case 'in':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 ${paramTime}에 안전하게 등원하였습니다.\n오늘도 밝은 분위기 속에서 즐겁고 성실하게 공부하고 귀가할 수 있도록 지도하겠습니다. 감사합니다.`;
-        break;
+        return buildCheckMessage(studentName, 'in', paramTime);
       case 'out':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 금일 개별 학습 일정을 건강하게 마치고 ${paramTime}에 하원하였습니다.\n가정에서도 숙제 수행 및 오늘 배운 단어를 복습할 수 있도록 격려와 지도 유도 부탁드립니다. 조은 하루 보내세요!`;
-        break;
+        return buildCheckMessage(studentName, 'out', paramTime);
       case 'homework':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n${parentName}께 안내 말씀드립니다.\n\n오늘 ${studentName} 학생이 숙제 및 단어 준비가 다소 부족하여 교습소에서 1:1 집중 보완 지도 및 밀린 숙제를 완료한 후 귀가할 예정입니다. 귀가 시간이 다소 지연되더라도 양해 부탁드리며, 가정에서도 규칙적인 학습 습관이 잡힐 수 있도록 관심 부탁드립니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n${parentName}께 안내 말씀드립니다.\n\n오늘 ${studentName} 학생이 숙제 및 단어 준비가 다소 부족하여 교습소에서 1:1 집중 보완 지도 및 밀린 숙제를 완료한 후 귀가할 예정입니다. 귀가 시간이 다소 지연되더라도 양해 부탁드리며, 가정에서도 규칙적인 학습 습관이 잡힐 수 있도록 관심 부탁드립니다.`;
       case 'makeup':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n${studentName} 학생의 미수강 진도 보충을 위한 개별 보강 수업 일정을 안내드립니다.\n\n- 일시: ${paramDate} ${paramTime}\n\n학생이 늦지 않고 출석하여 진도를 맞출 수 있도록 학부모님의 지도 협조 부탁드립니다. 감사합니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n${studentName} 학생의 미수강 진도 보충을 위한 개별 보강 수업 일정을 안내드립니다.\n\n- 일시: ${paramDate} ${paramTime}\n\n학생이 늦지 않고 출석하여 진도를 맞출 수 있도록 학부모님의 지도 협조 부탁드립니다. 감사합니다.`;
       case 'test':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 시행한 ${studentName} 학생의 단원 평가 결과를 안내해 드립니다.\n\n- 평가 영역: ${paramTestName}\n- 평가 점수: ${paramScore}\n\n스스로 열심히 노력하여 훌륭한 성취를 낸 ${studentName} 학생에게 아낌없는 칭찬과 응원 부탁드립니다. 늘 믿고 맡겨주셔서 감사드립니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 시행한 ${studentName} 학생의 단원 평가 결과를 안내해 드립니다.\n\n- 평가 영역: ${paramTestName}\n- 평가 점수: ${paramScore}\n\n스스로 열심히 노력하여 훌륭한 성취를 낸 ${studentName} 학생에게 아낌없는 칭찬과 응원 부탁드립니다. 늘 믿고 맡겨주셔서 감사드립니다.`;
       default:
-        msg = '';
+        return '';
     }
-
-    setCompiledMessage(msg);
   }, [selectedStudentId, selectedTemplate, paramTime, paramDate, paramTestName, paramScore, students]);
 
   // Clipboard copy helper
@@ -88,23 +90,105 @@ export const Messaging: React.FC<MessagingProps> = ({ students }) => {
     });
   };
 
-  // SMS Deep Link generator tailored for iOS / Android
+  // SMS Deep Link for the currently composed message.
   const getSMSDeepLink = (): string => {
     const student = students.find(s => s.id === selectedStudentId);
-    if (!student || !student.parentContact) return '#';
+    return buildSMSLink(student?.parentContact ?? '', compiledMessage);
+  };
 
-    const cleanPhone = student.parentContact.replace(/[^0-9]/g, '');
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const encodedBody = encodeURIComponent(compiledMessage);
-
-    // iOS uses '&body=', Android and standard systems use '?body='
-    return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
+  const handleCopyAlert = (id: string, message: string) => {
+    navigator.clipboard.writeText(message).then(() => {
+      setCopiedAlertId(id);
+      setTimeout(() => setCopiedAlertId(null), 2000);
+    });
   };
 
   const currentStudent = students.find(s => s.id === selectedStudentId);
 
   return (
-    <div className="grid-container cols-2-1">
+    <div>
+      {/* Kiosk check-in/out notifications awaiting send */}
+      {kioskAlerts.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--color-warning)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <h3 className="card-title" style={{ margin: 0 }}>
+              <Bell size={20} className="text-secondary" /> 키오스크 자동 발송 대기 ({kioskAlerts.length}건)
+            </h3>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
+              onClick={onClearAlerts}
+            >
+              <Trash2 size={14} /> 전체 비우기
+            </button>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+            학생이 키오스크에서 등·하원을 체크하면 자동으로 여기에 쌓입니다. 복사하거나 문자로 보낸 뒤 [완료]를 눌러 정리하세요.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto' }}>
+            {[...kioskAlerts].reverse().map(alert => {
+              const student = students.find(s => s.id === alert.studentId);
+              const name = student?.name ?? '알수없음';
+              const contact = student?.parentContact ?? '';
+              const message = buildCheckMessage(name, alert.kind, alert.time);
+              return (
+                <div
+                  key={alert.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem',
+                    padding: '0.85rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: '#fafcfb',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <span className={`badge ${alert.kind === 'in' ? 'badge-present' : 'badge-makeup'}`} style={{ fontSize: '0.72rem' }}>
+                      {alert.kind === 'in' ? '등원' : '하원'}
+                    </span>
+                    <strong style={{ color: 'var(--color-primary-dark)' }}>{name}</strong>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>{alert.time}</span>
+                    <span style={{ fontSize: '0.78rem', color: contact ? 'var(--color-text-muted)' : 'var(--color-danger)' }}>
+                      {contact ? `📞 ${contact}` : '연락처 없음'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
+                      onClick={() => handleCopyAlert(alert.id, message)}
+                    >
+                      {copiedAlertId === alert.id ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
+                    </button>
+                    {contact && (
+                      <a
+                        href={buildSMSLink(contact, message)}
+                        className="btn btn-primary"
+                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem', textDecoration: 'none' }}
+                      >
+                        <Send size={13} /> 문자
+                      </a>
+                    )}
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
+                      onClick={() => onDismissAlert(alert.id)}
+                    >
+                      완료
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid-container cols-2-1">
       {/* Left Column: Form & Template Controls */}
       <div className="card">
         <h3 className="card-title">
@@ -305,6 +389,7 @@ export const Messaging: React.FC<MessagingProps> = ({ students }) => {
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

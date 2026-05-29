@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import type { Student, Class, Attendance, Payment, CounselLog, PaymentMethod } from './types';
+import type { Student, Class, Attendance, Payment, CounselLog, PaymentMethod, KioskAlert } from './types';
 import {
   initialStudents,
   initialClasses,
@@ -7,6 +6,8 @@ import {
   initialPayments,
   initialCounselLogs,
 } from './utils/mockData';
+import { usePersistentState } from './utils/usePersistentState';
+import { useState } from 'react';
 
 // Import Tab Components
 import { Dashboard } from './components/Dashboard';
@@ -18,6 +19,7 @@ import { CounselLogs } from './components/CounselLogs';
 import { Backup } from './components/Backup';
 import { Kiosk } from './components/Kiosk';
 import { Messaging } from './components/Messaging';
+import { AttendanceStats } from './components/AttendanceStats';
 
 // Import Icons
 import {
@@ -33,157 +35,190 @@ import {
   X,
   Smartphone,
   Monitor,
+  BarChart3,
+  type LucideIcon,
 } from 'lucide-react';
+
+const DEFAULT_KIOSK_PIN = '1234';
+
+// Single source of truth for the primary navigation, rendered by both the
+// desktop sidebar and the mobile drawer to avoid duplicated markup.
+const NAV_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+  { id: 'students', label: '학생 관리', icon: Users },
+  { id: 'classes', label: '반/시간표 관리', icon: BookOpen },
+  { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
+  { id: 'stats', label: '출결 통계', icon: BarChart3 },
+  { id: 'payments', label: '수납 관리', icon: CreditCard },
+  { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
+  { id: 'messaging', label: '알림장 발송', icon: Smartphone },
+];
+
+const TAB_TITLES: Record<string, string> = {
+  dashboard: '학원 운영 대시보드',
+  students: '재원생 주소록 및 관리',
+  classes: '학급 개설 및 시간표',
+  attendance: '출석 및 보강 관리',
+  stats: '월별 출결 통계 리포트',
+  payments: '교육비 수납 장부',
+  counsel: '상담 및 학습/성적 일지',
+  messaging: '알림장 발송 도우미',
+  kiosk: '자율 등하원 키오스크',
+  backup: '데이터 백업 및 복원',
+};
+
+const NAV_ITEM_STYLE: React.CSSProperties = {
+  width: '100%',
+  background: 'none',
+  border: 'none',
+  textAlign: 'left',
+  font: 'inherit',
+};
+
+function NavItemButton({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+  style,
+  badge,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  style?: React.CSSProperties;
+  badge?: number;
+}) {
+  return (
+    <button
+      className={`nav-item ${active ? 'active' : ''}`}
+      style={{ ...NAV_ITEM_STYLE, ...style }}
+      onClick={onClick}
+    >
+      <Icon size={18} /> {label}
+      {badge ? (
+        <span
+          style={{
+            marginLeft: 'auto',
+            backgroundColor: 'var(--color-danger)',
+            color: '#fff',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            minWidth: '18px',
+            height: '18px',
+            borderRadius: '9px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 5px',
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Core States
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [counselLogs, setCounselLogs] = useState<CounselLog[]>([]);
+  // On a truly fresh install (no students/classes yet) we seed the sample
+  // data; an existing install restores exactly what's stored and must not get
+  // mock attendance/payments/logs re-injected.
+  const freshInstall = !(
+    localStorage.getItem('growing_students') && localStorage.getItem('growing_classes')
+  );
 
-  // 1. Initial Data Loading from LocalStorage or MockData
-  useEffect(() => {
-    const storedStudents = localStorage.getItem('growing_students');
-    const storedClasses = localStorage.getItem('growing_classes');
-    const storedAttendance = localStorage.getItem('growing_attendance');
-    const storedPayments = localStorage.getItem('growing_payments');
-    const storedLogs = localStorage.getItem('growing_logs');
-
-    if (storedStudents && storedClasses) {
-      setStudents(JSON.parse(storedStudents));
-      setClasses(JSON.parse(storedClasses));
-      setAttendance(storedAttendance ? JSON.parse(storedAttendance) : []);
-      setPayments(storedPayments ? JSON.parse(storedPayments) : []);
-      setCounselLogs(storedLogs ? JSON.parse(storedLogs) : []);
-    } else {
-      // First time load: pre-fill with Mock Data
-      setStudents(initialStudents);
-      setClasses(initialClasses);
-      setAttendance(initialAttendance);
-      setPayments(initialPayments);
-      setCounselLogs(initialCounselLogs);
-
-      // Save to localStorage immediately
-      localStorage.setItem('growing_students', JSON.stringify(initialStudents));
-      localStorage.setItem('growing_classes', JSON.stringify(initialClasses));
-      localStorage.setItem('growing_attendance', JSON.stringify(initialAttendance));
-      localStorage.setItem('growing_payments', JSON.stringify(initialPayments));
-      localStorage.setItem('growing_logs', JSON.stringify(initialCounselLogs));
-    }
-  }, []);
-
-  // 2. LocalStorage Persistence Sync
-  const saveToLocal = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  };
+  // Core States — each one auto-persists to localStorage on change.
+  const [kioskPin, setKioskPin] = usePersistentState<string>('growing_kiosk_pin', DEFAULT_KIOSK_PIN);
+  const [students, setStudents] = usePersistentState<Student[]>('growing_students', initialStudents);
+  const [classes, setClasses] = usePersistentState<Class[]>('growing_classes', initialClasses);
+  const [attendance, setAttendance] = usePersistentState<Attendance[]>(
+    'growing_attendance',
+    freshInstall ? initialAttendance : []
+  );
+  const [payments, setPayments] = usePersistentState<Payment[]>(
+    'growing_payments',
+    freshInstall ? initialPayments : []
+  );
+  const [counselLogs, setCounselLogs] = usePersistentState<CounselLog[]>(
+    'growing_logs',
+    freshInstall ? initialCounselLogs : []
+  );
+  // Kiosk check-in/out events awaiting a parent notification (queue only).
+  const [kioskAlerts, setKioskAlerts] = usePersistentState<KioskAlert[]>('growing_kiosk_alerts', []);
 
   // --- Student Operations ---
   const handleAddStudent = (studentData: Omit<Student, 'id'>) => {
-    const newStudent: Student = {
-      ...studentData,
-      id: `std_${Date.now()}`,
-    };
-    const updated = [...students, newStudent];
-    setStudents(updated);
-    saveToLocal('growing_students', updated);
+    const newStudent: Student = { ...studentData, id: `std_${Date.now()}` };
+    setStudents(prev => [...prev, newStudent]);
   };
 
   const handleUpdateStudent = (updatedStudent: Student) => {
-    const updated = students.map(s => (s.id === updatedStudent.id ? updatedStudent : s));
-    setStudents(updated);
-    saveToLocal('growing_students', updated);
+    setStudents(prev => prev.map(s => (s.id === updatedStudent.id ? updatedStudent : s)));
   };
 
   const handleDeleteStudent = (id: string) => {
-    const updatedStudents = students.filter(s => s.id !== id);
-    setStudents(updatedStudents);
-    saveToLocal('growing_students', updatedStudents);
+    setStudents(prev => prev.filter(s => s.id !== id));
 
-    // Clean up student from classes
-    const updatedClasses = classes.map(c => ({
-      ...c,
-      studentIds: c.studentIds.filter(sid => sid !== id),
-    }));
-    setClasses(updatedClasses);
-    saveToLocal('growing_classes', updatedClasses);
-    
-    // Clean up attendance, payments, logs
-    const updatedAttendance = attendance.filter(a => a.studentId !== id);
-    setAttendance(updatedAttendance);
-    saveToLocal('growing_attendance', updatedAttendance);
-
-    const updatedPayments = payments.filter(p => p.studentId !== id);
-    setPayments(updatedPayments);
-    saveToLocal('growing_payments', updatedPayments);
-
-    const updatedLogs = counselLogs.filter(l => l.studentId !== id);
-    setCounselLogs(updatedLogs);
-    saveToLocal('growing_logs', updatedLogs);
+    // Clean up student references across every related collection.
+    setClasses(prev => prev.map(c => ({ ...c, studentIds: c.studentIds.filter(sid => sid !== id) })));
+    setAttendance(prev => prev.filter(a => a.studentId !== id));
+    setPayments(prev => prev.filter(p => p.studentId !== id));
+    setCounselLogs(prev => prev.filter(l => l.studentId !== id));
   };
 
   // --- Class Operations ---
   const handleAddClass = (classData: Omit<Class, 'id'>) => {
-    const newClass: Class = {
-      ...classData,
-      id: `cls_${Date.now()}`,
-    };
-    const updated = [...classes, newClass];
-    setClasses(updated);
-    saveToLocal('growing_classes', updated);
+    const newClass: Class = { ...classData, id: `cls_${Date.now()}` };
+    setClasses(prev => [...prev, newClass]);
   };
 
   const handleUpdateClass = (updatedClass: Class) => {
-    const updated = classes.map(c => (c.id === updatedClass.id ? updatedClass : c));
-    setClasses(updated);
-    saveToLocal('growing_classes', updated);
+    setClasses(prev => prev.map(c => (c.id === updatedClass.id ? updatedClass : c)));
   };
 
   const handleDeleteClass = (id: string) => {
-    const updated = classes.filter(c => c.id !== id);
-    setClasses(updated);
-    saveToLocal('growing_classes', updated);
-
+    setClasses(prev => prev.filter(c => c.id !== id));
     // Remove attendance references for this class
-    const updatedAttendance = attendance.filter(a => a.classId !== id);
-    setAttendance(updatedAttendance);
-    saveToLocal('growing_attendance', updatedAttendance);
+    setAttendance(prev => prev.filter(a => a.classId !== id));
   };
 
   // --- Attendance Operations ---
   const handleSaveAttendance = (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => {
-    const existingIndex = attendance.findIndex(
-      a =>
-        a.studentId === attendanceData.studentId &&
-        a.classId === attendanceData.classId &&
-        a.date === attendanceData.date
-    );
+    setAttendance(prev => {
+      const existingIndex = prev.findIndex(
+        a =>
+          a.studentId === attendanceData.studentId &&
+          a.classId === attendanceData.classId &&
+          a.date === attendanceData.date
+      );
 
-    let updated: Attendance[];
-    if (existingIndex > -1) {
-      updated = [...attendance];
-      updated[existingIndex] = {
-        ...updated[existingIndex],
-        status: attendanceData.status,
-        memo: attendanceData.memo !== undefined ? attendanceData.memo : updated[existingIndex].memo,
-        homeworkStatus: attendanceData.homeworkStatus !== undefined ? attendanceData.homeworkStatus : updated[existingIndex].homeworkStatus,
-      };
-    } else {
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          status: attendanceData.status,
+          memo: attendanceData.memo !== undefined ? attendanceData.memo : updated[existingIndex].memo,
+          homeworkStatus:
+            attendanceData.homeworkStatus !== undefined
+              ? attendanceData.homeworkStatus
+              : updated[existingIndex].homeworkStatus,
+        };
+        return updated;
+      }
+
       const newAttendance: Attendance = {
         ...attendanceData,
-        id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         memo: attendanceData.memo || '',
         homeworkStatus: attendanceData.homeworkStatus || '',
       };
-      updated = [...attendance, newAttendance];
-    }
-
-    setAttendance(updated);
-    saveToLocal('growing_attendance', updated);
+      return [...prev, newAttendance];
+    });
   };
 
   // --- Payment Operations ---
@@ -200,13 +235,11 @@ function App() {
       const totalTuition = studentClasses.reduce((sum, c) => sum + c.tuitionFee, 0);
 
       // Check if bill already exists for this student & month
-      const billExists = payments.some(
-        p => p.studentId === student.id && p.billingMonth === month
-      );
+      const billExists = payments.some(p => p.studentId === student.id && p.billingMonth === month);
 
       if (!billExists && totalTuition > 0) {
         newPayments.push({
-          id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           studentId: student.id,
           billingMonth: month,
           amount: totalTuition,
@@ -220,67 +253,52 @@ function App() {
       return;
     }
 
-    const updated = [...payments, ...newPayments];
-    setPayments(updated);
-    saveToLocal('growing_payments', updated);
+    setPayments(prev => [...prev, ...newPayments]);
     alert(`성공적으로 ${newPayments.length}건의 청구서를 일괄 발행하였습니다!`);
   };
 
   const handleRecordPayment = (paymentId: string, paymentDate: string, method: PaymentMethod) => {
-    const updated = payments.map(p =>
-      p.id === paymentId ? { ...p, status: 'paid' as const, paymentDate, paymentMethod: method } : p
+    setPayments(prev =>
+      prev.map(p =>
+        p.id === paymentId ? { ...p, status: 'paid' as const, paymentDate, paymentMethod: method } : p
+      )
     );
-    setPayments(updated);
-    saveToLocal('growing_payments', updated);
   };
 
   const handleCancelPayment = (paymentId: string) => {
-    const updated = payments.map(p =>
-      p.id === paymentId
-        ? { ...p, status: 'unpaid' as const, paymentDate: undefined, paymentMethod: undefined }
-        : p
+    setPayments(prev =>
+      prev.map(p =>
+        p.id === paymentId
+          ? { ...p, status: 'unpaid' as const, paymentDate: undefined, paymentMethod: undefined }
+          : p
+      )
     );
-    setPayments(updated);
-    saveToLocal('growing_payments', updated);
   };
 
   const handleDeletePayment = (paymentId: string) => {
-    const updated = payments.filter(p => p.id !== paymentId);
-    setPayments(updated);
-    saveToLocal('growing_payments', updated);
+    setPayments(prev => prev.filter(p => p.id !== paymentId));
   };
 
   const handleAddManualPayment = (paymentData: Omit<Payment, 'id'>) => {
     const newPayment: Payment = {
       ...paymentData,
-      id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     };
-    const updated = [...payments, newPayment];
-    setPayments(updated);
-    saveToLocal('growing_payments', updated);
+    setPayments(prev => [...prev, newPayment]);
   };
 
   // --- Counsel Log Operations ---
   const handleAddCounselLog = (logData: Omit<CounselLog, 'id'>) => {
-    const newLog: CounselLog = {
-      ...logData,
-      id: `log_${Date.now()}`,
-    };
-    const updated = [...counselLogs, newLog];
-    setCounselLogs(updated);
-    saveToLocal('growing_logs', updated);
+    const newLog: CounselLog = { ...logData, id: `log_${Date.now()}` };
+    setCounselLogs(prev => [...prev, newLog]);
   };
 
   const handleUpdateCounselLog = (updatedLog: CounselLog) => {
-    const updated = counselLogs.map(l => l.id === updatedLog.id ? updatedLog : l);
-    setCounselLogs(updated);
-    saveToLocal('growing_logs', updated);
+    setCounselLogs(prev => prev.map(l => (l.id === updatedLog.id ? updatedLog : l)));
   };
 
   const handleDeleteCounselLog = (id: string) => {
-    const updated = counselLogs.filter(l => l.id !== id);
-    setCounselLogs(updated);
-    saveToLocal('growing_logs', updated);
+    setCounselLogs(prev => prev.filter(l => l.id !== id));
   };
 
   // --- Backup & Restore Operations ---
@@ -296,12 +314,6 @@ function App() {
     setAttendance(data.attendance);
     setPayments(data.payments);
     setCounselLogs(data.counselLogs);
-
-    saveToLocal('growing_students', data.students);
-    saveToLocal('growing_classes', data.classes);
-    saveToLocal('growing_attendance', data.attendance);
-    saveToLocal('growing_payments', data.payments);
-    saveToLocal('growing_logs', data.counselLogs);
   };
 
   const handleResetData = () => {
@@ -310,23 +322,34 @@ function App() {
     setAttendance(initialAttendance);
     setPayments(initialPayments);
     setCounselLogs(initialCounselLogs);
-
-    saveToLocal('growing_students', initialStudents);
-    saveToLocal('growing_classes', initialClasses);
-    saveToLocal('growing_attendance', initialAttendance);
-    saveToLocal('growing_payments', initialPayments);
-    saveToLocal('growing_logs', initialCounselLogs);
   };
 
-  const getAllData = () => {
-    return {
-      students,
-      classes,
-      attendance,
-      payments,
-      counselLogs,
+  const handleChangeKioskPin = (newPin: string) => {
+    setKioskPin(newPin);
+  };
+
+  // --- Kiosk Alert Queue ---
+  const handleQueueKioskAlert = (studentId: string, kind: 'in' | 'out', date: string, time: string) => {
+    const alert: KioskAlert = {
+      id: `ka_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      studentId,
+      kind,
+      date,
+      time,
+      createdAt: Date.now(),
     };
+    setKioskAlerts(prev => [...prev, alert]);
   };
+
+  const handleDismissKioskAlert = (id: string) => {
+    setKioskAlerts(prev => prev.filter(a => a.id !== id));
+  };
+
+  const handleClearKioskAlerts = () => {
+    setKioskAlerts([]);
+  };
+
+  const getAllData = () => ({ students, classes, attendance, payments, counselLogs });
 
   // Render Page Content based on tab Selection
   const renderContent = () => {
@@ -397,10 +420,15 @@ function App() {
             onDeleteCounselLog={handleDeleteCounselLog}
           />
         );
+      case 'stats':
+        return <AttendanceStats students={students} classes={classes} attendance={attendance} />;
       case 'messaging':
         return (
           <Messaging
             students={students}
+            kioskAlerts={kioskAlerts}
+            onDismissAlert={handleDismissKioskAlert}
+            onClearAlerts={handleClearKioskAlerts}
           />
         );
       case 'kiosk':
@@ -408,7 +436,9 @@ function App() {
           <Kiosk
             students={students}
             classes={classes}
+            kioskPin={kioskPin}
             onSaveAttendance={handleSaveAttendance}
+            onQueueAlert={handleQueueKioskAlert}
             onExitKiosk={() => setActiveTab('dashboard')}
           />
         );
@@ -418,6 +448,8 @@ function App() {
             onImportData={handleImportData}
             onResetData={handleResetData}
             getAllData={getAllData}
+            kioskPin={kioskPin}
+            onChangeKioskPin={handleChangeKioskPin}
           />
         );
       default:
@@ -425,20 +457,56 @@ function App() {
     }
   };
 
-  // Get human readable tab title
-  const getTabTitle = () => {
-    switch (activeTab) {
-      case 'dashboard': return '학원 운영 대시보드';
-      case 'students': return '재원생 주소록 및 관리';
-      case 'classes': return '학급 개설 및 시간표';
-      case 'attendance': return '출석 및 보강 관리';
-      case 'payments': return '교육비 수납 장부';
-      case 'counsel': return '상담 및 학습/성적 일지';
-      case 'messaging': return '알림장 발송 도우미';
-      case 'kiosk': return '자율 등하원 키오스크';
-      case 'backup': return '데이터 백업 및 복원';
-      default: return '그로잉영어';
-    }
+  // Renders the navigation list shared by the desktop sidebar and mobile drawer.
+  const renderNavSection = (opts: { closeOnNav: boolean; kioskAccent: string }) => {
+    const go = (id: string) => {
+      setActiveTab(id);
+      if (opts.closeOnNav) setIsMobileMenuOpen(false);
+    };
+    const launchKiosk = () => {
+      if (opts.closeOnNav) setIsMobileMenuOpen(false);
+      if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
+        setActiveTab('kiosk');
+      }
+    };
+
+    return (
+      <>
+        <nav style={{ flexGrow: 1 }}>
+          <ul className="nav-menu">
+            {NAV_ITEMS.map(item => (
+              <li key={item.id}>
+                <NavItemButton
+                  active={activeTab === item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => go(item.id)}
+                  badge={item.id === 'messaging' ? kioskAlerts.length : undefined}
+                />
+              </li>
+            ))}
+            <li>
+              <NavItemButton
+                active={activeTab === 'kiosk'}
+                icon={Monitor}
+                label="키오스크 모드"
+                onClick={launchKiosk}
+                style={{ color: opts.kioskAccent, fontWeight: 'bold' }}
+              />
+            </li>
+          </ul>
+        </nav>
+
+        <div className="sidebar-footer">
+          <NavItemButton
+            active={activeTab === 'backup'}
+            icon={ShieldCheck}
+            label="안전 백업 설정"
+            onClick={() => go('backup')}
+          />
+        </div>
+      </>
+    );
   };
 
   if (activeTab === 'kiosk') {
@@ -459,104 +527,7 @@ function App() {
           </div>
         </div>
 
-        <nav style={{ flexGrow: 1 }}>
-          <ul className="nav-menu">
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('dashboard')}
-              >
-                <LayoutDashboard size={18} /> 대시보드
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('students')}
-              >
-                <Users size={18} /> 학생 관리
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'classes' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('classes')}
-              >
-                <BookOpen size={18} /> 반/시간표 관리
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('attendance')}
-              >
-                <CalendarCheck size={18} /> 출결 관리
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'payments' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('payments')}
-              >
-                <CreditCard size={18} /> 수납 관리
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'counsel' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('counsel')}
-              >
-                <MessageSquare size={18} /> 상담/진도 일지
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'messaging' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => setActiveTab('messaging')}
-              >
-                <Smartphone size={18} /> 알림장 발송
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-item ${activeTab === 'kiosk' ? 'active' : ''}`}
-                style={{ 
-                  width: '100%', 
-                  background: 'none', 
-                  border: 'none', 
-                  textAlign: 'left', 
-                  font: 'inherit',
-                  color: 'var(--color-primary-dark)',
-                  fontWeight: 'bold'
-                }}
-                onClick={() => {
-                  if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 비밀번호: 1234)')) {
-                    setActiveTab('kiosk');
-                  }
-                }}
-              >
-                <Monitor size={18} className="text-secondary" /> 키오스크 모드
-              </button>
-            </li>
-          </ul>
-        </nav>
-
-        <div className="sidebar-footer">
-          <button
-            className={`nav-item ${activeTab === 'backup' ? 'active' : ''}`}
-            style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-            onClick={() => setActiveTab('backup')}
-          >
-            <ShieldCheck size={18} /> 안전 백업 설정
-          </button>
-        </div>
+        {renderNavSection({ closeOnNav: false, kioskAccent: 'var(--color-primary-dark)' })}
       </aside>
 
       {/* Mobile Top Header (Mobile only) */}
@@ -585,106 +556,8 @@ function App() {
                 <X size={22} />
               </button>
             </div>
-            
-            <nav style={{ flexGrow: 1 }}>
-              <ul className="nav-menu" style={{ gap: '0.5rem' }}>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
-                  >
-                    <LayoutDashboard size={18} /> 대시보드
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('students'); setIsMobileMenuOpen(false); }}
-                  >
-                    <Users size={18} /> 학생 관리
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'classes' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('classes'); setIsMobileMenuOpen(false); }}
-                  >
-                    <BookOpen size={18} /> 반/시간표 관리
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('attendance'); setIsMobileMenuOpen(false); }}
-                  >
-                    <CalendarCheck size={18} /> 출결 관리
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'payments' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('payments'); setIsMobileMenuOpen(false); }}
-                  >
-                    <CreditCard size={18} /> 수납 관리
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'counsel' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('counsel'); setIsMobileMenuOpen(false); }}
-                  >
-                    <MessageSquare size={18} /> 상담/진도 일지
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'messaging' ? 'active' : ''}`}
-                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                    onClick={() => { setActiveTab('messaging'); setIsMobileMenuOpen(false); }}
-                  >
-                    <Smartphone size={18} /> 알림장 발송
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className={`nav-item ${activeTab === 'kiosk' ? 'active' : ''}`}
-                    style={{ 
-                      width: '100%', 
-                      background: 'none', 
-                      border: 'none', 
-                      textAlign: 'left', 
-                      font: 'inherit',
-                      color: '#a3e2c9',
-                      fontWeight: 'bold'
-                    }}
-                    onClick={() => { 
-                      setIsMobileMenuOpen(false);
-                      if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 비밀번호: 1234)')) {
-                        setActiveTab('kiosk');
-                      }
-                    }}
-                  >
-                    <Monitor size={18} /> 키오스크 모드
-                  </button>
-                </li>
-              </ul>
-            </nav>
 
-            <div className="sidebar-footer" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem' }}>
-              <button
-                className={`nav-item ${activeTab === 'backup' ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
-                onClick={() => { setActiveTab('backup'); setIsMobileMenuOpen(false); }}
-              >
-                <ShieldCheck size={18} /> 안전 백업 설정
-              </button>
-            </div>
+            {renderNavSection({ closeOnNav: true, kioskAccent: '#a3e2c9' })}
           </div>
         </div>
       )}
@@ -693,10 +566,10 @@ function App() {
       <main className="main-content">
         <header className="header">
           <div>
-            <h2 className="page-title">{getTabTitle()}</h2>
+            <h2 className="page-title">{TAB_TITLES[activeTab] ?? '그로잉영어'}</h2>
             <p className="page-subtitle">그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.</p>
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#eaf6f0', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-accent-mint-light)' }}>
             <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--color-success)', borderRadius: '50%', display: 'inline-block' }}></span>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary)' }}>로컬 보안 접속 중</span>
