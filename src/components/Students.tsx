@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
 import { UserPlus, Search, Edit2, Trash2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone } from 'lucide-react';
 
@@ -12,6 +12,7 @@ interface StudentsProps {
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
   onAddCounselLog: (log: Omit<CounselLog, 'id'>) => void;
+  onUpdateCounselLog: (log: CounselLog) => void;
 }
 
 export const Students: React.FC<StudentsProps> = ({
@@ -24,6 +25,7 @@ export const Students: React.FC<StudentsProps> = ({
   onUpdateStudent,
   onDeleteStudent,
   onAddCounselLog,
+  onUpdateCounselLog,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
@@ -35,7 +37,7 @@ export const Students: React.FC<StudentsProps> = ({
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeDetailStudent, setActiveDetailStudent] = useState<Student | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'classes' | 'attendance' | 'payments' | 'counsel'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'classes' | 'attendance' | 'payments' | 'counsel' | 'analysis' | 'report'>('info');
 
   // Form Fields
   const [formName, setFormName] = useState('');
@@ -52,6 +54,60 @@ export const Students: React.FC<StudentsProps> = ({
   const [logContent, setLogContent] = useState('');
   const [logType, setLogType] = useState<'counsel' | 'progress' | 'test'>('counsel');
   const [logScore, setLogScore] = useState('');
+
+  // Monthly Report States
+  const [reportMonth, setReportMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [reportComment, setReportComment] = useState('');
+
+  // Sync comment when selected student or month changes
+  useEffect(() => {
+    if (!activeDetailStudent) return;
+    const existingLog = counselLogs.find(
+      log =>
+        log.studentId === activeDetailStudent.id &&
+        log.type === 'progress' &&
+        log.title.includes(`${reportMonth} 월간 학습 리포트`)
+    );
+    if (existingLog) {
+      setReportComment(existingLog.content);
+    } else {
+      setReportComment('');
+    }
+  }, [activeDetailStudent?.id, reportMonth, counselLogs]);
+
+  const handleSaveReportComment = () => {
+    if (!activeDetailStudent) return;
+    if (!reportComment.trim()) {
+      alert('종합 의견 내용을 입력해 주세요.');
+      return;
+    }
+    const existingLog = counselLogs.find(
+      log =>
+        log.studentId === activeDetailStudent.id &&
+        log.type === 'progress' &&
+        log.title.includes(`${reportMonth} 월간 학습 리포트`)
+    );
+
+    if (existingLog) {
+      onUpdateCounselLog({
+        ...existingLog,
+        content: reportComment.trim(),
+        date: new Date().toISOString().split('T')[0],
+      });
+    } else {
+      onAddCounselLog({
+        studentId: activeDetailStudent.id,
+        date: new Date().toISOString().split('T')[0],
+        title: `🌱 ${reportMonth} 월간 학습 리포트 종합 의견`,
+        content: reportComment.trim(),
+        type: 'progress',
+      });
+    }
+    alert('원장님 의견이 안전하게 저장되었습니다.');
+  };
 
   // Grades list
   const grades = [
@@ -455,7 +511,7 @@ export const Students: React.FC<StudentsProps> = ({
 
             <div className="modal-body" style={{ paddingTop: '1rem' }}>
               {/* Tab Header Navigation */}
-              <div className="tabs-header">
+               <div className="tabs-header">
                 <button className={`tab-btn ${detailTab === 'info' ? 'active' : ''}`} onClick={() => setDetailTab('info')}>
                   기본 정보
                 </button>
@@ -470,6 +526,12 @@ export const Students: React.FC<StudentsProps> = ({
                 </button>
                 <button className={`tab-btn ${detailTab === 'counsel' ? 'active' : ''}`} onClick={() => setDetailTab('counsel')}>
                   상담/성적 일지
+                </button>
+                <button className={`tab-btn ${detailTab === 'analysis' ? 'active' : ''}`} onClick={() => setDetailTab('analysis')}>
+                  성적 분석
+                </button>
+                <button className={`tab-btn ${detailTab === 'report' ? 'active' : ''}`} onClick={() => setDetailTab('report')}>
+                  월간 리포트
                 </button>
               </div>
 
@@ -762,6 +824,473 @@ export const Students: React.FC<StudentsProps> = ({
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Tab 6: Score Analysis Graph */}
+              {detailTab === 'analysis' && (
+                <div>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--color-primary-dark)' }}>
+                    📈 성적 추이 분석
+                  </h4>
+                  {(() => {
+                    const parseScoreValue = (scoreStr?: string): number => {
+                      if (!scoreStr) return 0;
+                      const match = scoreStr.match(/^(\d+)/);
+                      return match ? parseInt(match[1], 10) : 0;
+                    };
+
+                    const studentTestLogs = counselLogs
+                      .filter(log => log.studentId === activeDetailStudent.id && log.type === 'test')
+                      .sort((a, b) => a.date.localeCompare(b.date));
+
+                    if (studentTestLogs.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: '#fafbfc' }}>
+                          <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>🎯</span>
+                          기록된 테스트 성적이 없습니다.<br />
+                          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                            [상담/성적 일지] 탭에서 우측 상단 '일지 작성' 버튼을 선택해 테스트 유형의 성적을 추가해 주세요.
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    const width = 650;
+                    const height = 250;
+                    const padding = { top: 35, bottom: 45, left: 50, right: 30 };
+                    const chartWidth = width - padding.left - padding.right;
+                    const chartHeight = height - padding.top - padding.bottom;
+
+                    const points = studentTestLogs.map((log, index) => {
+                      const score = parseScoreValue(log.score);
+                      const x = padding.left + (studentTestLogs.length === 1 ? chartWidth / 2 : (index / (studentTestLogs.length - 1)) * chartWidth);
+                      const y = padding.top + chartHeight - (score / 100) * chartHeight;
+                      return { x, y, score, date: log.date, title: log.title };
+                    });
+
+                    const pointsString = points.map(p => `${p.x},${p.y}`).join(' ');
+                    
+                    let areaPath = '';
+                    if (points.length > 0) {
+                      const startX = points[0].x;
+                      const endX = points[points.length - 1].x;
+                      const zeroY = padding.top + chartHeight;
+                      areaPath = `M ${startX},${zeroY} ` + points.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${endX},${zeroY} Z`;
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ 
+                          border: '1px solid var(--color-border)', 
+                          borderRadius: 'var(--radius-md)', 
+                          padding: '1rem 0.5rem', 
+                          backgroundColor: '#ffffff',
+                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.01)',
+                          overflowX: 'auto'
+                        }}>
+                          <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} style={{ minWidth: '550px' }}>
+                            <defs>
+                              <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.2" />
+                                <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
+                              </linearGradient>
+                            </defs>
+
+                            {/* Horizontal Grid lines */}
+                            {[0, 20, 40, 60, 80, 100].map(val => {
+                              const y = padding.top + chartHeight - (val / 100) * chartHeight;
+                              return (
+                                <g key={val}>
+                                  <line 
+                                    x1={padding.left} 
+                                    y1={y} 
+                                    x2={width - padding.right} 
+                                    y2={y} 
+                                    stroke="#e9ecef" 
+                                    strokeDasharray="4 4" 
+                                  />
+                                  <text 
+                                    x={padding.left - 12} 
+                                    y={y + 4} 
+                                    textAnchor="end" 
+                                    fontSize="11" 
+                                    fontWeight="600"
+                                    fill="var(--color-text-muted)"
+                                  >
+                                    {val}
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* Gradient Fill under the line */}
+                            {points.length > 1 && (
+                              <path d={areaPath} fill="url(#chart-grad)" />
+                            )}
+
+                            {/* Main Trend Line */}
+                            {points.length > 1 && (
+                              <polyline 
+                                points={pointsString} 
+                                fill="none" 
+                                stroke="var(--color-primary)" 
+                                strokeWidth="3.5" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                              />
+                            )}
+
+                            {/* Grid / Dots & Tooltips */}
+                            {points.map((p, i) => (
+                              <g key={i}>
+                                <line 
+                                  x1={p.x} 
+                                  y1={p.y} 
+                                  x2={p.x} 
+                                  y2={padding.top + chartHeight} 
+                                  stroke="#ced4da" 
+                                  strokeDasharray="2 2" 
+                                />
+                                <circle cx={p.x} cy={p.y} r="8" fill="var(--color-primary)" opacity="0.15" />
+                                <circle 
+                                  cx={p.x} 
+                                  cy={p.y} 
+                                  r="4.5" 
+                                  fill="#ffffff" 
+                                  stroke="var(--color-primary)" 
+                                  strokeWidth="3.5" 
+                                />
+                                <text 
+                                  x={p.x} 
+                                  y={p.y - 12} 
+                                  textAnchor="middle" 
+                                  fontSize="12" 
+                                  fontWeight="800" 
+                                  fill="var(--color-primary-dark)"
+                                >
+                                  {p.score}점
+                                </text>
+                                <text 
+                                  x={p.x} 
+                                  y={padding.top + chartHeight + 20} 
+                                  textAnchor="middle" 
+                                  fontSize="10" 
+                                  fontWeight="600"
+                                  fill="var(--color-text-muted)"
+                                >
+                                  {p.date.substring(5)}
+                                </text>
+                              </g>
+                            ))}
+                          </svg>
+                        </div>
+
+                        <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                          <table className="custom-table" style={{ fontSize: '0.85rem' }}>
+                            <thead>
+                              <tr>
+                                <th>날짜</th>
+                                <th>테스트 명</th>
+                                <th>점수</th>
+                                <th>세부 평가 의견</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[...studentTestLogs].reverse().map(log => (
+                                <tr key={log.id}>
+                                  <td style={{ whiteSpace: 'nowrap' }}>{log.date}</td>
+                                  <td style={{ fontWeight: 700 }}>{log.title}</td>
+                                  <td style={{ fontWeight: 800, color: 'var(--color-primary)' }}>{log.score}</td>
+                                  <td style={{ color: 'var(--color-text-secondary)', whiteSpace: 'normal' }}>{log.content}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Tab 7: Monthly Progress Report */}
+              {detailTab === 'report' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-primary-dark)', margin: 0 }}>
+                      📋 월간 학습 성장 보고서
+                    </h4>
+                    
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="month"
+                        value={reportMonth}
+                        onChange={e => setReportMonth(e.target.value)}
+                        className="form-control"
+                        style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem', width: '130px', height: 'auto', margin: 0 }}
+                      />
+                      <button
+                        onClick={handleSaveReportComment}
+                        className="btn btn-primary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', gap: '0.25rem' }}
+                      >
+                        의견 저장
+                      </button>
+                      <button
+                        onClick={() => window.print()}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', gap: '0.25rem' }}
+                      >
+                        📄 PDF / 인쇄
+                      </button>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const parseScoreValue = (scoreStr?: string): number => {
+                      if (!scoreStr) return 0;
+                      const match = scoreStr.match(/^(\d+)/);
+                      return match ? parseInt(match[1], 10) : 0;
+                    };
+
+                    const monthAttendance = attendance.filter(a => 
+                      a.studentId === activeDetailStudent.id && 
+                      a.date.startsWith(reportMonth)
+                    );
+                    const totalDays = monthAttendance.length;
+                    const presentDays = monthAttendance.filter(a => a.status === 'present').length;
+                    const lateDays = monthAttendance.filter(a => a.status === 'late').length;
+                    const makeupDays = monthAttendance.filter(a => a.status === 'makeup').length;
+                    const absentDays = monthAttendance.filter(a => a.status === 'absent').length;
+                    const attendedDays = presentDays + lateDays + makeupDays;
+                    const attendanceRate = totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 100;
+
+                    const monthTests = counselLogs.filter(log => 
+                      log.studentId === activeDetailStudent.id && 
+                      log.type === 'test' && 
+                      log.date.startsWith(reportMonth)
+                    );
+                    const testScores = monthTests.map(t => parseScoreValue(t.score));
+                    const avgScore = testScores.length > 0 ? Math.round(testScores.reduce((a, b) => a + b, 0) / testScores.length) : null;
+
+                    const studentClasses = classes.filter(c => c.studentIds.includes(activeDetailStudent.id));
+                    const classNames = studentClasses.map(c => c.name).join(', ') || '배정 반 없음';
+
+                    const [yearPart, monthPart] = reportMonth.split('-');
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {/* Comment Input Box */}
+                        <div style={{ 
+                          padding: '1rem', 
+                          border: '1px solid var(--color-accent-mint-light)', 
+                          borderRadius: 'var(--radius-md)', 
+                          backgroundColor: '#f6faf8' 
+                        }}>
+                          <label style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
+                            ✍️ 원장님 종합 평가 코멘트
+                          </label>
+                          <textarea
+                            className="form-control"
+                            rows={3}
+                            placeholder="이번 달 학습 진도 이해도, 수업 자세, 과제 성취도 및 단어 암기 상태 등을 상세하게 남겨주세요."
+                            value={reportComment}
+                            onChange={e => setReportComment(e.target.value)}
+                            style={{ backgroundColor: '#ffffff', fontSize: '0.9rem', lineHeight: '1.5' }}
+                          />
+                        </div>
+
+                        {/* Report Print Preview Card Sheet */}
+                        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.5rem' }}>
+                            👀 리포트 인쇄물 미리보기 (Grey 테두리는 화면용이며 출력 시 A4 여백에 깔끔하게 맞춤)
+                          </span>
+                          
+                          <div className="print-report-card" style={{
+                            backgroundColor: '#ffffff',
+                            color: '#333333',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '8px',
+                            padding: '2rem 1.75rem',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1.5rem',
+                          }}>
+                            {/* Sheet Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--color-primary)', paddingBottom: '0.75rem' }}>
+                              <div>
+                                <span style={{ 
+                                  backgroundColor: 'var(--color-primary)', 
+                                  color: '#ffffff', 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 800, 
+                                  padding: '0.15rem 0.5rem', 
+                                  borderRadius: '4px',
+                                  letterSpacing: '0.05em'
+                                }}>
+                                  GROWING ENGLISH
+                                </span>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '0.2rem 0 0 0', color: 'var(--color-primary-dark)' }}>
+                                  월간 학습 성장 보고서
+                                </h2>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <div style={{ color: 'var(--color-primary)', backgroundColor: '#eaf6f0', padding: '0.35rem', borderRadius: '50%' }}>
+                                  <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                  </svg>
+                                </div>
+                                <div style={{ textAlign: 'left' }}>
+                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-primary-dark)', lineHeight: '1.1' }}>그로잉영어</div>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Growing English</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Student Metadata Table */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: '#f8f9fa', padding: '0.85rem', borderRadius: '6px', border: '1px solid #e9ecef', fontSize: '0.85rem' }}>
+                              <div>
+                                <span style={{ color: 'var(--color-text-muted)' }}>원생명:</span>{' '}
+                                <strong style={{ fontSize: '0.95rem' }}>{activeDetailStudent.name}</strong>{' '}
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>({activeDetailStudent.school} / {activeDetailStudent.grade})</span>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>대상월:</span>{' '}
+                                <strong>{yearPart}년 {monthPart}월</strong>
+                              </div>
+                              <div style={{ gridColumn: 'span 2', borderTop: '1px solid #e9ecef', paddingTop: '0.35rem', marginTop: '0.35rem' }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>수강반:</span>{' '}
+                                <strong>{classNames}</strong>
+                              </div>
+                            </div>
+
+                            {/* Section 1: Attendance */}
+                            <div>
+                              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '0.5rem', marginBottom: '0.6rem' }}>
+                                1. 출결 관리 현황
+                              </h3>
+                              
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '0.25rem 0' }}>
+                                <div style={{ flexGrow: 1 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                                    <span>출석 진행률</span>
+                                    <span style={{ color: 'var(--color-primary)' }}>{attendanceRate}%</span>
+                                  </div>
+                                  <div style={{ height: '10px', backgroundColor: '#e9ecef', borderRadius: '5px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${attendanceRate}%`, height: '100%', backgroundColor: 'var(--color-primary)', borderRadius: '5px' }} />
+                                  </div>
+                                </div>
+                                <div style={{ 
+                                  backgroundColor: '#f1fbf7', 
+                                  border: '1px solid var(--color-accent-mint-light)', 
+                                  borderRadius: '6px', 
+                                  padding: '0.4rem 0.75rem', 
+                                  textAlign: 'center',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>총 등원 대상</div>
+                                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-primary)', lineHeight: '1.1' }}>{totalDays}회</div>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginTop: '0.6rem', textAlign: 'center' }}>
+                                <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>출석</div>
+                                  <strong style={{ color: 'var(--color-success)' }}>{presentDays}회</strong>
+                                </div>
+                                <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>지각</div>
+                                  <strong style={{ color: 'var(--color-warning)' }}>{lateDays}회</strong>
+                                </div>
+                                <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>결석</div>
+                                  <strong style={{ color: 'var(--color-danger)' }}>{absentDays}회</strong>
+                                </div>
+                                <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>보강</div>
+                                  <strong style={{ color: 'var(--color-info)' }}>{makeupDays}회</strong>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Section 2: Assessment */}
+                            <div>
+                              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '0.5rem', marginBottom: '0.6rem' }}>
+                                2. 학습 평가 성취도
+                              </h3>
+                              
+                              {monthTests.length === 0 ? (
+                                <div style={{ padding: '1.25rem', textAlign: 'center', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                                  해당 월에 등록된 테스트 성적 기록이 없습니다.
+                                </div>
+                              ) : (
+                                <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', overflow: 'hidden' }}>
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                                    <thead>
+                                      <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #e9ecef', textAlign: 'left' }}>
+                                        <th style={{ padding: '0.5rem 0.75rem', color: 'var(--color-text-muted)' }}>평가일자</th>
+                                        <th style={{ padding: '0.5rem 0.75rem', color: 'var(--color-text-muted)' }}>평가 영역 및 단원</th>
+                                        <th style={{ padding: '0.5rem 0.75rem', color: 'var(--color-text-muted)', textAlign: 'right' }}>취득 점수</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {monthTests.map(test => (
+                                        <tr key={test.id} style={{ borderBottom: '1px solid #f1f3f5' }}>
+                                          <td style={{ padding: '0.5rem 0.75rem' }}>{test.date}</td>
+                                          <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700 }}>{test.title}</td>
+                                          <td style={{ padding: '0.5rem 0.75rem', fontWeight: 800, color: 'var(--color-primary)', textAlign: 'right' }}>{test.score}</td>
+                                        </tr>
+                                      ))}
+                                      {avgScore !== null && (
+                                        <tr style={{ backgroundColor: '#fcfdfd', fontWeight: 800, borderTop: '1px solid #e9ecef' }}>
+                                          <td colSpan={2} style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>평가 평균 성적:</td>
+                                          <td style={{ padding: '0.5rem 0.75rem', color: 'var(--color-primary)', textAlign: 'right', fontSize: '0.9rem' }}>{avgScore}점 / 100점</td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Section 3: Teacher's Review */}
+                            <div>
+                              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '0.5rem', marginBottom: '0.6rem' }}>
+                                3. 지도교사 종합 평가 의견
+                              </h3>
+                              <div style={{ 
+                                border: '1px dashed var(--color-primary-light)', 
+                                borderRadius: '6px', 
+                                padding: '1rem', 
+                                backgroundColor: '#fcfefe',
+                                fontSize: '0.85rem',
+                                lineHeight: '1.5',
+                                color: '#495057',
+                                whiteSpace: 'pre-wrap',
+                                minHeight: '100px'
+                              }}>
+                                {reportComment.trim() || '의견이 아직 입력되지 않았습니다. 원장 의견란에 코멘트를 입력 후 저장해 주세요.'}
+                              </div>
+                            </div>
+
+                            {/* Signature Footer */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                                본 보고서는 그로잉영어 프로그램의 출결 및 학업 평가 시스템을 기반으로 산출된 공식 리포트입니다.
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
+                                  그로잉영어 원장 <span style={{ fontFamily: 'serif', fontSize: '1.1rem', border: '1.5px solid #dc3545', color: '#dc3545', padding: '0.1rem 0.3rem', borderRadius: '50%', transform: 'rotate(-10deg)', display: 'inline-block', marginLeft: '0.35rem', fontWeight: 'bold' }}>🌱 인</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

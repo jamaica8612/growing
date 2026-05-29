@@ -16,6 +16,8 @@ import { AttendanceManager } from './components/Attendance';
 import { Payments } from './components/Payments';
 import { CounselLogs } from './components/CounselLogs';
 import { Backup } from './components/Backup';
+import { Kiosk } from './components/Kiosk';
+import { Messaging } from './components/Messaging';
 
 // Import Icons
 import {
@@ -29,6 +31,8 @@ import {
   Sprout,
   Menu,
   X,
+  Smartphone,
+  Monitor,
 } from 'lucide-react';
 
 function App() {
@@ -265,6 +269,12 @@ function App() {
     saveToLocal('growing_logs', updated);
   };
 
+  const handleUpdateCounselLog = (updatedLog: CounselLog) => {
+    const updated = counselLogs.map(l => l.id === updatedLog.id ? updatedLog : l);
+    setCounselLogs(updated);
+    saveToLocal('growing_logs', updated);
+  };
+
   const handleDeleteCounselLog = (id: string) => {
     const updated = counselLogs.filter(l => l.id !== id);
     setCounselLogs(updated);
@@ -341,6 +351,7 @@ function App() {
             onUpdateStudent={handleUpdateStudent}
             onDeleteStudent={handleDeleteStudent}
             onAddCounselLog={handleAddCounselLog}
+            onUpdateCounselLog={handleUpdateCounselLog}
           />
         );
       case 'classes':
@@ -384,6 +395,21 @@ function App() {
             onDeleteCounselLog={handleDeleteCounselLog}
           />
         );
+      case 'messaging':
+        return (
+          <Messaging
+            students={students}
+          />
+        );
+      case 'kiosk':
+        return (
+          <Kiosk
+            students={students}
+            classes={classes}
+            onSaveAttendance={handleSaveAttendance}
+            onExitKiosk={() => setActiveTab('dashboard')}
+          />
+        );
       case 'backup':
         return (
           <Backup
@@ -406,10 +432,16 @@ function App() {
       case 'attendance': return '출석 및 보강 관리';
       case 'payments': return '교육비 수납 장부';
       case 'counsel': return '상담 및 학습/성적 일지';
+      case 'messaging': return '알림장 발송 도우미';
+      case 'kiosk': return '자율 등하원 키오스크';
       case 'backup': return '데이터 백업 및 복원';
       default: return '그로잉영어';
     }
   };
+
+  if (activeTab === 'kiosk') {
+    return renderContent();
+  }
 
   return (
     <div className="app-container">
@@ -479,6 +511,36 @@ function App() {
                 onClick={() => setActiveTab('counsel')}
               >
                 <MessageSquare size={18} /> 상담/진도 일지
+              </button>
+            </li>
+            <li>
+              <button
+                className={`nav-item ${activeTab === 'messaging' ? 'active' : ''}`}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                onClick={() => setActiveTab('messaging')}
+              >
+                <Smartphone size={18} /> 알림장 발송
+              </button>
+            </li>
+            <li>
+              <button
+                className={`nav-item ${activeTab === 'kiosk' ? 'active' : ''}`}
+                style={{ 
+                  width: '100%', 
+                  background: 'none', 
+                  border: 'none', 
+                  textAlign: 'left', 
+                  font: 'inherit',
+                  color: 'var(--color-primary-dark)',
+                  fontWeight: 'bold'
+                }}
+                onClick={() => {
+                  if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 비밀번호: 1234)')) {
+                    setActiveTab('kiosk');
+                  }
+                }}
+              >
+                <Monitor size={18} className="text-secondary" /> 키오스크 모드
               </button>
             </li>
           </ul>
@@ -576,6 +638,37 @@ function App() {
                     onClick={() => { setActiveTab('counsel'); setIsMobileMenuOpen(false); }}
                   >
                     <MessageSquare size={18} /> 상담/진도 일지
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'messaging' ? 'active' : ''}`}
+                    style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit' }}
+                    onClick={() => { setActiveTab('messaging'); setIsMobileMenuOpen(false); }}
+                  >
+                    <Smartphone size={18} /> 알림장 발송
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className={`nav-item ${activeTab === 'kiosk' ? 'active' : ''}`}
+                    style={{ 
+                      width: '100%', 
+                      background: 'none', 
+                      border: 'none', 
+                      textAlign: 'left', 
+                      font: 'inherit',
+                      color: '#a3e2c9',
+                      fontWeight: 'bold'
+                    }}
+                    onClick={() => { 
+                      setIsMobileMenuOpen(false);
+                      if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 비밀번호: 1234)')) {
+                        setActiveTab('kiosk');
+                      }
+                    }}
+                  >
+                    <Monitor size={18} /> 키오스크 모드
                   </button>
                 </li>
               </ul>

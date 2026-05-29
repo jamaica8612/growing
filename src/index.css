@@ -1125,3 +1125,61 @@ body {
     font-size: 0.7rem !important;
   }
 }
+
+/* --- Print optimization --- */
+@media print {
+  /* Hide the entire website shell */
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+    visibility: hidden !important;
+  }
+  
+  /* Make only the report card visible and format it for printing */
+  .print-report-card,
+  .print-report-card * {
+    visibility: visible !important;
+  }
+  
+  .print-report-card {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: #ffffff !important;
+    color: #333333 !important;
+  }
+  
+  /* Prevent dark backgrounds inside progress bar or tables when printing */
+  .print-report-card table {
+    border: 1px solid #dee2e6 !important;
+    width: 100% !important;
+  }
+  
+  .print-report-card th {
+    background-color: #f8f9fa !important;
+    color: #333333 !important;
+    border-bottom: 2px solid #dee2e6 !important;
+  }
+  
+  .print-report-card td {
+    border-bottom: 1px solid #e9ecef !important;
+  }
+  
+  /* Force background colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+}
