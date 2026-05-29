@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Student, Class, Attendance, AttendanceStatus } from '../types';
-import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown } from 'lucide-react';
+import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown, Copy, Check } from 'lucide-react';
 
 interface AttendanceStatsProps {
   students: Student[];
@@ -13,6 +13,7 @@ interface StudentRow {
   name: string;
   school: string;
   grade: string;
+  parentContact: string;
   present: number;
   late: number;
   absent: number;
@@ -35,6 +36,7 @@ const rateColor = (rate: number) =>
 export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, classes, attendance }) => {
   const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Months that actually have records, plus the current month, newest first.
   const availableMonths = useMemo(() => {
@@ -77,6 +79,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           name: s.name,
           school: s.school,
           grade: s.grade,
+          parentContact: s.parentContact,
           present,
           late,
           absent,
@@ -98,8 +101,32 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
   // Students needing follow-up: at least one record and rate < 80% or >= 3 absences.
   const concernCount = studentRows.filter(r => r.total > 0 && (r.rate < 80 || r.absent >= 3)).length;
 
-  const monthLabel = `${selectedMonth.split('-')[0]}년 ${Number(selectedMonth.split('-')[1])}월`;
+  const monthNum = Number(selectedMonth.split('-')[1]);
+  const monthLabel = `${selectedMonth.split('-')[0]}년 ${monthNum}월`;
   const orderedStatuses: AttendanceStatus[] = ['present', 'late', 'absent', 'makeup'];
+
+  // Build a parent-facing attendance summary message for one student. The
+  // closing line softens or congratulates depending on the attendance level.
+  const buildAttendanceMessage = (row: StudentRow) => {
+    const needsAttention = row.rate < 80 || row.absent >= 3;
+    const closing = needsAttention
+      ? '최근 출결이 다소 불규칙하여 안내드립니다. 규칙적인 출석이 학습 흐름에 큰 도움이 되니, 가정에서도 관심과 격려 부탁드립니다. 😊'
+      : `${row.name} 학생이 성실하게 잘 출석하고 있습니다. 늘 믿고 맡겨주셔서 감사합니다. 😊`;
+    return (
+      `안녕하세요, 그로잉영어입니다. 🌱\n\n` +
+      `${row.name} 학생의 ${monthNum}월 출결 현황을 안내드립니다.\n\n` +
+      `- 출석 ${row.present}회 / 지각 ${row.late}회 / 결석 ${row.absent}회 / 보강 ${row.makeup}회\n` +
+      `- 출석률 ${row.rate}%\n\n` +
+      closing
+    );
+  };
+
+  const handleCopyMessage = (row: StudentRow) => {
+    navigator.clipboard.writeText(buildAttendanceMessage(row)).then(() => {
+      setCopiedId(row.studentId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -224,6 +251,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                     <th style={{ width: '60px', textAlign: 'center' }}>결석</th>
                     <th style={{ width: '60px', textAlign: 'center' }}>보강</th>
                     <th style={{ minWidth: '160px' }}>출석률</th>
+                    <th style={{ width: '110px', textAlign: 'center' }}>알림장</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -249,6 +277,28 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                               {row.rate}%
                             </span>
                           </div>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {row.total === 0 ? (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>—</span>
+                        ) : (
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', gap: '0.25rem' }}
+                            title={row.parentContact ? `학부모 연락처: ${row.parentContact}` : '학부모 연락처가 등록되지 않았습니다'}
+                            onClick={() => handleCopyMessage(row)}
+                          >
+                            {copiedId === row.studentId ? (
+                              <>
+                                <Check size={12} className="text-success" /> 복사됨
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} /> 출결 안내
+                              </>
+                            )}
+                          </button>
                         )}
                       </td>
                     </tr>
