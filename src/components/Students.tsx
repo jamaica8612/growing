@@ -30,6 +30,8 @@ export const Students: React.FC<StudentsProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
 
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -208,6 +210,18 @@ export const Students: React.FC<StudentsProps> = ({
     }
   };
 
+  // Students belonging to the selected class (when a class filter is active).
+  const filterClassMemberIds =
+    classFilter === 'all'
+      ? null
+      : new Set(classes.find(c => c.id === classFilter)?.studentIds ?? []);
+
+  // Students with an unpaid bill in the current billing month.
+  const currentBillingMonth = new Date().toISOString().substring(0, 7);
+  const unpaidStudentIds = new Set(
+    payments.filter(p => p.billingMonth === currentBillingMonth && p.status === 'unpaid').map(p => p.studentId)
+  );
+
   // Filter students
   const filteredStudents = students.filter(student => {
     const matchesSearch =
@@ -219,8 +233,10 @@ export const Students: React.FC<StudentsProps> = ({
 
     const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
     const matchesGrade = gradeFilter === 'all' || student.grade === gradeFilter;
+    const matchesClass = !filterClassMemberIds || filterClassMemberIds.has(student.id);
+    const matchesUnpaid = !unpaidOnly || unpaidStudentIds.has(student.id);
 
-    return matchesSearch && matchesStatus && matchesGrade;
+    return matchesSearch && matchesStatus && matchesGrade && matchesClass && matchesUnpaid;
   });
 
   // Calculations for Student Details
@@ -285,6 +301,26 @@ export const Students: React.FC<StudentsProps> = ({
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
+
+          <select
+            className="form-control"
+            style={{ width: '150px' }}
+            value={classFilter}
+            onChange={e => setClassFilter(e.target.value)}
+          >
+            <option value="all">전체 반</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <button
+            className={`btn ${unpaidOnly ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setUnpaidOnly(v => !v)}
+            title="이번 달 교육비가 미납된 학생만 보기"
+          >
+            미납자만 {unpaidOnly ? '✓' : ''}
+          </button>
 
           <button className="btn btn-primary" onClick={handleOpenAdd}>
             <UserPlus size={16} /> 학생 등록
