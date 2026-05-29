@@ -50,6 +50,16 @@ export interface Payment {
   status: PaymentStatus;
 }
 
+// A check-in/out event captured at the kiosk, queued for a parent notification.
+export interface KioskAlert {
+  id: string;
+  studentId: string;
+  kind: 'in' | 'out';
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  createdAt: number;
+}
+
 export type CounselLogType = 'counsel' | 'progress' | 'test';
 
 export interface CounselLog {

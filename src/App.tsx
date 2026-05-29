@@ -1,4 +1,4 @@
-import type { Student, Class, Attendance, Payment, CounselLog, PaymentMethod } from './types';
+import type { Student, Class, Attendance, Payment, CounselLog, PaymentMethod, KioskAlert } from './types';
 import {
   initialStudents,
   initialClasses,
@@ -81,12 +81,14 @@ function NavItemButton({
   label,
   onClick,
   style,
+  badge,
 }: {
   active: boolean;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
   style?: React.CSSProperties;
+  badge?: number;
 }) {
   return (
     <button
@@ -95,6 +97,26 @@ function NavItemButton({
       onClick={onClick}
     >
       <Icon size={18} /> {label}
+      {badge ? (
+        <span
+          style={{
+            marginLeft: 'auto',
+            backgroundColor: 'var(--color-danger)',
+            color: '#fff',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            minWidth: '18px',
+            height: '18px',
+            borderRadius: '9px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 5px',
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -126,6 +148,8 @@ function App() {
     'growing_logs',
     freshInstall ? initialCounselLogs : []
   );
+  // Kiosk check-in/out events awaiting a parent notification (queue only).
+  const [kioskAlerts, setKioskAlerts] = usePersistentState<KioskAlert[]>('growing_kiosk_alerts', []);
 
   // --- Student Operations ---
   const handleAddStudent = (studentData: Omit<Student, 'id'>) => {
@@ -304,6 +328,27 @@ function App() {
     setKioskPin(newPin);
   };
 
+  // --- Kiosk Alert Queue ---
+  const handleQueueKioskAlert = (studentId: string, kind: 'in' | 'out', date: string, time: string) => {
+    const alert: KioskAlert = {
+      id: `ka_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      studentId,
+      kind,
+      date,
+      time,
+      createdAt: Date.now(),
+    };
+    setKioskAlerts(prev => [...prev, alert]);
+  };
+
+  const handleDismissKioskAlert = (id: string) => {
+    setKioskAlerts(prev => prev.filter(a => a.id !== id));
+  };
+
+  const handleClearKioskAlerts = () => {
+    setKioskAlerts([]);
+  };
+
   const getAllData = () => ({ students, classes, attendance, payments, counselLogs });
 
   // Render Page Content based on tab Selection
@@ -378,7 +423,14 @@ function App() {
       case 'stats':
         return <AttendanceStats students={students} classes={classes} attendance={attendance} />;
       case 'messaging':
-        return <Messaging students={students} />;
+        return (
+          <Messaging
+            students={students}
+            kioskAlerts={kioskAlerts}
+            onDismissAlert={handleDismissKioskAlert}
+            onClearAlerts={handleClearKioskAlerts}
+          />
+        );
       case 'kiosk':
         return (
           <Kiosk
@@ -386,6 +438,7 @@ function App() {
             classes={classes}
             kioskPin={kioskPin}
             onSaveAttendance={handleSaveAttendance}
+            onQueueAlert={handleQueueKioskAlert}
             onExitKiosk={() => setActiveTab('dashboard')}
           />
         );
@@ -428,6 +481,7 @@ function App() {
                   icon={item.icon}
                   label={item.label}
                   onClick={() => go(item.id)}
+                  badge={item.id === 'messaging' ? kioskAlerts.length : undefined}
                 />
               </li>
             ))}

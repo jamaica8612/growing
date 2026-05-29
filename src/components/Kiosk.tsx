@@ -7,10 +7,11 @@ interface KioskProps {
   classes: Class[];
   kioskPin: string;
   onSaveAttendance: (attendanceData: { studentId: string; classId: string; date: string; status: 'present'; memo: string }) => void;
+  onQueueAlert: (studentId: string, kind: 'in' | 'out', date: string, time: string) => void;
   onExitKiosk: () => void;
 }
 
-export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSaveAttendance, onExitKiosk }) => {
+export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSaveAttendance, onQueueAlert, onExitKiosk }) => {
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
@@ -105,6 +106,9 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
       status: 'present',
       memo: memoText,
     });
+
+    // Queue a parent check-in/out notification for later sending.
+    onQueueAlert(selectedStudent.id, type, todayDateStr, currentTimeStr);
 
     // Play chime sound
     playSynthesizedChime(type);
