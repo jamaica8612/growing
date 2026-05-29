@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
 import { UserPlus, Search, Edit2, Trash2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone } from 'lucide-react';
 
@@ -62,21 +62,24 @@ export const Students: React.FC<StudentsProps> = ({
   });
   const [reportComment, setReportComment] = useState('');
 
-  // Sync comment when selected student or month changes
-  useEffect(() => {
-    if (!activeDetailStudent) return;
-    const existingLog = counselLogs.find(
-      log =>
-        log.studentId === activeDetailStudent.id &&
-        log.type === 'progress' &&
-        log.title.includes(`${reportMonth} 월간 학습 리포트`)
-    );
-    if (existingLog) {
-      setReportComment(existingLog.content);
-    } else {
-      setReportComment('');
-    }
-  }, [activeDetailStudent?.id, reportMonth, counselLogs]);
+  // Load the saved comment into the editable field whenever the selected
+  // student or month changes. Done during render (not in an effect) so the
+  // field is correct on first paint and in-progress edits aren't clobbered by
+  // unrelated counsel-log updates.
+  const reportSyncKey = `${activeDetailStudent?.id ?? ''}|${reportMonth}`;
+  const [syncedReportKey, setSyncedReportKey] = useState(reportSyncKey);
+  if (reportSyncKey !== syncedReportKey) {
+    setSyncedReportKey(reportSyncKey);
+    const existingLog = activeDetailStudent
+      ? counselLogs.find(
+          log =>
+            log.studentId === activeDetailStudent.id &&
+            log.type === 'progress' &&
+            log.title.includes(`${reportMonth} 월간 학습 리포트`)
+        )
+      : undefined;
+    setReportComment(existingLog?.content ?? '');
+  }
 
   const handleSaveReportComment = () => {
     if (!activeDetailStudent) return;
@@ -727,7 +730,7 @@ export const Students: React.FC<StudentsProps> = ({
                           <select
                             className="form-control"
                             value={logType}
-                            onChange={e => setLogType(e.target.value as any)}
+                            onChange={e => setLogType(e.target.value as 'counsel' | 'progress' | 'test')}
                           >
                             <option value="counsel">상담 일지</option>
                             <option value="progress">수업/진도 일지</option>

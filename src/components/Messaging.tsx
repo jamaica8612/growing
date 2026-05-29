@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Student } from '../types';
 import { MessageSquare, Copy, Check, Send, User } from 'lucide-react';
 
@@ -12,71 +12,51 @@ export const Messaging: React.FC<MessagingProps> = ({ students }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('in');
   
-  // Dynamic parameters for templates
-  const [paramTime, setParamTime] = useState('');
-  const [paramDate, setParamDate] = useState('');
+  // Dynamic parameters for templates (defaults computed once on mount)
+  const [paramTime, setParamTime] = useState(() =>
+    new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  );
+  const [paramDate, setParamDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  });
   const [paramTestName, setParamTestName] = useState('단어 단원 평가');
   const [paramScore, setParamScore] = useState('95/100');
-  
-  const [compiledMessage, setCompiledMessage] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
 
-  // Set default parameters
-  useEffect(() => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    setParamTime(timeStr);
-    
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    setParamDate(tomorrow.toISOString().split('T')[0]);
-  }, [selectedTemplate]);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Find active students
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
-  // Compile message text automatically when selections/parameters change
-  useEffect(() => {
+  // Compiled message is derived directly from the current selections/parameters.
+  const compiledMessage = useMemo(() => {
     if (!selectedStudentId) {
-      setCompiledMessage('학생을 선택하시면 알림장 메시지가 이곳에 조립됩니다. 🌱');
-      return;
+      return '학생을 선택하시면 알림장 메시지가 이곳에 조립됩니다. 🌱';
     }
 
     const student = students.find(s => s.id === selectedStudentId);
-    if (!student) return;
+    if (!student) return '';
 
     const studentName = student.name;
     const parentName = `${studentName} 학부모님`;
 
-    let msg = '';
-
     switch (selectedTemplate) {
       case 'in':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 ${paramTime}에 안전하게 등원하였습니다.\n오늘도 밝은 분위기 속에서 즐겁고 성실하게 공부하고 귀가할 수 있도록 지도하겠습니다. 감사합니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 ${paramTime}에 안전하게 등원하였습니다.\n오늘도 밝은 분위기 속에서 즐겁고 성실하게 공부하고 귀가할 수 있도록 지도하겠습니다. 감사합니다.`;
       case 'out':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 금일 개별 학습 일정을 건강하게 마치고 ${paramTime}에 하원하였습니다.\n가정에서도 숙제 수행 및 오늘 배운 단어를 복습할 수 있도록 격려와 지도 유도 부탁드립니다. 조은 하루 보내세요!`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 금일 개별 학습 일정을 건강하게 마치고 ${paramTime}에 하원하였습니다.\n가정에서도 숙제 수행 및 오늘 배운 단어를 복습할 수 있도록 격려와 지도 유도 부탁드립니다. 조은 하루 보내세요!`;
       case 'homework':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n${parentName}께 안내 말씀드립니다.\n\n오늘 ${studentName} 학생이 숙제 및 단어 준비가 다소 부족하여 교습소에서 1:1 집중 보완 지도 및 밀린 숙제를 완료한 후 귀가할 예정입니다. 귀가 시간이 다소 지연되더라도 양해 부탁드리며, 가정에서도 규칙적인 학습 습관이 잡힐 수 있도록 관심 부탁드립니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n${parentName}께 안내 말씀드립니다.\n\n오늘 ${studentName} 학생이 숙제 및 단어 준비가 다소 부족하여 교습소에서 1:1 집중 보완 지도 및 밀린 숙제를 완료한 후 귀가할 예정입니다. 귀가 시간이 다소 지연되더라도 양해 부탁드리며, 가정에서도 규칙적인 학습 습관이 잡힐 수 있도록 관심 부탁드립니다.`;
       case 'makeup':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n${studentName} 학생의 미수강 진도 보충을 위한 개별 보강 수업 일정을 안내드립니다.\n\n- 일시: ${paramDate} ${paramTime}\n\n학생이 늦지 않고 출석하여 진도를 맞출 수 있도록 학부모님의 지도 협조 부탁드립니다. 감사합니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n${studentName} 학생의 미수강 진도 보충을 위한 개별 보강 수업 일정을 안내드립니다.\n\n- 일시: ${paramDate} ${paramTime}\n\n학생이 늦지 않고 출석하여 진도를 맞출 수 있도록 학부모님의 지도 협조 부탁드립니다. 감사합니다.`;
       case 'test':
-        msg = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 시행한 ${studentName} 학생의 단원 평가 결과를 안내해 드립니다.\n\n- 평가 영역: ${paramTestName}\n- 평가 점수: ${paramScore}\n\n스스로 열심히 노력하여 훌륭한 성취를 낸 ${studentName} 학생에게 아낌없는 칭찬과 응원 부탁드립니다. 늘 믿고 맡겨주셔서 감사드립니다.`;
-        break;
+        return `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 시행한 ${studentName} 학생의 단원 평가 결과를 안내해 드립니다.\n\n- 평가 영역: ${paramTestName}\n- 평가 점수: ${paramScore}\n\n스스로 열심히 노력하여 훌륭한 성취를 낸 ${studentName} 학생에게 아낌없는 칭찬과 응원 부탁드립니다. 늘 믿고 맡겨주셔서 감사드립니다.`;
       default:
-        msg = '';
+        return '';
     }
-
-    setCompiledMessage(msg);
   }, [selectedStudentId, selectedTemplate, paramTime, paramDate, paramTestName, paramScore, students]);
 
   // Clipboard copy helper

@@ -80,7 +80,10 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   // Handle status update
   const handleStatusChange = (studentId: string, classId: string, status: AttendanceStatus) => {
-    const currentMemo = attendanceMemos[`${studentId}-${classId}`] || '';
+    const currentMemo =
+      attendanceMemos[`${studentId}-${classId}`] ??
+      getAttendanceRecord(studentId, classId, selectedDate)?.memo ??
+      '';
     onSaveAttendance({
       studentId,
       classId,
@@ -101,7 +104,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   // Save memo manually
   const handleSaveMemo = (studentId: string, classId: string) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
-    const memoText = attendanceMemos[`${studentId}-${classId}`] || '';
+    const memoText = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
     
     if (record) {
       onSaveAttendance({
@@ -252,11 +255,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                   const currentStatus = record?.status;
                   const currentHomework = record?.homeworkStatus || '';
                   const memoKey = `${student.id}-${cls.id}`;
-                  
-                  // Initialize local memo state if there's a record but not yet in temporary input state
-                  if (record?.memo && attendanceMemos[memoKey] === undefined) {
-                    attendanceMemos[memoKey] = record.memo;
-                  }
 
                   return (
                     <tr key={`${student.id}-${cls.id}`}>
@@ -365,7 +363,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                           className="form-control"
                           style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
                           placeholder="특이사항 메모 입력 (예: 감기 조퇴...)"
-                          value={attendanceMemos[memoKey] || ''}
+                          value={attendanceMemos[memoKey] ?? record?.memo ?? ''}
                           onChange={e => handleMemoChange(student.id, cls.id, e.target.value)}
                         />
                       </td>

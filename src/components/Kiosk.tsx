@@ -29,7 +29,9 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
   // Web Audio API Chime sound generator (Fully self-contained, works offline!)
   const playSynthesizedChime = (type: 'in' | 'out') => {
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContext =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof window.AudioContext }).webkitAudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
       const now = ctx.currentTime;
