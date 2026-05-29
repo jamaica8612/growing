@@ -25,6 +25,7 @@ export interface Class {
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'makeup';
+export type HomeworkStatus = 'done' | 'incomplete' | 'undone' | '';
 
 export interface Attendance {
   id: string;
@@ -33,6 +34,7 @@ export interface Attendance {
   date: string; // YYYY-MM-DD
   status: AttendanceStatus;
   memo: string;
+  homeworkStatus?: HomeworkStatus;
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'transfer' | '';

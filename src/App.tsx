@@ -170,12 +170,14 @@ function App() {
         ...updated[existingIndex],
         status: attendanceData.status,
         memo: attendanceData.memo !== undefined ? attendanceData.memo : updated[existingIndex].memo,
+        homeworkStatus: attendanceData.homeworkStatus !== undefined ? attendanceData.homeworkStatus : updated[existingIndex].homeworkStatus,
       };
     } else {
       const newAttendance: Attendance = {
         ...attendanceData,
         id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         memo: attendanceData.memo || '',
+        homeworkStatus: attendanceData.homeworkStatus || '',
       };
       updated = [...attendance, newAttendance];
     }

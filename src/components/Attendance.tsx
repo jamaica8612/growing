@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { Student, Class, Attendance, AttendanceStatus } from '../types';
-import { Calendar, Clock, Save } from 'lucide-react';
+import type { Student, Class, Attendance, AttendanceStatus, HomeworkStatus } from '../types';
+import { Calendar, Clock, Save, MessageSquare, Send, Check } from 'lucide-react';
 
 interface AttendanceProps {
   attendance: Attendance[];
@@ -18,6 +18,55 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [attendanceMemos, setAttendanceMemos] = useState<{ [key: string]: string }>({});
+  const [copiedStatusKey, setCopiedStatusKey] = useState<string | null>(null);
+
+  // Compile Homework Message Template
+  const getHomeworkMessage = (studentName: string, status: HomeworkStatus): string => {
+    const prefix = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생은 `;
+    if (status === 'done') {
+      return prefix + `부여된 영어 숙제와 단어 암기 준비를 아주 성실하게 잘 완료하고 수업에 참여하였습니다. 대견한 모습에 가정에서도 많은 칭찬과 격려 부탁드립니다. 감사합니다.`;
+    } else if (status === 'incomplete') {
+      return prefix + `영어 숙제 및 단어 준비가 다소 부족(일부 미완료)한 상태로 등원하였습니다. 교습소에서 개별 보완 지도를 실시하였으나, 가정에서도 학습 습관이 유지되도록 남은 과제를 챙겨주시기를 부탁드립니다.`;
+    } else if (status === 'undone') {
+      return prefix + `영어 숙제 및 단어 암기 준비가 전혀 되어있지 않았습니다. 학업 연속성을 위해 과제 수행이 필수적이오니, 가정에서도 숙제를 반드시 완료해서 보낼 수 있도록 각별한 지도 협조를 부탁드립니다.`;
+    }
+    return '';
+  };
+
+  // Copy Homework status notification for KakaoTalk
+  const handleCopyHomeworkMessage = (studentName: string, status: HomeworkStatus, key: string) => {
+    const msg = getHomeworkMessage(studentName, status);
+    if (!msg) return;
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedStatusKey(key);
+      setTimeout(() => setCopiedStatusKey(null), 2000);
+    });
+  };
+
+  // Open SMS client directly for mobile
+  const getSMSLink = (parentContact: string, studentName: string, status: HomeworkStatus): string => {
+    const msg = getHomeworkMessage(studentName, status);
+    if (!msg || !parentContact) return '#';
+    const cleanPhone = parentContact.replace(/[^0-9]/g, '');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const encodedBody = encodeURIComponent(msg);
+    return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
+  };
+
+  // Handle homework update
+  const handleHomeworkChange = (studentId: string, classId: string, homeworkStatus: HomeworkStatus) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    const status = record?.status || 'present'; // Default to present if homework is checked
+    const memo = record?.memo || '';
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status,
+      memo,
+      homeworkStatus,
+    });
+  };
   
   // Month filter for monthly report (defaults to current month YYYY-MM)
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
@@ -181,18 +230,19 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           <table className="custom-table">
             <thead>
               <tr>
-                <th style={{ width: '120px' }}>이름</th>
-                <th style={{ width: '160px' }}>반 이름</th>
-                <th style={{ width: '140px' }}>학교 / 학년</th>
-                <th style={{ width: '280px' }}>출결 체크</th>
+                <th style={{ width: '90px' }}>이름</th>
+                <th style={{ width: '150px' }}>반 / 학교 / 학년</th>
+                <th style={{ width: '220px' }}>출결 체크</th>
+                <th style={{ width: '180px' }}>숙제 체크</th>
+                <th style={{ width: '120px', textAlign: 'center' }}>학부모 알림</th>
                 <th>비고 (메모 입력)</th>
-                <th style={{ width: '80px', textAlign: 'center' }}>저장</th>
+                <th style={{ width: '50px', textAlign: 'center' }}>저장</th>
               </tr>
             </thead>
             <tbody>
               {targetList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-secondary)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-secondary)' }}>
                     🌱 이 조건으로 활성화된 원생이 없습니다. [반/시간표 관리]에서 수강 학생을 지정해 주세요.
                   </td>
                 </tr>
@@ -200,6 +250,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                 targetList.map(({ student, class: cls }) => {
                   const record = getAttendanceRecord(student.id, cls.id, selectedDate);
                   const currentStatus = record?.status;
+                  const currentHomework = record?.homeworkStatus || '';
                   const memoKey = `${student.id}-${cls.id}`;
                   
                   // Initialize local memo state if there's a record but not yet in temporary input state
@@ -210,9 +261,11 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                   return (
                     <tr key={`${student.id}-${cls.id}`}>
                       <td style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>{student.name}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{cls.name}</td>
-                      <td style={{ fontSize: '0.85rem' }}>
-                        {student.school || '-'} ({student.grade.split(' ')[1] || student.grade})
+                      <td style={{ fontSize: '0.8rem', lineHeight: '1.35' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{cls.name}</div>
+                        <div style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', marginTop: '0.15rem' }}>
+                          {student.school || '교습소'} • {student.grade.split(' ')[1] || student.grade}
+                        </div>
                       </td>
                       <td>
                         <div className="quick-att-buttons">
@@ -241,6 +294,70 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             보강
                           </button>
                         </div>
+                      </td>
+                      <td>
+                        <div className="quick-att-buttons">
+                          <button
+                            className={`btn-att-select ${currentHomework === 'done' ? 'active-present' : ''}`}
+                            onClick={() => handleHomeworkChange(student.id, cls.id, 'done')}
+                          >
+                            완료
+                          </button>
+                          <button
+                            className={`btn-att-select ${currentHomework === 'incomplete' ? 'active-late' : ''}`}
+                            onClick={() => handleHomeworkChange(student.id, cls.id, 'incomplete')}
+                          >
+                            미흡
+                          </button>
+                          <button
+                            className={`btn-att-select ${currentHomework === 'undone' ? 'active-absent' : ''}`}
+                            onClick={() => handleHomeworkChange(student.id, cls.id, 'undone')}
+                          >
+                            안함
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {currentHomework ? (
+                          <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center' }}>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', gap: '0.2rem', minWidth: 'auto', margin: 0, display: 'inline-flex', alignItems: 'center' }}
+                              onClick={() => handleCopyHomeworkMessage(student.name, currentHomework, memoKey)}
+                              title="카톡 메시지 본문 복사"
+                            >
+                              {copiedStatusKey === memoKey ? (
+                                <Check size={12} className="text-success" />
+                              ) : (
+                                <MessageSquare size={12} className="text-secondary" />
+                              )}
+                              카톡
+                            </button>
+                            {student.parentContact ? (
+                              <a
+                                href={getSMSLink(student.parentContact, student.name, currentHomework)}
+                                className="btn btn-primary"
+                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', gap: '0.2rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minWidth: 'auto', margin: 0 }}
+                                title="학부모에게 문자(SMS) 즉시 전송"
+                              >
+                                <Send size={12} />
+                                문자
+                              </a>
+                            ) : (
+                              <button
+                                className="btn btn-primary"
+                                disabled
+                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', gap: '0.2rem', opacity: 0.5, minWidth: 'auto', margin: 0, display: 'inline-flex', alignItems: 'center' }}
+                                title="연락처 없음"
+                              >
+                                <Send size={12} />
+                                문자
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>체크 대기</span>
+                        )}
                       </td>
                       <td>
                         <input
