@@ -19,6 +19,7 @@ import { CounselLogs } from './components/CounselLogs';
 import { Backup } from './components/Backup';
 import { Kiosk } from './components/Kiosk';
 import { Messaging } from './components/Messaging';
+import { AttendanceStats } from './components/AttendanceStats';
 
 // Import Icons
 import {
@@ -34,6 +35,7 @@ import {
   X,
   Smartphone,
   Monitor,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -46,6 +48,7 @@ const NAV_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'students', label: '학생 관리', icon: Users },
   { id: 'classes', label: '반/시간표 관리', icon: BookOpen },
   { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
+  { id: 'stats', label: '출결 통계', icon: BarChart3 },
   { id: 'payments', label: '수납 관리', icon: CreditCard },
   { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
   { id: 'messaging', label: '알림장 발송', icon: Smartphone },
@@ -56,6 +59,7 @@ const TAB_TITLES: Record<string, string> = {
   students: '재원생 주소록 및 관리',
   classes: '학급 개설 및 시간표',
   attendance: '출석 및 보강 관리',
+  stats: '월별 출결 통계 리포트',
   payments: '교육비 수납 장부',
   counsel: '상담 및 학습/성적 일지',
   messaging: '알림장 발송 도우미',
@@ -371,6 +375,8 @@ function App() {
             onDeleteCounselLog={handleDeleteCounselLog}
           />
         );
+      case 'stats':
+        return <AttendanceStats students={students} classes={classes} attendance={attendance} />;
       case 'messaging':
         return <Messaging students={students} />;
       case 'kiosk':
