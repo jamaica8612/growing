@@ -111,10 +111,10 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
 
           setTimeout(() => setImportStatus(null), 5000);
         }
-      } catch (err: any) {
+      } catch (err) {
         setImportStatus({
           success: false,
-          message: err.message || 'JSON 파일 분석에 실패했습니다. 파일이 손상되었는지 확인하세요.',
+          message: err instanceof Error ? err.message : 'JSON 파일 분석에 실패했습니다. 파일이 손상되었는지 확인하세요.',
         });
       }
     };
