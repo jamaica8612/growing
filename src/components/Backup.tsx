@@ -1,6 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle, KeyRound } from 'lucide-react';
 import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
+
+// Bump when the backup file shape changes so old/foreign files can be detected.
+const SCHEMA_VERSION = 1;
 
 interface BackupProps {
   onImportData: (data: {
@@ -18,16 +21,30 @@ interface BackupProps {
     payments: Payment[];
     counselLogs: CounselLog[];
   };
+  kioskPin: string;
+  onChangeKioskPin: (newPin: string) => void;
 }
 
-export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData }) => {
+// Verify each record is an object carrying a string id, so a corrupt or
+// foreign JSON file is rejected before it overwrites real data.
+const isRecordArray = (value: unknown): value is { id: unknown }[] =>
+  Array.isArray(value) &&
+  value.every(item => typeof item === 'object' && item !== null && typeof (item as { id?: unknown }).id === 'string');
+
+export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinStatus, setPinStatus] = useState<string | null>(null);
 
   // Export Data to JSON File
   const handleExport = () => {
     try {
-      const data = getAllData();
+      const data = {
+        schemaVersion: SCHEMA_VERSION,
+        exportedAt: new Date().toISOString(),
+        ...getAllData(),
+      };
       const jsonString = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -56,16 +73,26 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
     reader.onload = (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
-        
-        // Basic schema verification
+
+        if (typeof json !== 'object' || json === null) {
+          throw new Error('데이터 양식이 일치하지 않습니다. 올바른 그로잉영어 백업 파일이 아닙니다.');
+        }
+
+        // Field-level verification: every collection must be an array of records
+        // with a string id, so a partially corrupt file can't silently wipe data.
         if (
-          !Array.isArray(json.students) ||
-          !Array.isArray(json.classes) ||
-          !Array.isArray(json.attendance) ||
-          !Array.isArray(json.payments) ||
-          !Array.isArray(json.counselLogs)
+          !isRecordArray(json.students) ||
+          !isRecordArray(json.classes) ||
+          !isRecordArray(json.attendance) ||
+          !isRecordArray(json.payments) ||
+          !isRecordArray(json.counselLogs)
         ) {
           throw new Error('데이터 양식이 일치하지 않습니다. 올바른 그로잉영어 백업 파일이 아닙니다.');
+        }
+
+        // Newer backups carry a schemaVersion; warn if it's from a future build.
+        if (typeof json.schemaVersion === 'number' && json.schemaVersion > SCHEMA_VERSION) {
+          throw new Error('이 백업 파일은 더 최신 버전에서 생성되었습니다. 프로그램을 업데이트한 후 다시 시도해 주세요.');
         }
 
         if (window.confirm('기존 브라우저 데이터가 모두 지워지고 백업 파일 데이터로 덮어씌워집니다. 진행하시겠습니까?')) {
@@ -101,6 +128,18 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSavePin = () => {
+    const trimmed = pinInput.trim();
+    if (!/^\d{4,8}$/.test(trimmed)) {
+      setPinStatus('PIN은 4~8자리 숫자로 입력해 주세요.');
+      return;
+    }
+    onChangeKioskPin(trimmed);
+    setPinInput('');
+    setPinStatus('키오스크 복귀 PIN이 변경되었습니다.');
+    setTimeout(() => setPinStatus(null), 4000);
   };
 
   const handleResetClick = () => {
@@ -174,6 +213,38 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             백업 파일 업로드하여 복원하기
           </button>
         </div>
+      </div>
+
+      {/* Kiosk Security PIN Setting */}
+      <div className="card" style={{ borderLeft: '5px solid var(--color-secondary, #f59e0b)' }}>
+        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <KeyRound size={18} /> 키오스크 복귀 PIN 설정
+        </h4>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+          자율출결 키오스크 모드에서 관리자 화면으로 돌아올 때 사용하는 비밀번호입니다.
+          외부에 노출되지 않도록 기본값(1234)에서 변경하여 사용하시길 권장합니다.
+          <strong> 현재 설정: {'•'.repeat(kioskPin.length)} ({kioskPin.length}자리)</strong>
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="password"
+            inputMode="numeric"
+            className="form-control"
+            style={{ maxWidth: '240px' }}
+            placeholder="새 PIN (4~8자리 숫자)"
+            value={pinInput}
+            onChange={e => setPinInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSavePin(); }}
+          />
+          <button className="btn btn-primary" onClick={handleSavePin}>
+            PIN 변경하기
+          </button>
+        </div>
+        {pinStatus && (
+          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)', marginTop: '0.75rem' }}>
+            {pinStatus}
+          </p>
+        )}
       </div>
 
       {/* Operation Status Feedbacks */}

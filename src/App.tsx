@@ -35,9 +35,14 @@ import {
   Monitor,
 } from 'lucide-react';
 
+const DEFAULT_KIOSK_PIN = '1234';
+
 function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [kioskPin, setKioskPin] = useState<string>(
+    () => localStorage.getItem('growing_kiosk_pin') || DEFAULT_KIOSK_PIN
+  );
 
   // Core States
   const [students, setStudents] = useState<Student[]>([]);
@@ -78,8 +83,22 @@ function App() {
   }, []);
 
   // 2. LocalStorage Persistence Sync
-  const saveToLocal = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
+  // Wrapped in try/catch so a quota overflow or serialization failure surfaces
+  // to the user instead of silently dropping their data.
+  const saveToLocal = (key: string, data: unknown) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error(`Failed to persist "${key}" to localStorage:`, error);
+      const isQuota =
+        error instanceof DOMException &&
+        (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+      alert(
+        isQuota
+          ? '브라우저 저장 공간이 가득 차 데이터를 저장하지 못했습니다.\n[안전 백업 설정]에서 백업 파일을 받은 뒤 오래된 출결/상담 기록을 정리해 주세요.'
+          : '데이터를 저장하는 중 오류가 발생했습니다. 변경 내용이 저장되지 않았을 수 있으니 백업을 권장합니다.'
+      );
+    }
   };
 
   // --- Student Operations ---
@@ -318,6 +337,11 @@ function App() {
     saveToLocal('growing_logs', initialCounselLogs);
   };
 
+  const handleChangeKioskPin = (newPin: string) => {
+    setKioskPin(newPin);
+    saveToLocal('growing_kiosk_pin', newPin);
+  };
+
   const getAllData = () => {
     return {
       students,
@@ -408,6 +432,7 @@ function App() {
           <Kiosk
             students={students}
             classes={classes}
+            kioskPin={kioskPin}
             onSaveAttendance={handleSaveAttendance}
             onExitKiosk={() => setActiveTab('dashboard')}
           />
@@ -418,6 +443,8 @@ function App() {
             onImportData={handleImportData}
             onResetData={handleResetData}
             getAllData={getAllData}
+            kioskPin={kioskPin}
+            onChangeKioskPin={handleChangeKioskPin}
           />
         );
       default:
@@ -537,7 +564,7 @@ function App() {
                   fontWeight: 'bold'
                 }}
                 onClick={() => {
-                  if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 비밀번호: 1234)')) {
+                  if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
                     setActiveTab('kiosk');
                   }
                 }}
@@ -663,9 +690,9 @@ function App() {
                       color: '#a3e2c9',
                       fontWeight: 'bold'
                     }}
-                    onClick={() => { 
+                    onClick={() => {
                       setIsMobileMenuOpen(false);
-                      if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 비밀번호: 1234)')) {
+                      if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
                         setActiveTab('kiosk');
                       }
                     }}

@@ -5,11 +5,12 @@ import { Sprout, Home, Lock, Search, CheckCircle, Volume2 } from 'lucide-react';
 interface KioskProps {
   students: Student[];
   classes: Class[];
+  kioskPin: string;
   onSaveAttendance: (attendanceData: { studentId: string; classId: string; date: string; status: 'present'; memo: string }) => void;
   onExitKiosk: () => void;
 }
 
-export const Kiosk: React.FC<KioskProps> = ({ students, classes, onSaveAttendance, onExitKiosk }) => {
+export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSaveAttendance, onExitKiosk }) => {
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
@@ -125,10 +126,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, onSaveAttendanc
   // Exit Kiosk Mode configuration
   const handleExitSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === '1234') {
+    if (passcode === kioskPin) {
       onExitKiosk();
     } else {
-      alert('비밀번호가 올바르지 않습니다. (기본: 1234)');
+      alert('비밀번호가 올바르지 않습니다.');
       setPasscode('');
     }
   };
