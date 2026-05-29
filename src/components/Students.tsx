@@ -267,8 +267,7 @@ export const Students: React.FC<StudentsProps> = ({
                       {student.name}
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.9rem' }}>{student.school || '-'}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{student.grade}</div>
+                      {student.school || '-'} ({student.grade})
                     </td>
                     <td>{student.parentContact || '-'}</td>
                     <td style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{student.registrationDate}</td>

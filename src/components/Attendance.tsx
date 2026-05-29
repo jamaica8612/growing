@@ -211,9 +211,8 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                     <tr key={`${student.id}-${cls.id}`}>
                       <td style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>{student.name}</td>
                       <td style={{ fontSize: '0.85rem' }}>{cls.name}</td>
-                      <td style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                        <div>{student.school || '-'}</div>
-                        <div>{student.grade.split(' ')[1] || student.grade}</div>
+                      <td style={{ fontSize: '0.85rem' }}>
+                        {student.school || '-'} ({student.grade.split(' ')[1] || student.grade})
                       </td>
                       <td>
                         <div className="quick-att-buttons">
