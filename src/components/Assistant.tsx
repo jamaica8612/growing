@@ -52,11 +52,11 @@ export const Assistant: React.FC = () => {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)', minHeight: '480px' }}>
       <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>
-        <Sparkles size={20} className="text-primary" /> AI 학원 비서
+        <Sparkles size={20} className="text-primary" /> 아이비 <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--color-text-secondary)' }}>· 그로잉영어 AI 비서</span>
         <span className="badge badge-present" style={{ fontSize: '0.65rem', marginLeft: '0.5rem' }}>Beta</span>
       </h3>
       <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-        그로잉영어 운영을 도와드립니다. (현재는 대화 단계 — 학원 데이터 직접 조회는 곧 연결됩니다)
+        안녕하세요, 아이비예요 🌱 그로잉영어 운영을 도와드립니다. (현재는 대화 단계 — 학원 데이터 직접 조회는 곧 연결됩니다)
       </p>
 
       {/* 메시지 영역 */}
