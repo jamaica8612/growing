@@ -321,7 +321,7 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
           borderTop: '1px solid rgba(255, 255, 255, 0.05)',
         }}
       >
-        🌱 그로잉영어 등교/하교 시 이름을 탭한 후 체크해 주세요. 
+        🌱 그로잉영어 등원/하원 시 이름을 탭한 후 체크해 주세요.
       </footer>
 
       {/* Pop-up modal: Check-in / check-out action */}
