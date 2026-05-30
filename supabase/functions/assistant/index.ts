@@ -1,13 +1,9 @@
-// Supabase Edge Function: AI 학원 비서 '아이비' (Phase 1 — 읽기 비서)
+// Supabase Edge Function: AI 학원 비서 '아이비' (Phase 2 — 쓰기 + 확인 카드)
 //
-// 정적 호스팅(GitHub Pages)에서는 GEMINI_API_KEY를 노출할 수 없으므로, 이
-// 함수가 프론트엔드와 Gemini API 사이의 중계 계층 역할을 한다. 호출은 항상
-// 로그인한 원장님의 Supabase JWT로 이루어지며, 그 토큰으로 만든 Supabase
-// 클라이언트로 DB를 읽기 때문에 RLS가 본인 학원 데이터로 자동 격리한다.
-//
-// Phase 1 범위: Gemini function-calling으로 6개 읽기 tool을 제공한다.
-// (학생/반/출결/수납/상담 조회 + 오늘 현황).
-// Phase 2는 DB 쓰기 전 단계로, 학부모 안내문 초안 생성부터 제공한다.
+// Phase 2 추가사항:
+// - propose_attendance_change / propose_payment_change 도구로 변경 제안 객체 반환
+// - execute_action 모드: 프론트가 승인한 action을 받아 실제 DB write 수행
+// 모든 write는 RLS-scoped 클라이언트를 통하므로 본인 학원 데이터만 접근 가능.
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -17,18 +13,15 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// 모델 티어링: 단순 작업은 lite, 품질이 필요한 작업은 flash. Phase 1은 단일
-// 에이전트라 tool 선택·종합 신뢰도를 위해 flash를 사용한다.
 const MODELS = {
   lite: 'gemini-2.5-flash-lite',
   flash: 'gemini-2.5-flash',
 } as const;
 
-// ---- 한국 시간(KST) 헬퍼: 서버는 UTC라 '오늘'/'이번 달'을 KST로 계산 ----
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const kstNow = () => new Date(Date.now() + KST_OFFSET_MS);
-const kstToday = () => kstNow().toISOString().slice(0, 10); // YYYY-MM-DD
-const kstMonth = () => kstNow().toISOString().slice(0, 7); // YYYY-MM
+const kstToday = () => kstNow().toISOString().slice(0, 10);
+const kstMonth = () => kstNow().toISOString().slice(0, 7);
 const KDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const kstDayOfWeek = () => KDAYS[kstNow().getUTCDay()];
 
@@ -45,7 +38,38 @@ interface ChatMessage {
 }
 
 // =====================================================================
-// 조회 tool 정의 (Gemini functionDeclarations)
+// PendingAction 타입 (프론트와 공유하는 구조)
+// =====================================================================
+interface UpdateAttendanceAction {
+  type: 'update_attendance';
+  attendance_id: string;
+  student_name: string;
+  date: string;
+  old_status: string;
+  new_status: string;
+}
+
+interface CreateAttendanceAction {
+  type: 'create_attendance';
+  student_id: string;
+  student_name: string;
+  date: string;
+  old_status: string;
+  new_status: string;
+}
+
+interface UpdatePaymentAction {
+  type: 'update_payment';
+  payment_id: string;
+  student_name: string;
+  billing_month: string;
+  amount: number;
+}
+
+type PendingAction = UpdateAttendanceAction | CreateAttendanceAction | UpdatePaymentAction;
+
+// =====================================================================
+// tool 정의
 // =====================================================================
 const TOOL_DECLARATIONS = [
   {
@@ -123,14 +147,42 @@ const TOOL_DECLARATIONS = [
       required: ['kind'],
     },
   },
+  {
+    name: 'propose_attendance_change',
+    description: '학생의 출결 상태 변경을 제안한다. 실제 DB를 변경하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 출결을 수정·등록 요청 시 반드시 이 도구를 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색 가능)' },
+        date: { type: 'STRING', description: '날짜 YYYY-MM-DD 형식. 생략 시 오늘' },
+        newStatus: {
+          type: 'STRING',
+          enum: ['present', 'absent', 'late', 'makeup'],
+          description: '변경할 출결 상태: 출석(present)/결석(absent)/지각(late)/보강(makeup)',
+        },
+      },
+      required: ['studentName', 'newStatus'],
+    },
+  },
+  {
+    name: 'propose_payment_change',
+    description: '학생의 미납 수납을 완납으로 처리할 것을 제안한다. 실제 DB를 변경하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 수납 처리 요청 시 반드시 이 도구를 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색 가능)' },
+        billingMonth: { type: 'STRING', description: '청구 월 YYYY-MM 형식. 생략 시 이번 달' },
+      },
+      required: ['studentName'],
+    },
+  },
 ];
 
 // =====================================================================
-// tool 실행기 (모두 RLS-스코프된 supabase 클라이언트로 읽는다)
+// tool 실행기
 // =====================================================================
 type Json = Record<string, unknown>;
 
-// 학생 목록을 한 번 받아 id↔이름 매핑/검색에 재사용.
 async function fetchStudents(sb: SupabaseClient) {
   const { data, error } = await sb.from('growing_students').select('*');
   if (error) throw error;
@@ -144,6 +196,10 @@ const formatWon = (amount: number) => `${Math.round(amount).toLocaleString('ko-K
 function compactLines(lines: (string | false | null | undefined)[]) {
   return lines.filter(Boolean).join('\n');
 }
+
+const ATTENDANCE_KO: Record<string, string> = {
+  present: '출석', absent: '결석', late: '지각', makeup: '보강',
+};
 
 async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<Json> {
   switch (name) {
@@ -195,7 +251,6 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       if (classesRes.error) throw classesRes.error;
       if (attRes.error) throw attRes.error;
 
-      // 대상 학생 id 집합 결정(이름/반 필터)
       let targetIds: Set<string> | null = null;
       if (studentName) {
         targetIds = new Set(students.filter((s: Json) => matchName(norm(s.name), studentName)).map((s: Json) => s.id as string));
@@ -339,11 +394,8 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         const amount = rows.reduce((sum, p: Json) => sum + (p.amount as number), 0);
         const targetLabel = student ? `${norm(student.name)} 학부모님` : '학부모님';
         return {
-          found: true,
-          kind,
-          month,
-          unpaidCount: rows.length,
-          unpaidAmount: amount,
+          found: true, kind, month,
+          unpaidCount: rows.length, unpaidAmount: amount,
           draft: compactLines([
             `${targetLabel}, 안녕하세요. 그로잉영어입니다.`,
             rows.length > 0
@@ -358,9 +410,7 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       }
 
       if (kind === 'attendance_followup') {
-        if (!student) {
-          return { found: false, message: '출결 후속 안내문은 학생 이름이 필요합니다.' };
-        }
+        if (!student) return { found: false, message: '출결 후속 안내문은 학생 이름이 필요합니다.' };
         const { data, error } = await sb
           .from('growing_attendance')
           .select('*')
@@ -371,12 +421,8 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         const absences = (data ?? []).filter((r: Json) => r.status === 'absent');
         const lates = (data ?? []).filter((r: Json) => r.status === 'late');
         return {
-          found: true,
-          kind,
-          month,
-          studentName: student.name,
-          absentCount: absences.length,
-          lateCount: lates.length,
+          found: true, kind, month,
+          studentName: student.name, absentCount: absences.length, lateCount: lates.length,
           draft: compactLines([
             `${student.name} 학부모님, 안녕하세요. 그로잉영어입니다.`,
             `${month} 출결 확인 결과 결석 ${absences.length}회, 지각 ${lates.length}회로 기록되어 안내드립니다.`,
@@ -389,8 +435,7 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       }
 
       return {
-        found: true,
-        kind,
+        found: true, kind,
         draft: compactLines([
           `${norm(student?.name) || ''}${student ? ' 학부모님' : '학부모님'}, 안녕하세요. 그로잉영어입니다.`,
           extraNote || '전달드릴 안내사항이 있어 연락드립니다.',
@@ -401,22 +446,186 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    // ---- Phase 2: 제안 도구 ----
+
+    case 'propose_attendance_change': {
+      const studentName = (args.studentName as string) ?? '';
+      const date = (args.date as string) || kstToday();
+      const newStatus = (args.newStatus as string) ?? '';
+
+      if (!studentName || !newStatus) {
+        return { error: '학생 이름과 변경할 상태는 필수입니다.' };
+      }
+
+      const students = await fetchStudents(sb);
+      const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+      if (matched.length === 0) {
+        return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+      }
+      if (matched.length > 1) {
+        return {
+          found: false,
+          message: `'${studentName}'로 검색된 학생이 여러 명입니다: ${matched.map((s: Json) => s.name).join(', ')}. 이름을 더 구체적으로 말씀해 주세요.`,
+        };
+      }
+
+      const student = matched[0] as Json;
+      const { data: attData, error: attErr } = await sb
+        .from('growing_attendance')
+        .select('*')
+        .eq('student_id', student.id)
+        .eq('date', date)
+        .maybeSingle();
+      if (attErr) throw attErr;
+
+      const newStatusKo = ATTENDANCE_KO[newStatus] ?? newStatus;
+
+      if (!attData) {
+        // 기록 없음 → 새로 생성 제안
+        return {
+          action_proposed: true,
+          action: {
+            type: 'create_attendance',
+            student_id: student.id,
+            student_name: student.name,
+            date,
+            old_status: '(기록없음)',
+            new_status: newStatus,
+          } satisfies CreateAttendanceAction,
+          summary: `${student.name} 학생의 ${date} 출결 기록이 없어 ${newStatusKo}으로 새로 등록합니다.`,
+        };
+      }
+
+      const oldStatus = attData.status as string;
+      if (oldStatus === newStatus) {
+        return {
+          action_proposed: false,
+          message: `${student.name} 학생의 ${date} 출결은 이미 '${ATTENDANCE_KO[oldStatus] ?? oldStatus}' 상태입니다.`,
+        };
+      }
+
+      return {
+        action_proposed: true,
+        action: {
+          type: 'update_attendance',
+          attendance_id: attData.id as string,
+          student_name: norm(student.name),
+          date,
+          old_status: oldStatus,
+          new_status: newStatus,
+        } satisfies UpdateAttendanceAction,
+        summary: `${student.name} 학생의 ${date} 출결을 '${ATTENDANCE_KO[oldStatus] ?? oldStatus}' → '${newStatusKo}'으로 변경 예정입니다.`,
+      };
+    }
+
+    case 'propose_payment_change': {
+      const studentName = (args.studentName as string) ?? '';
+      const billingMonth = (args.billingMonth as string) || kstMonth();
+
+      if (!studentName) return { error: '학생 이름은 필수입니다.' };
+
+      const students = await fetchStudents(sb);
+      const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+      if (matched.length === 0) {
+        return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+      }
+      if (matched.length > 1) {
+        return {
+          found: false,
+          message: `'${studentName}'로 검색된 학생이 여러 명입니다: ${matched.map((s: Json) => s.name).join(', ')}. 이름을 더 구체적으로 말씀해 주세요.`,
+        };
+      }
+
+      const student = matched[0] as Json;
+      const { data: payData, error: payErr } = await sb
+        .from('growing_payments')
+        .select('*')
+        .eq('student_id', student.id)
+        .eq('billing_month', billingMonth)
+        .eq('status', 'unpaid')
+        .maybeSingle();
+      if (payErr) throw payErr;
+
+      if (!payData) {
+        return {
+          action_proposed: false,
+          message: `${student.name} 학생의 ${billingMonth} 미납 수납 기록을 찾지 못했습니다. 이미 완납 처리됐거나 청구 내역이 없을 수 있습니다.`,
+        };
+      }
+
+      return {
+        action_proposed: true,
+        action: {
+          type: 'update_payment',
+          payment_id: payData.id as string,
+          student_name: norm(student.name),
+          billing_month: billingMonth,
+          amount: payData.amount as number,
+        } satisfies UpdatePaymentAction,
+        summary: `${student.name} 학생의 ${billingMonth} 수납 ${formatWon(payData.amount as number)}을 완납으로 처리 예정입니다.`,
+      };
+    }
+
     default:
       return { error: `알 수 없는 도구: ${name}` };
   }
 }
 
 // =====================================================================
-// Gemini function-calling 루프
+// execute_action: 승인된 action을 실제 DB에 반영
+// =====================================================================
+async function executeAction(sb: SupabaseClient, action: PendingAction): Promise<Json> {
+  switch (action.type) {
+    case 'update_attendance': {
+      const { error } = await sb
+        .from('growing_attendance')
+        .update({ status: action.new_status })
+        .eq('id', action.attendance_id);
+      if (error) throw error;
+      const oldKo = ATTENDANCE_KO[action.old_status] ?? action.old_status;
+      const newKo = ATTENDANCE_KO[action.new_status] ?? action.new_status;
+      return {
+        success: true,
+        message: `${action.student_name} 학생의 ${action.date} 출결을 **${oldKo} → ${newKo}**으로 변경했습니다.`,
+      };
+    }
+
+    case 'create_attendance': {
+      const { error } = await sb
+        .from('growing_attendance')
+        .insert({ student_id: action.student_id, date: action.date, status: action.new_status });
+      if (error) throw error;
+      const newKo = ATTENDANCE_KO[action.new_status] ?? action.new_status;
+      return {
+        success: true,
+        message: `${action.student_name} 학생의 ${action.date} 출결을 **${newKo}**으로 등록했습니다.`,
+      };
+    }
+
+    case 'update_payment': {
+      const { error } = await sb
+        .from('growing_payments')
+        .update({ status: 'paid', payment_date: kstToday() })
+        .eq('id', action.payment_id);
+      if (error) throw error;
+      return {
+        success: true,
+        message: `${action.student_name} 학생의 ${action.billing_month} 수납 **${formatWon(action.amount)}** 완납 처리했습니다.`,
+      };
+    }
+
+    default:
+      throw new Error('알 수 없는 action type입니다.');
+  }
+}
+
+// =====================================================================
+// Gemini 호출 + function-calling 루프
 // =====================================================================
 
-// 원장님이 저장한 기억을 조회한다. 실패해도 아이비 호출은 중단하지 않는다.
 async function fetchMemory(sb: SupabaseClient): Promise<string> {
   try {
-    const { data } = await sb
-      .from('growing_assistant_memory')
-      .select('memory_text')
-      .maybeSingle();
+    const { data } = await sb.from('growing_assistant_memory').select('memory_text').maybeSingle();
     return (data?.memory_text as string | null) ?? '';
   } catch {
     return '';
@@ -432,9 +641,11 @@ function systemPrompt(memory: string): string {
 원장님을 도와 학생·출결·수납·상담 업무를 돕습니다. 스스로를 소개할 때는 아이비라고 합니다.
 
 [원칙]
-- 학원 데이터(학생/반/출결/수납/상담)에 대한 질문은 반드시 제공된 도구(tool)로 실제 데이터를 조회한 뒤 답합니다. 절대 추측하거나 지어내지 않습니다.
+- 학원 데이터에 대한 질문은 반드시 제공된 도구로 실제 데이터를 조회한 뒤 답합니다. 절대 추측하거나 지어내지 않습니다.
 - 도구 결과가 비어 있으면 해당 데이터가 없다고 솔직히 답합니다.
-- 지금은 읽기와 초안 작성 단계입니다. 청구서 발행·출결 변경·메시지 실제 발송 같은 데이터 변경 요청에는, 조회와 안내문 초안 작성은 도와드리되 실제 변경/발송은 하지 않는다고 안내합니다.
+- 출결 변경·수납 처리 같은 DB 변경 요청은 반드시 propose_attendance_change 또는 propose_payment_change 도구를 사용해 원장님의 승인을 구합니다. 직접 변경하지 않습니다.
+- propose_* 도구가 action_proposed: true를 반환하면 "아래 내용으로 변경하시겠어요? 확인 버튼을 눌러 승인해 주세요."처럼 안내합니다.
+- propose_* 도구가 action_proposed: false를 반환하면 그 message를 원장님께 전달합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.${memorySection}`;
 }
@@ -444,9 +655,6 @@ interface GeminiContent { role: string; parts: GeminiPart[] }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// 과부하(503 UNAVAILABLE)·레이트리밋(429)은 일시적이므로 재시도하고, flash가
-// 계속 막히면 더 한가한 flash-lite로 대체 시도한다. 그래도 안 되면 날 것의
-// JSON 대신 친절한 문구를 던진다.
 async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise<GeminiContent> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY 시크릿이 설정되지 않았습니다.');
@@ -478,13 +686,11 @@ async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise
       }
 
       const detail = await res.text();
-      // 일시적 오류: 같은 모델 1회 재시도 → 다음 모델로 대체
       if (res.status === 503 || res.status === 429) {
         overloaded = true;
         if (attempt < 2) { await sleep(700 * attempt); continue; }
-        break; // 다음 모델 시도
+        break;
       }
-      // 그 외 오류는 즉시 중단(원인 일부 노출)
       throw new Error(`Gemini 호출 실패 (${res.status}): ${detail.slice(0, 300)}`);
     }
   }
@@ -495,9 +701,10 @@ async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise
   throw new Error('AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.');
 }
 
-// 대화 히스토리(텍스트) → Gemini contents, 이후 tool 루프를 돈다.
-async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ reply: string; toolsUsed: string[] }> {
-  // 기억 조회 실패 시에도 아이비 호출은 이어간다.
+async function runAgent(
+  sb: SupabaseClient,
+  messages: ChatMessage[]
+): Promise<{ reply: string; toolsUsed: string[]; action?: PendingAction }> {
   const memory = await fetchMemory(sb);
 
   const contents: GeminiContent[] = messages.map(m => ({
@@ -506,20 +713,20 @@ async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ 
   }));
 
   const toolsUsed: string[] = [];
-  for (let i = 0; i < 5; i++) {
+  let pendingAction: PendingAction | undefined;
+
+  for (let i = 0; i < 6; i++) {
     const content = await callGeminiRaw(contents, memory);
     const parts = content.parts ?? [];
     const calls = parts.filter(p => p.functionCall);
 
     if (calls.length === 0) {
       const text = parts.map(p => p.text ?? '').join('').trim();
-      return { reply: text || '죄송해요, 답변을 생성하지 못했어요.', toolsUsed };
+      return { reply: text || '죄송해요, 답변을 생성하지 못했어요.', toolsUsed, action: pendingAction };
     }
 
-    // 모델의 functionCall 턴을 히스토리에 추가
     contents.push({ role: 'model', parts });
 
-    // 호출된 도구들을 실행하고 functionResponse를 모아 user 턴으로 추가
     const responseParts: GeminiPart[] = [];
     for (const p of calls) {
       const fc = p.functionCall!;
@@ -527,6 +734,10 @@ async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ 
       let result: Json;
       try {
         result = await execTool(sb, fc.name, fc.args ?? {});
+        // propose_* tool이 action을 반환하면 저장
+        if (result.action_proposed === true && result.action) {
+          pendingAction = result.action as PendingAction;
+        }
       } catch (e) {
         result = { error: e instanceof Error ? e.message : '도구 실행 오류' };
       }
@@ -537,16 +748,14 @@ async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ 
   return { reply: '요청이 너무 복잡해 처리하지 못했어요. 조금 더 구체적으로 말씀해 주시겠어요?', toolsUsed };
 }
 
+// =====================================================================
+// HTTP 핸들러
+// =====================================================================
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-  if (req.method !== 'POST') {
-    return jsonResponse({ error: 'POST 요청만 지원합니다.' }, 405);
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonResponse({ error: 'POST 요청만 지원합니다.' }, 405);
 
   try {
-    // 인증 사용자 확인 + RLS-스코프 클라이언트 구성(이 토큰으로 읽는 DB는 본인 학원만)
     const authHeader = req.headers.get('Authorization') ?? '';
     const sb = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -559,13 +768,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
+
+    // execute_action 모드: messages 없이 action만 전달되면 직접 실행
+    if (body?.action && !body?.messages) {
+      const result = await executeAction(sb, body.action as PendingAction);
+      return jsonResponse(result);
+    }
+
     const messages: ChatMessage[] = Array.isArray(body?.messages) ? body.messages : [];
     if (messages.length === 0) {
       return jsonResponse({ error: '메시지가 비어 있습니다.' }, 400);
     }
 
-    const { reply, toolsUsed } = await runAgent(sb, messages);
-    return jsonResponse({ reply, model: MODELS.flash, toolsUsed });
+    const { reply, toolsUsed, action } = await runAgent(sb, messages);
+    return jsonResponse({ reply, model: MODELS.flash, toolsUsed, action });
   } catch (e) {
     return jsonResponse({ error: e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.' }, 500);
   }

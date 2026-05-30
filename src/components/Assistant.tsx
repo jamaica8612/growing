@@ -1,15 +1,149 @@
 import { useRef, useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Check, Clipboard, MessageSquare, Sparkles, Send, User, Loader2, X } from 'lucide-react';
-import { sendAssistantMessage, type ChatMessage } from '../lib/assistant';
+import { Check, CheckCircle2, Clipboard, MessageSquare, Sparkles, Send, User, Loader2, X, XCircle } from 'lucide-react';
+import { sendAssistantMessage, executeAction, type ChatMessage, type PendingAction } from '../lib/assistant';
 
+// AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯.
+// Phase 2: propose_* tool 응답에 action 객체가 오면 확인 카드를 표시하고,
+// 원장님이 승인 시 execute_action으로 실제 DB를 변경한다.
 
-// AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯 (Phase 0).
-// 메뉴 탭이 아니라 모든 화면에 떠 있는 런처 버튼으로, 클릭하면 채팅 팝업이
-// 열린다. 현재는 DB 조회와 학부모 안내문 초안 작성을 지원하며, 실제 발송과
-// 데이터 변경 도구는 이후 Phase에서 연결된다.
 interface AssistantProps {
   onSendToMessaging?: (content: string) => void;
+}
+
+const ATTENDANCE_KO: Record<string, string> = {
+  present: '출석', absent: '결석', late: '지각', makeup: '보강', '(기록없음)': '기록없음',
+};
+
+const ACTION_TITLE: Record<PendingAction['type'], string> = {
+  update_attendance: '출결 변경',
+  create_attendance: '출결 등록',
+  update_payment: '수납 처리',
+};
+
+function formatWon(amount: number) {
+  return `${Math.round(amount).toLocaleString('ko-KR')}원`;
+}
+
+// ---- 확인 카드 컴포넌트 ----
+interface ConfirmationCardProps {
+  action: PendingAction;
+  onApprove: () => void;
+  onReject: () => void;
+  disabled?: boolean;
+}
+
+function ConfirmationCard({ action, onApprove, onReject, disabled }: ConfirmationCardProps) {
+  const rows: { label: string; value: string }[] = [];
+
+  if (action.type === 'update_attendance' || action.type === 'create_attendance') {
+    rows.push({ label: '학생', value: action.student_name });
+    rows.push({ label: '날짜', value: action.date });
+    rows.push({ label: '현재', value: ATTENDANCE_KO[action.old_status] ?? action.old_status });
+    rows.push({ label: '변경 후', value: ATTENDANCE_KO[action.new_status] ?? action.new_status });
+  } else if (action.type === 'update_payment') {
+    rows.push({ label: '학생', value: action.student_name });
+    rows.push({ label: '청구 월', value: action.billing_month });
+    rows.push({ label: '금액', value: formatWon(action.amount) });
+    rows.push({ label: '처리', value: '미납 → 완납' });
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: '0.6rem',
+        borderRadius: 'var(--radius-md)',
+        border: '1.5px solid var(--color-primary)',
+        overflow: 'hidden',
+        fontSize: '0.82rem',
+      }}
+    >
+      {/* 카드 헤더 */}
+      <div
+        style={{
+          padding: '0.45rem 0.75rem',
+          background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark, #0c2e20))',
+          color: '#fff',
+          fontWeight: 700,
+          fontSize: '0.78rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.3rem',
+        }}
+      >
+        <Sparkles size={13} />
+        {ACTION_TITLE[action.type]} — 승인이 필요합니다
+      </div>
+
+      {/* 변경 내용 */}
+      <div style={{ padding: '0.6rem 0.75rem', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        {rows.map(r => (
+          <div key={r.label} style={{ display: 'flex', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--color-text-secondary)', minWidth: '4rem' }}>{r.label}</span>
+            <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 버튼 영역 */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.4rem',
+          padding: '0.5rem 0.75rem',
+          borderTop: '1px solid var(--color-border)',
+          backgroundColor: '#fafbfc',
+        }}
+      >
+        <button
+          type="button"
+          onClick={onApprove}
+          disabled={disabled}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.3rem',
+            padding: '0.4rem 0',
+            borderRadius: 'var(--radius-sm)',
+            border: 'none',
+            backgroundColor: 'var(--color-primary)',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: '0.78rem',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+          }}
+        >
+          <Check size={13} /> 승인
+        </button>
+        <button
+          type="button"
+          onClick={onReject}
+          disabled={disabled}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.3rem',
+            padding: '0.4rem 0',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--color-border)',
+            backgroundColor: '#fff',
+            color: 'var(--color-text-secondary)',
+            fontWeight: 700,
+            fontSize: '0.78rem',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+          }}
+        >
+          <X size={13} /> 취소
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
@@ -21,7 +155,6 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 새 메시지/패널 오픈 시 항상 맨 아래로 스크롤.
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
@@ -36,8 +169,13 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
     setError(null);
     setLoading(true);
     try {
-      const { reply } = await sendAssistantMessage(next);
-      setMessages([...next, { role: 'assistant', content: reply }]);
+      const { reply, action } = await sendAssistantMessage(next);
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: reply,
+        ...(action ? { action, actionStatus: 'pending' } : {}),
+      };
+      setMessages([...next, assistantMsg]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'AI 비서 응답에 실패했습니다.');
     } finally {
@@ -45,8 +183,29 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
     }
   };
 
+  const handleApproveAction = async (msgIndex: number, action: PendingAction) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { message } = await executeAction(action);
+      setMessages(prev =>
+        prev.map((m, i) => i === msgIndex ? { ...m, actionStatus: 'approved' as const } : m)
+      );
+      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '처리에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectAction = (msgIndex: number) => {
+    setMessages(prev =>
+      prev.map((m, i) => i === msgIndex ? { ...m, actionStatus: 'rejected' as const } : m)
+    );
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter 전송 / Shift+Enter 줄바꿈
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void handleSend();
@@ -76,14 +235,13 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   };
 
   const suggestions = [
-    '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
     '오늘 출석 현황 알려줘',
-    '결석이 잦은 학생 관리 팁 알려줘',
+    '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
+    '홍길동 오늘 결석 → 출석으로 바꿔줘',
   ];
 
   return (
     <>
-      {/* 런처 버튼 (닫혀 있을 때) */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -113,7 +271,6 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
         </button>
       )}
 
-      {/* 채팅 패널 (열려 있을 때) */}
       {open && (
         <div
           style={{
@@ -223,7 +380,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                 </div>
                 <div
                   style={{
-                    maxWidth: '78%',
+                    maxWidth: '82%',
                     minWidth: 0,
                     padding: '0.6rem 0.8rem',
                     borderRadius: 'var(--radius-md)',
@@ -254,6 +411,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                       <Sparkles size={11} /> 초안
                     </div>
                   )}
+
                   {m.role === 'assistant' ? (
                     <ReactMarkdown
                       components={{
@@ -265,9 +423,53 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                     >
                       {m.content}
                     </ReactMarkdown>
-                    ) : (
-                      m.content
+                  ) : (
+                    m.content
                   )}
+
+                  {/* 확인 카드 */}
+                  {m.role === 'assistant' && m.action && m.actionStatus === 'pending' && (
+                    <ConfirmationCard
+                      action={m.action}
+                      onApprove={() => void handleApproveAction(i, m.action!)}
+                      onReject={() => handleRejectAction(i)}
+                      disabled={loading}
+                    />
+                  )}
+
+                  {/* 승인/거부 결과 뱃지 */}
+                  {m.role === 'assistant' && m.action && m.actionStatus === 'approved' && (
+                    <div
+                      style={{
+                        marginTop: '0.6rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        fontSize: '0.75rem',
+                        color: 'var(--color-primary-dark, #0c2e20)',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <CheckCircle2 size={14} style={{ color: 'var(--color-primary)' }} /> 처리 완료
+                    </div>
+                  )}
+                  {m.role === 'assistant' && m.action && m.actionStatus === 'rejected' && (
+                    <div
+                      style={{
+                        marginTop: '0.6rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        fontSize: '0.75rem',
+                        color: 'var(--color-text-secondary)',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <XCircle size={14} /> 취소됨
+                    </div>
+                  )}
+
+                  {/* 복사 / 알림장 버튼 */}
                   {m.role === 'assistant' && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.55rem', flexWrap: 'wrap' }}>
                       <button
