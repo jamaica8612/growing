@@ -405,6 +405,29 @@ export const api = {
     if (error) throw error;
   },
 
+  // ---- 아이비 자가학습 노트 ----
+  async listAssistantNotes(): Promise<{ id: string; scope: string; category: string; content: string; studentName: string; createdAt: string }[]> {
+    const [notesRes, studentsRes] = await Promise.all([
+      supabase.from('growing_assistant_notes').select('*').order('created_at', { ascending: false }),
+      supabase.from('growing_students').select('id, name'),
+    ]);
+    if (notesRes.error) throw notesRes.error;
+    const nameById = new Map((studentsRes.data ?? []).map(s => [s.id as string, s.name as string]));
+    return (notesRes.data ?? []).map(r => ({
+      id: r.id as string,
+      scope: r.scope as string,
+      category: r.category as string,
+      content: r.content as string,
+      studentName: r.student_id ? (nameById.get(r.student_id as string) ?? '') : '',
+      createdAt: r.created_at as string,
+    }));
+  },
+
+  async deleteAssistantNote(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_assistant_notes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   // ---- Bulk: delete all of the signed-in owner's academy rows (RLS-scoped) ----
   async clearAll(): Promise<void> {
     // Order respects FKs; students last (cascades the rest), classes before.
