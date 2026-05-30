@@ -1,12 +1,16 @@
 import { useRef, useState, useEffect } from 'react';
-import { Check, Clipboard, Sparkles, Send, User, Loader2, X } from 'lucide-react';
+import { Check, Clipboard, MessageSquare, Sparkles, Send, User, Loader2, X } from 'lucide-react';
 import { sendAssistantMessage, type ChatMessage } from '../lib/assistant';
 
 // AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯 (Phase 0).
 // 메뉴 탭이 아니라 모든 화면에 떠 있는 런처 버튼으로, 클릭하면 채팅 팝업이
 // 열린다. 현재는 DB 조회와 학부모 안내문 초안 작성을 지원하며, 실제 발송과
 // 데이터 변경 도구는 이후 Phase에서 연결된다.
-export const Assistant: React.FC = () => {
+interface AssistantProps {
+  onSendToMessaging?: (content: string) => void;
+}
+
+export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -63,6 +67,11 @@ export const Assistant: React.FC = () => {
     content.includes('초안') ||
     content.includes('발송')
   );
+
+  const handleSendToMessaging = (content: string) => {
+    onSendToMessaging?.(content);
+    setOpen(false);
+  };
 
   const suggestions = [
     '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
@@ -243,7 +252,7 @@ export const Assistant: React.FC = () => {
                   )}
                   {m.content}
                   {m.role === 'assistant' && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.55rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.55rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         onClick={() => void handleCopy(m.content, i)}
@@ -268,6 +277,31 @@ export const Assistant: React.FC = () => {
                         {copiedIndex === i ? <Check size={13} /> : <Clipboard size={13} />}
                         {copiedIndex === i ? '복사됨' : '복사'}
                       </button>
+                      {onSendToMessaging && isDraftMessage(m.content) && (
+                        <button
+                          type="button"
+                          onClick={() => handleSendToMessaging(m.content)}
+                          aria-label="아이비 답변을 알림장으로 보내기"
+                          title="알림장으로 보내기"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            minHeight: '28px',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--color-accent-mint, #10b981)',
+                            backgroundColor: 'var(--color-accent-mint-light, #d1fae5)',
+                            color: 'var(--color-primary-dark, #0c2e20)',
+                            font: 'inherit',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <MessageSquare size={13} /> 알림장으로
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -1,15 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import type { Student, KioskAlert } from '../types';
-import { MessageSquare, Copy, Check, Send, User, Bell, Trash2 } from 'lucide-react';
+import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles } from 'lucide-react';
 
 interface MessagingProps {
   students: Student[];
   kioskAlerts: KioskAlert[];
   onDismissAlert: (id: string) => void;
   onClearAlerts: () => void;
+  assistantDraft?: {
+    id: number;
+    content: string;
+  } | null;
 }
 
-type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test';
+type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test' | 'custom';
 
 // Shared check-in / check-out message body, reused by both the manual
 // composer and the kiosk auto-queue so the wording stays in one place.
@@ -29,10 +33,11 @@ const buildSMSLink = (parentContact: string, message: string): string => {
   return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
 };
 
-export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts }) => {
+export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts, assistantDraft }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('in');
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(() => assistantDraft?.content ? 'custom' : 'in');
+  const [customMessage, setCustomMessage] = useState(() => assistantDraft?.content ?? '');
   
   // Dynamic parameters for templates (defaults computed once on mount)
   const [paramTime, setParamTime] = useState(() =>
@@ -56,6 +61,7 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
   // Compiled message is derived directly from the current selections/parameters.
   const compiledMessage = useMemo(() => {
     if (!selectedStudentId) {
+      if (selectedTemplate === 'custom' && customMessage) return customMessage;
       return '학생을 선택하시면 알림장 메시지가 이곳에 조립됩니다. 🌱';
     }
 
@@ -66,6 +72,8 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
     const parentName = `${studentName} 학부모님`;
 
     switch (selectedTemplate) {
+      case 'custom':
+        return customMessage || '아이비 초안이나 직접 작성한 메시지가 이곳에 표시됩니다. 🌱';
       case 'in':
         return buildCheckMessage(studentName, 'in', paramTime);
       case 'out':
@@ -79,11 +87,11 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
       default:
         return '';
     }
-  }, [selectedStudentId, selectedTemplate, paramTime, paramDate, paramTestName, paramScore, students]);
+  }, [selectedStudentId, selectedTemplate, customMessage, paramTime, paramDate, paramTestName, paramScore, students]);
 
   // Clipboard copy helper
   const handleCopy = () => {
-    if (!selectedStudentId) return;
+    if (!compiledMessage || compiledMessage.includes('학생을 선택하시면')) return;
     navigator.clipboard.writeText(compiledMessage).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
@@ -264,10 +272,20 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
             >
               평가 결과 통보 🎯
             </button>
+            {customMessage && (
+              <button
+                className={`btn ${selectedTemplate === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setSelectedTemplate('custom')}
+                style={{ gridColumn: 'span 2', fontSize: '0.85rem', padding: '0.5rem', gap: '0.35rem' }}
+              >
+                <Sparkles size={15} /> 아이비 초안
+              </button>
+            )}
           </div>
         </div>
 
         {/* Dynamic Parameter Settings */}
+        {selectedTemplate !== 'custom' ? (
         <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
           <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '0.75rem' }}>
             메시지 세부 변수 조정
@@ -320,6 +338,16 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
             </div>
           )}
         </div>
+        ) : (
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Sparkles size={15} /> 아이비 초안 편집
+            </h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+              아래 미리보기에서 내용을 직접 다듬은 뒤 복사하거나 학생 연락처를 선택해 문자로 보낼 수 있습니다.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Right Column: Compiled Message Preview & Send Actions */}
@@ -332,18 +360,19 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
           <textarea
             className="form-control"
             rows={12}
-            readOnly
+            readOnly={selectedTemplate !== 'custom'}
             style={{
               fontFamily: 'inherit',
               lineHeight: '1.6',
               fontSize: '0.95rem',
               backgroundColor: '#fafcfb',
-              cursor: 'default',
+              cursor: selectedTemplate === 'custom' ? 'text' : 'default',
               border: '1px solid var(--color-border)',
               resize: 'none',
               padding: '1rem',
             }}
             value={compiledMessage}
+            onChange={e => setCustomMessage(e.target.value)}
           />
         </div>
 
@@ -351,7 +380,7 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
           <button
             className="btn btn-secondary"
             onClick={handleCopy}
-            disabled={!selectedStudentId}
+            disabled={!compiledMessage || compiledMessage.includes('학생을 선택하시면')}
             style={{ width: '100%', gap: '0.5rem' }}
           >
             {isCopied ? (

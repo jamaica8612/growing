@@ -188,6 +188,7 @@ function App() {
 function AcademyApp({ session }: { session: Session }) {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [assistantDraft, setAssistantDraft] = useState<{ id: number; content: string } | null>(null);
 
   const data = useAcademyData(session.user.id);
   const {
@@ -205,6 +206,12 @@ function AcademyApp({ session }: { session: Session }) {
 
   const handleLogout = () => {
     void supabase.auth.signOut();
+  };
+
+  const handleAssistantDraftToMessaging = (content: string) => {
+    setAssistantDraft({ id: Date.now(), content });
+    setActiveTab('messaging');
+    setIsMobileMenuOpen(false);
   };
 
   // Render Page Content based on tab Selection
@@ -281,10 +288,12 @@ function AcademyApp({ session }: { session: Session }) {
       case 'messaging':
         return (
           <Messaging
+            key={assistantDraft?.id ?? 'manual-messaging'}
             students={students}
             kioskAlerts={kioskAlerts}
             onDismissAlert={data.handleDismissKioskAlert}
             onClearAlerts={data.handleClearKioskAlerts}
+            assistantDraft={assistantDraft}
           />
         );
       case 'kiosk':
@@ -459,7 +468,7 @@ function AcademyApp({ session }: { session: Session }) {
       </main>
 
       {/* AI 비서 아이비 — 모든 화면 오른쪽 하단 플로팅 위젯 (키오스크 모드 제외) */}
-      <Assistant />
+      <Assistant onSendToMessaging={handleAssistantDraftToMessaging} />
     </div>
   );
 }
