@@ -6,7 +6,7 @@ interface KioskProps {
   students: Student[];
   classes: Class[];
   kioskPin: string;
-  onSaveAttendance: (attendanceData: { studentId: string; classId: string; date: string; status: 'present'; memo: string }) => void;
+  onSaveAttendance: (attendanceData: { studentId: string; classId: string; date: string; status: 'present'; checkInTime?: string; checkOutTime?: string }) => void;
   onQueueAlert: (studentId: string, kind: 'in' | 'out', date: string, time: string) => void;
   onExitKiosk: () => void;
 }
@@ -96,15 +96,13 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
     // Default to first class if enrolled in multiple; empty => no class (null in DB)
     const classId = studentClasses[0]?.id || '';
 
-    const actionText = type === 'in' ? '등원' : '하원';
-    const memoText = `${actionText}: ${currentTimeStr}`;
-
+    // 등원/하원 시각을 정식 필드에 기록 (반대쪽 값은 useAcademyData가 유지)
     onSaveAttendance({
       studentId: selectedStudent.id,
       classId,
       date: todayDateStr,
       status: 'present',
-      memo: memoText,
+      ...(type === 'in' ? { checkInTime: currentTimeStr } : { checkOutTime: currentTimeStr }),
     });
 
     // Queue a parent check-in/out notification for later sending.

@@ -54,6 +54,8 @@ const toAttendance = (r: Row): Attendance => ({
   status: r.status as AttendanceStatus,
   memo: s(r.memo),
   homeworkStatus: (s(r.homework_status) || '') as HomeworkStatus,
+  checkInTime: (r.check_in_time as string) ?? undefined,
+  checkOutTime: (r.check_out_time as string) ?? undefined,
 });
 
 const toPayment = (r: Row): Payment => ({
@@ -220,6 +222,8 @@ export const api = {
         status: a.status,
         memo: a.memo ?? '',
         homework_status: a.homeworkStatus ?? '',
+        check_in_time: orNull(a.checkInTime),
+        check_out_time: orNull(a.checkOutTime),
       })
       .select()
       .single();
@@ -229,11 +233,23 @@ export const api = {
 
   async updateAttendance(
     id: string,
-    fields: { status: AttendanceStatus; memo: string; homeworkStatus: HomeworkStatus | '' }
+    fields: {
+      status: AttendanceStatus;
+      memo: string;
+      homeworkStatus: HomeworkStatus | '';
+      checkInTime?: string;
+      checkOutTime?: string;
+    }
   ): Promise<Attendance> {
     const { data: row, error } = await supabase
       .from('growing_attendance')
-      .update({ status: fields.status, memo: fields.memo, homework_status: fields.homeworkStatus })
+      .update({
+        status: fields.status,
+        memo: fields.memo,
+        homework_status: fields.homeworkStatus,
+        check_in_time: orNull(fields.checkInTime),
+        check_out_time: orNull(fields.checkOutTime),
+      })
       .eq('id', id)
       .select()
       .single();

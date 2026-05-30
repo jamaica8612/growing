@@ -266,6 +266,12 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                         </div>
                       </td>
                       <td>
+                        {(record?.checkInTime || record?.checkOutTime) && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginBottom: '0.35rem', display: 'flex', gap: '0.5rem' }}>
+                            {record?.checkInTime && <span>🌱 등원 {record.checkInTime}</span>}
+                            {record?.checkOutTime && <span>🏡 하원 {record.checkOutTime}</span>}
+                          </div>
+                        )}
                         <div className="quick-att-buttons">
                           <button
                             className={`btn-att-select ${currentStatus === 'present' ? 'active-present' : ''}`}

@@ -104,7 +104,7 @@ export function useAcademyData(userId: string) {
     });
 
   // ---- Attendance ----
-  const handleSaveAttendance = (data: Omit<Attendance, 'id'> & { memo?: string }) =>
+  const handleSaveAttendance = (data: Omit<Attendance, 'id' | 'memo'> & { memo?: string }) =>
     guard(async () => {
       const existing = attendance.find(
         a => a.studentId === data.studentId && a.classId === (data.classId ?? '') && a.date === data.date
@@ -114,6 +114,9 @@ export function useAcademyData(userId: string) {
           status: data.status,
           memo: data.memo !== undefined ? data.memo : existing.memo,
           homeworkStatus: data.homeworkStatus !== undefined ? data.homeworkStatus : existing.homeworkStatus ?? '',
+          // 부분 업데이트: 전달된 시각만 갱신하고 나머지는 기존 값 유지
+          checkInTime: data.checkInTime !== undefined ? data.checkInTime : existing.checkInTime,
+          checkOutTime: data.checkOutTime !== undefined ? data.checkOutTime : existing.checkOutTime,
         });
         setAttendance(prev => prev.map(a => (a.id === updated.id ? updated : a)));
       } else {
@@ -124,6 +127,8 @@ export function useAcademyData(userId: string) {
           status: data.status,
           memo: data.memo ?? '',
           homeworkStatus: data.homeworkStatus ?? '',
+          checkInTime: data.checkInTime,
+          checkOutTime: data.checkOutTime,
         });
         setAttendance(prev => [...prev, created]);
       }
@@ -263,6 +268,8 @@ export function useAcademyData(userId: string) {
           status: a.status,
           memo: a.memo ?? '',
           homeworkStatus: a.homeworkStatus ?? '',
+          checkInTime: a.checkInTime,
+          checkOutTime: a.checkOutTime,
         });
       }
       for (const p of data.payments) {

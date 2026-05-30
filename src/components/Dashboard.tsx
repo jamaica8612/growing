@@ -7,7 +7,7 @@ interface DashboardProps {
   classes: Class[];
   attendance: Attendance[];
   payments: Payment[];
-  onSaveAttendance: (attendanceData: Omit<Attendance, 'id'>) => void;
+  onSaveAttendance: (attendanceData: Omit<Attendance, 'id' | 'memo'> & { memo?: string }) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -87,26 +87,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const getRecordForToday = (studentId: string, classId: string) =>
     attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === todayDateStr);
 
-  const parseTimes = (memo: string) => {
-    const arr = memo.match(/등원:\s*(\d{2}:\d{2})/);
-    const dep = memo.match(/하원:\s*(\d{2}:\d{2})/);
-    return { arrivalTime: arr?.[1] ?? null, departureTime: dep?.[1] ?? null };
-  };
-
+  // 등원/하원 시각은 정식 필드(checkInTime/checkOutTime)에 기록한다. 한쪽만
+  // 전달하면 useAcademyData가 반대쪽 값은 그대로 유지한다.
   const handleArrival = (studentId: string, classId: string) => {
-    const now = getCurrentTimeStr();
-    const existing = getRecordForToday(studentId, classId);
-    const { departureTime } = existing ? parseTimes(existing.memo) : { departureTime: null };
-    const memo = departureTime ? `등원: ${now} / 하원: ${departureTime}` : `등원: ${now}`;
-    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', memo });
+    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkInTime: getCurrentTimeStr() });
   };
 
   const handleDeparture = (studentId: string, classId: string) => {
-    const now = getCurrentTimeStr();
-    const existing = getRecordForToday(studentId, classId);
-    const { arrivalTime } = existing ? parseTimes(existing.memo) : { arrivalTime: null };
-    const memo = arrivalTime ? `등원: ${arrivalTime} / 하원: ${now}` : `하원: ${now}`;
-    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', memo });
+    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkOutTime: getCurrentTimeStr() });
   };
 
   return (
@@ -200,7 +188,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         const student = students.find(s => s.id === studentId);
                         if (!student) return null;
                         const record = getRecordForToday(student.id, cls.id);
-                        const { arrivalTime, departureTime } = record ? parseTimes(record.memo) : { arrivalTime: null, departureTime: null };
+                        const arrivalTime = record?.checkInTime ?? null;
+                        const departureTime = record?.checkOutTime ?? null;
 
                         return (
                           <div key={student.id} className="quick-att-card">
