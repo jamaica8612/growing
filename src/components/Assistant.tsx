@@ -255,7 +255,16 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                     </div>
                   )}
                   {m.role === 'assistant' ? (
-                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p style={{ margin: '0 0 0.35em 0' }}>{children}</p>,
+                        ul: ({ children }) => <ul style={{ margin: '0.2em 0', paddingLeft: '1.2em' }}>{children}</ul>,
+                        ol: ({ children }) => <ol style={{ margin: '0.2em 0', paddingLeft: '1.3em' }}>{children}</ol>,
+                        li: ({ children }) => <li style={{ margin: '0.1em 0' }}>{children}</li>,
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
                     ) : (
                       m.content
                   )}
