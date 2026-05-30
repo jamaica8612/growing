@@ -15,6 +15,7 @@ import { CounselLogs } from './components/CounselLogs';
 import { Backup } from './components/Backup';
 import { Kiosk } from './components/Kiosk';
 import { Messaging } from './components/Messaging';
+import { Assistant } from './components/Assistant';
 
 // Import Icons
 import {
@@ -32,6 +33,7 @@ import {
   Monitor,
   BarChart3,
   LogOut,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -44,6 +46,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: '오늘 업무',
     items: [
       { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+      { id: 'assistant', label: '아이비 (AI 비서)', icon: Sparkles },
       { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
       { id: 'messaging', label: '알림장 발송', icon: Smartphone },
       { id: 'kiosk', label: '키오스크 모드', icon: Monitor, kind: 'kiosk' },
@@ -76,6 +79,7 @@ const NAV_GROUP_TITLE_STYLE: React.CSSProperties = {
 
 const TAB_TITLES: Record<string, string> = {
   dashboard: '학원 운영 대시보드',
+  assistant: '아이비 · AI 학원 비서',
   students: '재원생 주소록 및 관리',
   classes: '학급 개설 및 시간표',
   attendance: '출석 및 보강 관리',
@@ -219,6 +223,8 @@ function AcademyApp({ session }: { session: Session }) {
             onSaveAttendance={data.handleSaveAttendance}
           />
         );
+      case 'assistant':
+        return <Assistant />;
       case 'students':
         return (
           <Students
