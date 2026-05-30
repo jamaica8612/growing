@@ -4,8 +4,8 @@ import { sendAssistantMessage, type ChatMessage } from '../lib/assistant';
 
 // AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯 (Phase 0).
 // 메뉴 탭이 아니라 모든 화면에 떠 있는 런처 버튼으로, 클릭하면 채팅 팝업이
-// 열린다. 현재는 Gemini와의 대화 파이프만 검증하며, DB 조회/쓰기 tool과
-// 멀티 에이전트는 이후 Phase에서 연결된다.
+// 열린다. 현재는 DB 조회와 학부모 안내문 초안 작성을 지원하며, 실제 발송과
+// 데이터 변경 도구는 이후 Phase에서 연결된다.
 export const Assistant: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -47,9 +47,9 @@ export const Assistant: React.FC = () => {
   };
 
   const suggestions = [
-    '미납 학부모에게 보낼 안내 문구 만들어줘',
+    '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
+    '오늘 출석 현황 알려줘',
     '결석이 잦은 학생 관리 팁 알려줘',
-    '신규 상담 시 체크할 항목 정리해줘',
   ];
 
   return (

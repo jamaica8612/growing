@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# Growing
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+그로잉영어 교습소 운영을 위한 React + Supabase 기반 관리 앱입니다. 학생, 반/시간표, 출결, 수납, 상담 기록, 알림장, 키오스크 흐름을 한 화면에서 관리하고, 오른쪽 하단의 AI 비서 아이비가 운영 데이터 조회와 학부모 안내문 초안 작성을 돕습니다.
 
-Currently, two official plugins are available:
+## 주요 기능
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Supabase Auth 기반 로그인
+- 학생 주소록과 재원/퇴원 관리
+- 반/시간표 관리
+- 출석, 지각, 결석, 보강 기록
+- 월별 출결 통계
+- 교육비 수납 및 미납 확인
+- 상담/진도/시험 일지
+- 등하원 키오스크와 알림 대기열
+- AI 비서 아이비
+  - 학생/반/출결/수납/상담/오늘 현황 조회
+  - 미납 안내, 출결 후속 안내 등 학부모 메시지 초안 작성
 
-## React Compiler
+## 실행
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 환경 변수
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+프론트엔드는 `.env`에 Supabase 프로젝트 정보를 사용합니다.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
 ```
+
+AI 비서 Edge Function은 Supabase 프로젝트 시크릿에 `GEMINI_API_KEY`가 필요합니다.
+
+## 검증
+
+```bash
+npm run lint
+npm run build
+```
+
+## Supabase Edge Function 배포
+
+Supabase CLI가 전역 설치되어 있지 않으면 `npx`로 실행할 수 있습니다.
+
+```bash
+npx supabase functions deploy assistant --project-ref <project-ref>
+```
+
+현재 프론트엔드는 `VITE_SUPABASE_URL/functions/v1/assistant`를 호출합니다.
