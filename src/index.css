@@ -1203,6 +1203,13 @@ body {
   }
 }
 
+.assistant-markdown {
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
 .assistant-markdown p {
   margin: 0 0 0.45rem;
 }
@@ -1213,12 +1220,13 @@ body {
 
 .assistant-markdown ul,
 .assistant-markdown ol {
-  margin: 0.35rem 0 0.45rem 1.1rem;
-  padding: 0;
+  margin: 0.35rem 0 0.45rem 0.9rem;
+  padding-left: 0.5rem;
 }
 
 .assistant-markdown li {
   margin: 0.18rem 0;
+  padding-left: 0;
 }
 
 .assistant-markdown strong {

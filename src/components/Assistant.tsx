@@ -224,11 +224,13 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                 <div
                   style={{
                     maxWidth: '78%',
+                    minWidth: 0,
                     padding: '0.6rem 0.8rem',
                     borderRadius: 'var(--radius-md)',
                     fontSize: '0.85rem',
                     lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
+                    whiteSpace: m.role === 'assistant' ? 'normal' : 'pre-wrap',
+                    overflowWrap: 'anywhere',
                     backgroundColor: m.role === 'user' ? 'var(--color-primary)' : '#fff',
                     color: m.role === 'user' ? '#fff' : 'var(--color-text-primary)',
                     border: m.role === 'user' ? 'none' : '1px solid var(--color-border)',
