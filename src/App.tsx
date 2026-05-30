@@ -290,6 +290,7 @@ function AcademyApp({ session }: { session: Session }) {
             students={students}
             onAddCounselLog={data.handleAddCounselLog}
             onDeleteCounselLog={data.handleDeleteCounselLog}
+            onSendDraftToMessaging={handleAssistantDraftToMessaging}
           />
         );
       case 'messaging':
