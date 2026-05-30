@@ -35,6 +35,8 @@ export interface Attendance {
   status: AttendanceStatus;
   memo: string;
   homeworkStatus?: HomeworkStatus;
+  checkInTime?: string; // 등원 시각 "HH:MM"
+  checkOutTime?: string; // 하원 시각 "HH:MM"
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'transfer' | '';

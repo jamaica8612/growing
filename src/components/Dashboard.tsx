@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Student, Class, Attendance, Payment, AttendanceStatus, DayOfWeek } from '../types';
+import type { Student, Class, Attendance, Payment, DayOfWeek } from '../types';
 import { Users, BookOpen, CreditCard, AlertCircle, Copy, Check, Clock, Calendar } from 'lucide-react';
 
 interface DashboardProps {
@@ -7,7 +7,7 @@ interface DashboardProps {
   classes: Class[];
   attendance: Attendance[];
   payments: Payment[];
-  onSaveAttendance: (attendanceData: Omit<Attendance, 'id'>) => void;
+  onSaveAttendance: (attendanceData: Omit<Attendance, 'id' | 'memo'> & { memo?: string }) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -81,12 +81,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   };
 
-  // Find attendance status for student in a class today
-  const getAttendanceStatusForToday = (studentId: string, classId: string): AttendanceStatus | undefined => {
-    const record = attendance.find(
-      a => a.studentId === studentId && a.classId === classId && a.date === todayDateStr
-    );
-    return record?.status;
+  const getCurrentTimeStr = (): string =>
+    new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const getRecordForToday = (studentId: string, classId: string) =>
+    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === todayDateStr);
+
+  // 등원/하원 시각은 정식 필드(checkInTime/checkOutTime)에 기록한다. 한쪽만
+  // 전달하면 useAcademyData가 반대쪽 값은 그대로 유지한다.
+  const handleArrival = (studentId: string, classId: string) => {
+    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkInTime: getCurrentTimeStr() });
+  };
+
+  const handleDeparture = (studentId: string, classId: string) => {
+    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkOutTime: getCurrentTimeStr() });
   };
 
   return (
@@ -117,10 +125,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="card metric-card accent-sage">
           <div className="metric-info">
-            <h4>오늘 출석률</h4>
+            <h4>오늘 등원율</h4>
             <div className="metric-value">{attendanceRate}%</div>
             <div className="metric-sub">
-              {presentOrLateCount} / {totalExpectedAttendance} 명 완료
+              {presentOrLateCount} / {totalExpectedAttendance} 명 등원 완료
             </div>
           </div>
           <div className="metric-icon-wrapper">
@@ -179,7 +187,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {cls.studentIds.map(studentId => {
                         const student = students.find(s => s.id === studentId);
                         if (!student) return null;
-                        const currentStatus = getAttendanceStatusForToday(student.id, cls.id);
+                        const record = getRecordForToday(student.id, cls.id);
+                        const arrivalTime = record?.checkInTime ?? null;
+                        const departureTime = record?.checkOutTime ?? null;
 
                         return (
                           <div key={student.id} className="quick-att-card">
@@ -191,28 +201,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                             <div className="quick-att-buttons">
                               <button
-                                className={`btn-att-select ${currentStatus === 'present' ? 'active-present' : ''}`}
-                                onClick={() => onSaveAttendance({ studentId: student.id, classId: cls.id, date: todayDateStr, status: 'present', memo: '' })}
+                                className={`btn-att-select ${arrivalTime ? 'active-present' : ''}`}
+                                onClick={() => handleArrival(student.id, cls.id)}
                               >
-                                출석
+                                🌱 등원{arrivalTime ? ` ${arrivalTime}` : ''}
                               </button>
                               <button
-                                className={`btn-att-select ${currentStatus === 'absent' ? 'active-absent' : ''}`}
-                                onClick={() => onSaveAttendance({ studentId: student.id, classId: cls.id, date: todayDateStr, status: 'absent', memo: '' })}
+                                className={`btn-att-select ${departureTime ? 'active-makeup' : ''}`}
+                                onClick={() => handleDeparture(student.id, cls.id)}
                               >
-                                결석
-                              </button>
-                              <button
-                                className={`btn-att-select ${currentStatus === 'late' ? 'active-late' : ''}`}
-                                onClick={() => onSaveAttendance({ studentId: student.id, classId: cls.id, date: todayDateStr, status: 'late', memo: '' })}
-                              >
-                                지각
-                              </button>
-                              <button
-                                className={`btn-att-select ${currentStatus === 'makeup' ? 'active-makeup' : ''}`}
-                                onClick={() => onSaveAttendance({ studentId: student.id, classId: cls.id, date: todayDateStr, status: 'makeup', memo: '' })}
-                              >
-                                보강
+                                🏡 하원{departureTime ? ` ${departureTime}` : ''}
                               </button>
                             </div>
                           </div>
