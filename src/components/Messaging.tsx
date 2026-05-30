@@ -33,8 +33,17 @@ const buildSMSLink = (parentContact: string, message: string): string => {
   return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
 };
 
+const findDraftStudentId = (students: Student[], draft?: string): string => {
+  if (!draft) return '';
+  const activeMatches = students
+    .filter(s => s.status === 'active' && s.name && draft.includes(s.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  if (activeMatches.length !== 1) return '';
+  return activeMatches[0].id;
+};
+
 export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts, assistantDraft }) => {
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(() => findDraftStudentId(students, assistantDraft?.content));
   const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(() => assistantDraft?.content ? 'custom' : 'in');
   const [customMessage, setCustomMessage] = useState(() => assistantDraft?.content ?? '');
@@ -112,6 +121,7 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
   };
 
   const currentStudent = students.find(s => s.id === selectedStudentId);
+  const draftMatchedStudent = assistantDraft?.content ? students.find(s => s.id === findDraftStudentId(students, assistantDraft.content)) : null;
 
   return (
     <div>
@@ -231,6 +241,25 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
             }}
           >
             📞 <strong>학부모 연락처:</strong> {currentStudent.parentContact || '연락처가 등록되지 않았습니다.'}
+          </div>
+        )}
+
+        {assistantDraft?.content && (
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              backgroundColor: draftMatchedStudent ? 'var(--color-accent-mint-light, #d1fae5)' : 'var(--color-warning-light, #fef3c7)',
+              borderRadius: 'var(--radius-md)',
+              border: `1px solid ${draftMatchedStudent ? 'var(--color-accent-mint, #10b981)' : 'var(--color-warning, #f59e0b)'}`,
+              fontSize: '0.82rem',
+              color: 'var(--color-primary-dark)',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <strong>아이비 초안</strong>
+            {draftMatchedStudent
+              ? `에서 ${draftMatchedStudent.name} 학생을 자동 선택했습니다.`
+              : '에서 학생 이름을 하나로 확정하지 못했습니다. 대상 원생을 직접 선택해 주세요.'}
           </div>
         )}
 
