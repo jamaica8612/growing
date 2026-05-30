@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, KeyRound } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit } from 'lucide-react';
 import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
+import { api } from '../lib/api';
 
 // Bump when the backup file shape changes so old/foreign files can be detected.
 const SCHEMA_VERSION = 1;
@@ -36,6 +37,44 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinStatus, setPinStatus] = useState<string | null>(null);
+
+  const MEMORY_MAX = 3000;
+  const DEFAULT_MEMORY = `- 아이비는 그로잉영어 원장님을 돕는 학원 운영 비서다.
+- 답변은 짧고 실무적으로 한다.
+- 학부모 안내문은 따뜻하고 정중하게 작성한다.
+- 미납 안내는 압박하지 않고 확인 요청 형태로 작성한다.
+- 출결/수납/상담/진도 데이터는 반드시 DB 조회 결과를 기준으로 답한다.
+- 모르는 내용은 추측하지 않는다.
+- 개인정보는 꼭 필요한 경우에만 최소한으로 언급한다.`;
+
+  const [memoryText, setMemoryText] = useState('');
+  const [memoryLoading, setMemoryLoading] = useState(true);
+  const [memorySaving, setMemorySaving] = useState(false);
+  const [memoryStatus, setMemoryStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    api.getAssistantMemory()
+      .then(text => setMemoryText(text || DEFAULT_MEMORY))
+      .catch(() => setMemoryText(DEFAULT_MEMORY))
+      .finally(() => setMemoryLoading(false));
+  // DEFAULT_MEMORY는 상수라 deps에 넣지 않는다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSaveMemory = async () => {
+    const trimmed = memoryText.slice(0, MEMORY_MAX);
+    setMemorySaving(true);
+    setMemoryStatus(null);
+    try {
+      await api.setAssistantMemory(trimmed);
+      setMemoryStatus({ success: true, message: '아이비 기억이 저장되었습니다.' });
+    } catch (e) {
+      setMemoryStatus({ success: false, message: e instanceof Error ? e.message : '저장에 실패했습니다.' });
+    } finally {
+      setMemorySaving(false);
+      setTimeout(() => setMemoryStatus(null), 4000);
+    }
+  };
 
   // Export Data to JSON File
   const handleExport = () => {
@@ -267,6 +306,57 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           <span>{importStatus.message}</span>
         </div>
       )}
+
+      {/* 아이비 기억 설정 */}
+      <div className="card" style={{ borderLeft: '5px solid var(--color-primary)' }}>
+        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <BrainCircuit size={18} /> 아이비 기억 설정
+        </h4>
+        <p style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', marginBottom: '0.9rem', lineHeight: 1.65 }}>
+          아이비가 참고할 <strong>말투·운영 기준·학부모 안내 스타일</strong>을 자유롭게 입력하세요.
+          학생 데이터를 저장하는 기능이 아니며, 아이비가 답변·안내문을 작성할 때 일관되게 따를 원칙만 적어두시면 됩니다.
+          최대 {MEMORY_MAX.toLocaleString()}자 이내.
+        </p>
+        {memoryLoading ? (
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+        ) : (
+          <>
+            <textarea
+              className="form-control"
+              style={{ resize: 'vertical', minHeight: '160px', fontFamily: 'inherit', fontSize: '0.85rem', lineHeight: 1.7, marginBottom: '0.5rem' }}
+              maxLength={MEMORY_MAX}
+              value={memoryText}
+              onChange={e => setMemoryText(e.target.value)}
+              placeholder="예: 미납 안내는 압박하지 않고 확인 요청 형태로 작성한다."
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', color: memoryText.length >= MEMORY_MAX ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+                {memoryText.length.toLocaleString()} / {MEMORY_MAX.toLocaleString()}자
+              </span>
+              <button
+                className="btn btn-primary"
+                onClick={() => void handleSaveMemory()}
+                disabled={memorySaving}
+                style={{ minWidth: '100px' }}
+              >
+                {memorySaving ? '저장 중...' : '기억 저장'}
+              </button>
+            </div>
+            {memoryStatus && (
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  marginTop: '0.6rem', fontSize: '0.85rem', fontWeight: 600,
+                  color: memoryStatus.success ? 'var(--color-primary)' : 'var(--color-danger)',
+                }}
+              >
+                {memoryStatus.success ? <CheckCircle size={15} /> : <AlertTriangle size={15} />}
+                {memoryStatus.message}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Danger Zone Reset Data */}
       <div className="card" style={{ border: '1px solid #fca5a5', backgroundColor: '#fffbfb' }}>

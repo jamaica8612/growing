@@ -409,7 +409,24 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
 // =====================================================================
 // Gemini function-calling 루프
 // =====================================================================
-function systemPrompt(): string {
+
+// 원장님이 저장한 기억을 조회한다. 실패해도 아이비 호출은 중단하지 않는다.
+async function fetchMemory(sb: SupabaseClient): Promise<string> {
+  try {
+    const { data } = await sb
+      .from('growing_assistant_memory')
+      .select('memory_text')
+      .maybeSingle();
+    return (data?.memory_text as string | null) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function systemPrompt(memory: string): string {
+  const memorySection = memory.trim()
+    ? `\n\n[원장님이 설정한 운영 기준 — 반드시 따른다]\n${memory.trim()}`
+    : '';
   return `당신은 '그로잉영어' 영어 교습소의 AI 운영 비서 '아이비(Ivy)'입니다.
 오늘은 ${kstToday()} (${kstDayOfWeek()}요일)이며, 이번 달은 ${kstMonth()}입니다.
 원장님을 도와 학생·출결·수납·상담 업무를 돕습니다. 스스로를 소개할 때는 아이비라고 합니다.
@@ -419,7 +436,7 @@ function systemPrompt(): string {
 - 도구 결과가 비어 있으면 해당 데이터가 없다고 솔직히 답합니다.
 - 지금은 읽기와 초안 작성 단계입니다. 청구서 발행·출결 변경·메시지 실제 발송 같은 데이터 변경 요청에는, 조회와 안내문 초안 작성은 도와드리되 실제 변경/발송은 하지 않는다고 안내합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
-- 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.`;
+- 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.${memorySection}`;
 }
 
 interface GeminiPart { text?: string; functionCall?: { name: string; args: Json }; functionResponse?: { name: string; response: Json } }
@@ -430,7 +447,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 // 과부하(503 UNAVAILABLE)·레이트리밋(429)은 일시적이므로 재시도하고, flash가
 // 계속 막히면 더 한가한 flash-lite로 대체 시도한다. 그래도 안 되면 날 것의
 // JSON 대신 친절한 문구를 던진다.
-async function callGeminiRaw(contents: GeminiContent[]): Promise<GeminiContent> {
+async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise<GeminiContent> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY 시크릿이 설정되지 않았습니다.');
 
@@ -445,7 +462,7 @@ async function callGeminiRaw(contents: GeminiContent[]): Promise<GeminiContent> 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt() }] },
+            systemInstruction: { parts: [{ text: systemPrompt(memory) }] },
             contents,
             tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
             generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
@@ -480,6 +497,9 @@ async function callGeminiRaw(contents: GeminiContent[]): Promise<GeminiContent> 
 
 // 대화 히스토리(텍스트) → Gemini contents, 이후 tool 루프를 돈다.
 async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ reply: string; toolsUsed: string[] }> {
+  // 기억 조회 실패 시에도 아이비 호출은 이어간다.
+  const memory = await fetchMemory(sb);
+
   const contents: GeminiContent[] = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
@@ -487,7 +507,7 @@ async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ 
 
   const toolsUsed: string[] = [];
   for (let i = 0; i < 5; i++) {
-    const content = await callGeminiRaw(contents);
+    const content = await callGeminiRaw(contents, memory);
     const parts = content.parts ?? [];
     const calls = parts.filter(p => p.functionCall);
 

@@ -387,6 +387,24 @@ export const api = {
     if (error) throw error;
   },
 
+  // ---- 아이비 기억 설정 ----
+  async getAssistantMemory(): Promise<string> {
+    const { data } = await supabase
+      .from('growing_assistant_memory')
+      .select('memory_text')
+      .maybeSingle();
+    return (data?.memory_text as string | null) ?? '';
+  },
+
+  async setAssistantMemory(text: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('로그인이 필요합니다.');
+    const { error } = await supabase
+      .from('growing_assistant_memory')
+      .upsert({ owner_id: user.id, memory_text: text, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  },
+
   // ---- Bulk: delete all of the signed-in owner's academy rows (RLS-scoped) ----
   async clearAll(): Promise<void> {
     // Order respects FKs; students last (cascades the rest), classes before.
