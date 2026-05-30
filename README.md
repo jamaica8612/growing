@@ -37,9 +37,10 @@ AI 비서 Edge Function은 Supabase 프로젝트 시크릿에 `GEMINI_API_KEY`�
 ## 검증
 
 ```bash
-npm run lint
-npm run build
+npm run verify
 ```
+
+아이비 AI 비서와 알림장 연결 기능의 배포 전 점검은 [Ivy Assistant QA Runbook](docs/assistant-qa.md)을 따릅니다.
 
 ## Supabase Edge Function 배포
 
