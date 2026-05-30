@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen } from 'lucide-react';
 import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
 import { api } from '../lib/api';
 
@@ -73,6 +73,31 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
     } finally {
       setMemorySaving(false);
       setTimeout(() => setMemoryStatus(null), 4000);
+    }
+  };
+
+  type AssistantNote = { id: string; scope: string; category: string; content: string; studentName: string; createdAt: string };
+  const [notes, setNotes] = useState<AssistantNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.listAssistantNotes()
+      .then(setNotes)
+      .catch(() => {})
+      .finally(() => setNotesLoading(false));
+  }, []);
+
+  const handleDeleteNote = async (id: string) => {
+    if (!window.confirm('이 메모를 삭제하시겠습니까?')) return;
+    setDeletingId(id);
+    try {
+      await api.deleteAssistantNote(id);
+      setNotes(prev => prev.filter(n => n.id !== id));
+    } catch {
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -355,6 +380,61 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
               </div>
             )}
           </>
+        )}
+      </div>
+
+      {/* 아이비 자가학습 메모 목록 */}
+      <div className="card">
+        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <BookOpen size={18} /> 아이비가 스스로 학습한 메모
+        </h4>
+        <p style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', marginBottom: '1rem', lineHeight: 1.65 }}>
+          대화 중 아이비가 자동으로 저장한 메모입니다. <strong>학원 전반(academy)</strong> 노트는 매번 아이비 답변에 반영되고,
+          <strong> 학생별(student)</strong> 노트는 해당 학생 관련 질문 시에만 불러옵니다. 잘못된 내용은 삭제하세요.
+        </p>
+        {notesLoading ? (
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+        ) : notes.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+            🌱 아직 아이비가 학습한 메모가 없습니다. 대화를 나눠보세요.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '360px', overflowY: 'auto' }}>
+            {notes.map(note => (
+              <div
+                key={note.id}
+                style={{
+                  display: 'grid', gridTemplateColumns: 'auto 1fr auto',
+                  alignItems: 'center', gap: '0.65rem',
+                  padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)', backgroundColor: '#fafcfb',
+                  fontSize: '0.83rem',
+                }}
+              >
+                <span
+                  className={note.scope === 'academy' ? 'badge badge-present' : 'badge badge-late'}
+                  style={{ fontSize: '0.68rem', whiteSpace: 'nowrap' }}
+                >
+                  {note.scope === 'academy' ? '학원' : (note.studentName || '학생')}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginRight: '0.4rem' }}>
+                    [{note.category}]
+                  </span>
+                  <span style={{ color: 'var(--color-text-primary)', wordBreak: 'break-word' }}>{note.content}</span>
+                </div>
+                <button
+                  className="btn-icon-only"
+                  title="메모 삭제"
+                  disabled={deletingId === note.id}
+                  onClick={() => void handleDeleteNote(note.id)}
+                  style={{ color: 'var(--color-danger)', opacity: deletingId === note.id ? 0.5 : 1 }}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

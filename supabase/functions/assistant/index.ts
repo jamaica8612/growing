@@ -123,6 +123,31 @@ const TOOL_DECLARATIONS = [
       required: ['kind'],
     },
   },
+  {
+    name: 'remember_note',
+    description: '대화에서 알게 된 안정적 사실·선호를 메모로 저장한다. 추측·일시적 정보·민감정보는 저장하지 않는다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        scope: { type: 'STRING', enum: ['academy', 'student'], description: 'academy: 학원 전반 원칙/말투, student: 특정 학생·학부모 선호/특이사항' },
+        studentName: { type: 'STRING', description: 'scope=student일 때 학생 이름(부분 검색)' },
+        category: { type: 'STRING', description: '분류 키워드(예: parent_pref, student_trait, rule, tone)' },
+        content: { type: 'STRING', description: '기억할 내용. 간결하게 한 문장. 최대 300자.' },
+      },
+      required: ['scope', 'category', 'content'],
+    },
+  },
+  {
+    name: 'recall_notes',
+    description: '과거에 저장한 메모를 조회한다. 학생 관련 질문에 답하기 전 필요 시 호출한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '특정 학생 이름(부분 검색). 생략 시 학원 전반(academy) 노트 반환.' },
+        query: { type: 'STRING', description: '내용 부분 검색어(선택)' },
+      },
+    },
+  },
 ];
 
 // =====================================================================
@@ -401,6 +426,61 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    case 'remember_note': {
+      const scope = (args.scope as string) || 'academy';
+      const studentName = (args.studentName as string) ?? '';
+      const category = (args.category as string) ?? 'general';
+      const rawContent = (args.content as string) ?? '';
+      const content = rawContent.slice(0, 300).trim();
+      if (!content) return { saved: false, reason: '내용이 비어 있어 저장하지 않았습니다.' };
+
+      let studentId: string | null = null;
+      if (scope === 'student') {
+        if (!studentName) return { saved: false, reason: 'scope=student에는 studentName이 필요합니다.' };
+        const students = await fetchStudents(sb);
+        const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+        if (matched.length === 0) return { saved: false, reason: `'${studentName}' 학생을 찾지 못해 저장하지 않았습니다.` };
+        studentId = matched[0].id as string;
+      }
+
+      // 중복 방지: 같은 owner+scope+student+content 존재 시 skip
+      const { data: existing } = await sb
+        .from('growing_assistant_notes')
+        .select('id')
+        .eq('scope', scope)
+        .eq('content', content)
+        .is('student_id', studentId)
+        .maybeSingle();
+      if (existing) return { saved: false, reason: '이미 동일한 내용이 저장되어 있습니다.' };
+
+      const { error } = await sb.from('growing_assistant_notes').insert({
+        scope, category, content,
+        ...(studentId ? { student_id: studentId } : {}),
+      });
+      if (error) throw error;
+      return { saved: true, scope, category, content, studentName: studentName || null };
+    }
+
+    case 'recall_notes': {
+      const studentName = (args.studentName as string) ?? '';
+      const query = (args.query as string) ?? '';
+      let qb = sb.from('growing_assistant_notes').select('*').order('created_at', { ascending: false });
+      if (studentName) {
+        const students = await fetchStudents(sb);
+        const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+        if (matched.length === 0) return { found: false, notes: [], message: `'${studentName}' 학생 노트가 없습니다.` };
+        const ids = matched.map((s: Json) => s.id as string);
+        qb = qb.in('student_id', ids).eq('scope', 'student');
+      } else {
+        qb = qb.eq('scope', 'academy');
+      }
+      const { data, error } = await qb;
+      if (error) throw error;
+      let notes = (data ?? []).map((r: Json) => ({ category: r.category, content: r.content, createdAt: r.created_at }));
+      if (query) notes = notes.filter(n => matchName(n.content as string, query));
+      return { found: true, count: notes.length, notes };
+    }
+
     default:
       return { error: `알 수 없는 도구: ${name}` };
   }
@@ -410,14 +490,27 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
 // Gemini function-calling 루프
 // =====================================================================
 
-// 원장님이 저장한 기억을 조회한다. 실패해도 아이비 호출은 중단하지 않는다.
+const ACADEMY_NOTES_CHAR_CAP = 1500;
+
+// 원장님 수동 기억 + 아이비 자가학습(academy 노트)을 합쳐 반환한다.
+// 실패해도 아이비 호출은 중단하지 않는다.
 async function fetchMemory(sb: SupabaseClient): Promise<string> {
   try {
-    const { data } = await sb
-      .from('growing_assistant_memory')
-      .select('memory_text')
-      .maybeSingle();
-    return (data?.memory_text as string | null) ?? '';
+    const [memRes, notesRes] = await Promise.all([
+      sb.from('growing_assistant_memory').select('memory_text').maybeSingle(),
+      sb.from('growing_assistant_notes')
+        .select('category, content')
+        .eq('scope', 'academy')
+        .order('created_at', { ascending: false })
+        .limit(30),
+    ]);
+
+    const manual = (memRes.data?.memory_text as string | null) ?? '';
+    const autoNotes = (notesRes.data ?? [])
+      .map((r: Record<string, unknown>) => `[${r.category}] ${r.content}`)
+      .join('\n');
+    const combined = [manual.trim(), autoNotes.trim()].filter(Boolean).join('\n\n');
+    return combined.slice(0, ACADEMY_NOTES_CHAR_CAP);
   } catch {
     return '';
   }
@@ -425,7 +518,7 @@ async function fetchMemory(sb: SupabaseClient): Promise<string> {
 
 function systemPrompt(memory: string): string {
   const memorySection = memory.trim()
-    ? `\n\n[원장님이 설정한 운영 기준 — 반드시 따른다]\n${memory.trim()}`
+    ? `\n\n[원장님이 설정한 운영 기준 및 아이비가 학습한 원칙 — 반드시 따른다]\n${memory.trim()}`
     : '';
   return `당신은 '그로잉영어' 영어 교습소의 AI 운영 비서 '아이비(Ivy)'입니다.
 오늘은 ${kstToday()} (${kstDayOfWeek()}요일)이며, 이번 달은 ${kstMonth()}입니다.
@@ -436,7 +529,9 @@ function systemPrompt(memory: string): string {
 - 도구 결과가 비어 있으면 해당 데이터가 없다고 솔직히 답합니다.
 - 지금은 읽기와 초안 작성 단계입니다. 청구서 발행·출결 변경·메시지 실제 발송 같은 데이터 변경 요청에는, 조회와 안내문 초안 작성은 도와드리되 실제 변경/발송은 하지 않는다고 안내합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
-- 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.${memorySection}`;
+- 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.
+- 대화에서 운영에 반복적으로 유용할 안정적 사실·선호(예: 특정 학부모의 연락 방식 선호, 학원 운영 규칙)를 알게 되면 remember_note로 간결히 저장합니다. 추측·일시적 정보·민감개인정보는 저장하지 않습니다.
+- 학생 관련 질문에 답하기 전 과거 메모가 필요하다고 판단되면 recall_notes로 먼저 확인합니다.${memorySection}`;
 }
 
 interface GeminiPart { text?: string; functionCall?: { name: string; args: Json }; functionResponse?: { name: string; response: Json } }
