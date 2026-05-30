@@ -35,18 +35,44 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-// Single source of truth for the primary navigation, rendered by both the
-// desktop sidebar and the mobile drawer to avoid duplicated markup.
-const NAV_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
-  { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-  { id: 'students', label: '학생 관리', icon: Users },
-  { id: 'classes', label: '반/시간표 관리', icon: BookOpen },
-  { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
-  { id: 'stats', label: '출결 통계', icon: BarChart3 },
-  { id: 'payments', label: '수납 관리', icon: CreditCard },
-  { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
-  { id: 'messaging', label: '알림장 발송', icon: Smartphone },
+// Navigation grouped by usage flow so the most-frequent daily tasks sit at the
+// top. Rendered by both the desktop sidebar and the mobile drawer. The 'kiosk'
+// item launches full-screen mode via a confirm; 'backup' lives in the footer.
+type NavItem = { id: string; label: string; icon: LucideIcon; kind?: 'kiosk' };
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: '오늘 업무',
+    items: [
+      { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+      { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
+      { id: 'messaging', label: '알림장 발송', icon: Smartphone },
+      { id: 'kiosk', label: '키오스크 모드', icon: Monitor, kind: 'kiosk' },
+    ],
+  },
+  {
+    title: '원생 · 수업',
+    items: [
+      { id: 'students', label: '학생 관리', icon: Users },
+      { id: 'classes', label: '반/시간표 관리', icon: BookOpen },
+      { id: 'payments', label: '수납 관리', icon: CreditCard },
+    ],
+  },
+  {
+    title: '기록 · 분석',
+    items: [
+      { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
+      { id: 'stats', label: '출결 통계', icon: BarChart3 },
+    ],
+  },
 ];
+
+const NAV_GROUP_TITLE_STYLE: React.CSSProperties = {
+  fontSize: '0.68rem',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  color: 'rgba(255, 255, 255, 0.38)',
+  padding: '0.75rem 1rem 0.3rem',
+};
 
 const TAB_TITLES: Record<string, string> = {
   dashboard: '학원 운영 대시보드',
@@ -302,28 +328,25 @@ function AcademyApp({ session }: { session: Session }) {
     return (
       <>
         <nav style={{ flexGrow: 1 }}>
-          <ul className="nav-menu">
-            {NAV_ITEMS.map(item => (
-              <li key={item.id}>
-                <NavItemButton
-                  active={activeTab === item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => go(item.id)}
-                  badge={item.id === 'messaging' ? kioskAlerts.length : undefined}
-                />
-              </li>
-            ))}
-            <li>
-              <NavItemButton
-                active={activeTab === 'kiosk'}
-                icon={Monitor}
-                label="키오스크 모드"
-                onClick={launchKiosk}
-                style={{ color: opts.kioskAccent, fontWeight: 'bold' }}
-              />
-            </li>
-          </ul>
+          {NAV_GROUPS.map(group => (
+            <div key={group.title} style={{ marginBottom: '0.35rem' }}>
+              <div style={NAV_GROUP_TITLE_STYLE}>{group.title}</div>
+              <ul className="nav-menu">
+                {group.items.map(item => (
+                  <li key={item.id}>
+                    <NavItemButton
+                      active={activeTab === item.id}
+                      icon={item.icon}
+                      label={item.label}
+                      onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
+                      badge={item.id === 'messaging' ? kioskAlerts.length : undefined}
+                      style={item.kind === 'kiosk' ? { color: opts.kioskAccent, fontWeight: 'bold' } : undefined}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
