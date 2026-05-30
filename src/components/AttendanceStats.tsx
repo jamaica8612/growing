@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import type { Student, Class, Attendance, AttendanceStatus } from '../types';
-import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown, Copy, Check } from 'lucide-react';
+import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown, Copy, Check, MessageSquare } from 'lucide-react';
 
 interface AttendanceStatsProps {
   students: Student[];
   classes: Class[];
   attendance: Attendance[];
+  onSendDraftToMessaging?: (content: string) => void;
 }
 
 interface StudentRow {
@@ -33,7 +34,7 @@ const STATUS_META: Record<AttendanceStatus, { label: string; badge: string; colo
 const rateColor = (rate: number) =>
   rate >= 90 ? 'var(--color-success)' : rate >= 75 ? 'var(--color-warning)' : 'var(--color-danger)';
 
-export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, classes, attendance }) => {
+export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, classes, attendance, onSendDraftToMessaging }) => {
   const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -99,7 +100,8 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
   }, [students, monthRecords]);
 
   // Students needing follow-up: at least one record and rate < 80% or >= 3 absences.
-  const concernCount = studentRows.filter(r => r.total > 0 && (r.rate < 80 || r.absent >= 3)).length;
+  const concernRows = studentRows.filter(r => r.total > 0 && (r.rate < 80 || r.absent >= 3 || r.late >= 3));
+  const concernCount = concernRows.length;
 
   const monthNum = Number(selectedMonth.split('-')[1]);
   const monthLabel = `${selectedMonth.split('-')[0]}년 ${monthNum}월`;
@@ -126,6 +128,10 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
       setCopiedId(row.studentId);
       setTimeout(() => setCopiedId(null), 2000);
     });
+  };
+
+  const handleSendToMessaging = (row: StudentRow) => {
+    onSendDraftToMessaging?.(buildAttendanceMessage(row));
   };
 
   return (
@@ -202,13 +208,81 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
               <div className="metric-info">
                 <h4>관리 필요 학생</h4>
                 <div className="metric-value">{concernCount}명</div>
-                <div className="metric-sub">출석률 80% 미만 또는 결석 3회+</div>
+                <div className="metric-sub">출석률 80% 미만 · 결석/지각 3회+</div>
               </div>
               <div className="metric-icon-wrapper">
                 <AlertTriangle size={24} />
               </div>
             </div>
           </div>
+
+          {concernRows.length > 0 && (
+            <div className="card" style={{ borderLeft: '5px solid var(--color-danger)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                <div>
+                  <h3 className="card-title" style={{ marginBottom: '0.35rem' }}>
+                    <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} /> 출결 후속 관리 대상
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                    {monthLabel} 기준 출석률이 낮거나 결석/지각이 반복된 학생입니다. 안내문을 복사하거나 알림장 조립기로 넘겨 바로 다듬을 수 있습니다.
+                  </p>
+                </div>
+                <span className="badge badge-absent" style={{ fontSize: '0.78rem' }}>{concernRows.length}명 확인 필요</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                {concernRows.slice(0, 8).map(row => (
+                  <div
+                    key={row.studentId}
+                    style={{
+                      padding: '0.9rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--color-danger-light)',
+                      backgroundColor: '#fffdfd',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <div>
+                        <strong style={{ color: 'var(--color-primary-dark)' }}>{row.name}</strong>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '0.1rem' }}>
+                          {row.school || '교습소'} · {row.grade.split(' ')[1] || row.grade}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: rateColor(row.rate) }}>{row.rate}%</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.76rem' }}>
+                      <span className="badge badge-absent">결석 {row.absent}</span>
+                      <span className="badge badge-late">지각 {row.late}</span>
+                      <span className="badge badge-present">출석 {row.present}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ flex: '1 1 110px', padding: '0.4rem 0.6rem', fontSize: '0.76rem', gap: '0.25rem' }}
+                        onClick={() => handleCopyMessage(row)}
+                      >
+                        {copiedId === row.studentId ? <><Check size={12} className="text-success" /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        style={{ flex: '1 1 120px', padding: '0.4rem 0.6rem', fontSize: '0.76rem', gap: '0.25rem' }}
+                        onClick={() => handleSendToMessaging(row)}
+                      >
+                        <MessageSquare size={12} /> 알림장으로
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {concernRows.length > 8 && (
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.75rem' }}>
+                  상위 8명만 표시했습니다. 전체 목록은 아래 학생별 출결 현황에서 확인하세요.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Status distribution bar */}
           <div className="card">
@@ -283,22 +357,34 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                         {row.total === 0 ? (
                           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>—</span>
                         ) : (
-                          <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', gap: '0.25rem' }}
-                            title={row.parentContact ? `학부모 연락처: ${row.parentContact}` : '학부모 연락처가 등록되지 않았습니다'}
-                            onClick={() => handleCopyMessage(row)}
-                          >
-                            {copiedId === row.studentId ? (
-                              <>
-                                <Check size={12} className="text-success" /> 복사됨
-                              </>
-                            ) : (
-                              <>
-                                <Copy size={12} /> 출결 안내
-                              </>
+                          <>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', gap: '0.25rem' }}
+                              title={row.parentContact ? `학부모 연락처: ${row.parentContact}` : '학부모 연락처가 등록되지 않았습니다'}
+                              onClick={() => handleCopyMessage(row)}
+                            >
+                              {copiedId === row.studentId ? (
+                                <>
+                                  <Check size={12} className="text-success" /> 복사됨
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={12} /> 출결 안내
+                                </>
+                              )}
+                            </button>
+                            {onSendDraftToMessaging && (
+                              <button
+                                className="btn btn-primary"
+                                style={{ marginLeft: '0.35rem', padding: '0.35rem 0.6rem', fontSize: '0.75rem', gap: '0.25rem' }}
+                                title="출결 안내문을 알림장 조립기로 보내기"
+                                onClick={() => handleSendToMessaging(row)}
+                              >
+                                <MessageSquare size={12} /> 보내기
+                              </button>
                             )}
-                          </button>
+                          </>
                         )}
                       </td>
                     </tr>

@@ -262,7 +262,14 @@ function AcademyApp({ session }: { session: Session }) {
           />
         );
       case 'stats':
-        return <AttendanceStats students={students} classes={classes} attendance={attendance} />;
+        return (
+          <AttendanceStats
+            students={students}
+            classes={classes}
+            attendance={attendance}
+            onSendDraftToMessaging={handleAssistantDraftToMessaging}
+          />
+        );
       case 'payments':
         return (
           <Payments
