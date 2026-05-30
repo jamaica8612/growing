@@ -6,8 +6,8 @@
 // 클라이언트로 DB를 읽기 때문에 RLS가 본인 학원 데이터로 자동 격리한다.
 //
 // Phase 1 범위: Gemini function-calling으로 6개 읽기 tool을 제공한다.
-// (학생/반/출결/수납/상담 조회 + 오늘 현황). 쓰기(청구서 발행·출결 변경)는
-// Phase 2, 멀티 에이전트는 Phase 3에서 추가한다.
+// (학생/반/출결/수납/상담 조회 + 오늘 현황).
+// Phase 2는 DB 쓰기 전 단계로, 학부모 안내문 초안 생성부터 제공한다.
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -105,6 +105,24 @@ const TOOL_DECLARATIONS = [
     description: '오늘의 학원 현황 요약: 오늘 요일/날짜, 오늘 예정된 수업과 반별 학생 수·출결 진행, 이번 달 미납 건수/금액.',
     parameters: { type: 'OBJECT', properties: {} },
   },
+  {
+    name: 'compose_parent_notice',
+    description: '학부모에게 보낼 안내문 초안을 만든다. 실제 메시지 발송이나 DB 변경은 하지 않는다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        kind: {
+          type: 'STRING',
+          enum: ['payment_reminder', 'attendance_followup', 'general'],
+          description: '안내문 종류: 미납 안내, 출결 후속 안내, 일반 안내',
+        },
+        studentName: { type: 'STRING', description: '학생 이름(선택). 미납/출결 안내는 학생명을 넣으면 더 정확하다.' },
+        month: { type: 'STRING', description: '조회 월 YYYY-MM 형식. 생략 시 이번 달' },
+        extraNote: { type: 'STRING', description: '반드시 포함할 추가 안내나 요청사항(선택)' },
+      },
+      required: ['kind'],
+    },
+  },
 ];
 
 // =====================================================================
@@ -121,6 +139,11 @@ async function fetchStudents(sb: SupabaseClient) {
 
 const norm = (v: unknown) => (typeof v === 'string' ? v : '');
 const matchName = (name: string, q: string) => name.toLowerCase().includes(q.toLowerCase());
+const formatWon = (amount: number) => `${Math.round(amount).toLocaleString('ko-KR')}원`;
+
+function compactLines(lines: (string | false | null | undefined)[]) {
+  return lines.filter(Boolean).join('\n');
+}
 
 async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<Json> {
   switch (name) {
@@ -292,6 +315,92 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    case 'compose_parent_notice': {
+      const kind = (args.kind as string) || 'general';
+      const studentName = (args.studentName as string) ?? '';
+      const month = (args.month as string) || kstMonth();
+      const extraNote = (args.extraNote as string) ?? '';
+      const students = await fetchStudents(sb);
+      const matchedStudents = studentName
+        ? students.filter((s: Json) => matchName(norm(s.name), studentName))
+        : [];
+      const student = matchedStudents[0] as Json | undefined;
+
+      if (studentName && !student) {
+        return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다. 이름을 확인해 주세요.` };
+      }
+
+      if (kind === 'payment_reminder') {
+        let q = sb.from('growing_payments').select('*').eq('billing_month', month).eq('status', 'unpaid');
+        if (student) q = q.eq('student_id', student.id);
+        const { data, error } = await q;
+        if (error) throw error;
+        const rows = data ?? [];
+        const amount = rows.reduce((sum, p: Json) => sum + (p.amount as number), 0);
+        const targetLabel = student ? `${norm(student.name)} 학부모님` : '학부모님';
+        return {
+          found: true,
+          kind,
+          month,
+          unpaidCount: rows.length,
+          unpaidAmount: amount,
+          draft: compactLines([
+            `${targetLabel}, 안녕하세요. 그로잉영어입니다.`,
+            rows.length > 0
+              ? `${month} 교육비 ${formatWon(amount)} 수납 확인이 아직 되지 않아 안내드립니다.`
+              : `${month} 교육비 수납 관련해 안내드립니다.`,
+            '이미 납부해 주셨다면 확인 중일 수 있으니 편하게 말씀 부탁드립니다.',
+            extraNote,
+            '늘 함께해 주셔서 감사합니다.',
+          ]),
+          caution: '초안만 생성했으며 실제 발송이나 수납 상태 변경은 하지 않았습니다.',
+        };
+      }
+
+      if (kind === 'attendance_followup') {
+        if (!student) {
+          return { found: false, message: '출결 후속 안내문은 학생 이름이 필요합니다.' };
+        }
+        const { data, error } = await sb
+          .from('growing_attendance')
+          .select('*')
+          .eq('student_id', student.id)
+          .like('date', `${month}%`)
+          .order('date', { ascending: false });
+        if (error) throw error;
+        const absences = (data ?? []).filter((r: Json) => r.status === 'absent');
+        const lates = (data ?? []).filter((r: Json) => r.status === 'late');
+        return {
+          found: true,
+          kind,
+          month,
+          studentName: student.name,
+          absentCount: absences.length,
+          lateCount: lates.length,
+          draft: compactLines([
+            `${student.name} 학부모님, 안녕하세요. 그로잉영어입니다.`,
+            `${month} 출결 확인 결과 결석 ${absences.length}회, 지각 ${lates.length}회로 기록되어 안내드립니다.`,
+            '수업 흐름이 끊기지 않도록 필요한 보강이나 학습 점검을 함께 챙기겠습니다.',
+            extraNote,
+            '확인하시고 궁금하신 점이 있으면 언제든 말씀 주세요.',
+          ]),
+          caution: '초안만 생성했으며 실제 발송이나 출결 변경은 하지 않았습니다.',
+        };
+      }
+
+      return {
+        found: true,
+        kind,
+        draft: compactLines([
+          `${norm(student?.name) || ''}${student ? ' 학부모님' : '학부모님'}, 안녕하세요. 그로잉영어입니다.`,
+          extraNote || '전달드릴 안내사항이 있어 연락드립니다.',
+          '확인하시고 궁금하신 점이 있으면 언제든 말씀 주세요.',
+          '감사합니다.',
+        ]),
+        caution: '초안만 생성했으며 실제 발송이나 DB 변경은 하지 않았습니다.',
+      };
+    }
+
     default:
       return { error: `알 수 없는 도구: ${name}` };
   }
@@ -308,7 +417,7 @@ function systemPrompt(): string {
 [원칙]
 - 학원 데이터(학생/반/출결/수납/상담)에 대한 질문은 반드시 제공된 도구(tool)로 실제 데이터를 조회한 뒤 답합니다. 절대 추측하거나 지어내지 않습니다.
 - 도구 결과가 비어 있으면 해당 데이터가 없다고 솔직히 답합니다.
-- 지금은 읽기 전용 단계입니다. 청구서 발행·출결 변경·메시지 발송 같은 데이터 변경 요청에는, 조회는 도와드리되 실제 변경은 곧 추가될 예정이라고 안내합니다.
+- 지금은 읽기와 초안 작성 단계입니다. 청구서 발행·출결 변경·메시지 실제 발송 같은 데이터 변경 요청에는, 조회와 안내문 초안 작성은 도와드리되 실제 변경/발송은 하지 않는다고 안내합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.`;
 }
@@ -316,31 +425,57 @@ function systemPrompt(): string {
 interface GeminiPart { text?: string; functionCall?: { name: string; args: Json }; functionResponse?: { name: string; response: Json } }
 interface GeminiContent { role: string; parts: GeminiPart[] }
 
-async function callGeminiRaw(model: string, contents: GeminiContent[]): Promise<GeminiContent> {
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// 과부하(503 UNAVAILABLE)·레이트리밋(429)은 일시적이므로 재시도하고, flash가
+// 계속 막히면 더 한가한 flash-lite로 대체 시도한다. 그래도 안 되면 날 것의
+// JSON 대신 친절한 문구를 던진다.
+async function callGeminiRaw(contents: GeminiContent[]): Promise<GeminiContent> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY 시크릿이 설정되지 않았습니다.');
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt() }] },
-        contents,
-        tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
-      }),
+  const modelChain = [MODELS.flash, MODELS.lite];
+  let overloaded = false;
+
+  for (const model of modelChain) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt() }] },
+            contents,
+            tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.candidates?.[0]?.content;
+        if (!content) throw new Error('Gemini 응답이 비어 있어요. 다시 한 번 말씀해 주시겠어요?');
+        return content as GeminiContent;
+      }
+
+      const detail = await res.text();
+      // 일시적 오류: 같은 모델 1회 재시도 → 다음 모델로 대체
+      if (res.status === 503 || res.status === 429) {
+        overloaded = true;
+        if (attempt < 2) { await sleep(700 * attempt); continue; }
+        break; // 다음 모델 시도
+      }
+      // 그 외 오류는 즉시 중단(원인 일부 노출)
+      throw new Error(`Gemini 호출 실패 (${res.status}): ${detail.slice(0, 300)}`);
     }
-  );
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Gemini 호출 실패 (${res.status}): ${detail.slice(0, 600)}`);
   }
-  const data = await res.json();
-  const content = data?.candidates?.[0]?.content;
-  if (!content) throw new Error('Gemini 응답이 비어 있습니다.');
-  return content as GeminiContent;
+
+  if (overloaded) {
+    throw new Error('지금 AI 서버가 잠시 혼잡해요(일시적 과부하). 잠깐 뒤 다시 시도해 주세요. 🙏');
+  }
+  throw new Error('AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.');
 }
 
 // 대화 히스토리(텍스트) → Gemini contents, 이후 tool 루프를 돈다.
@@ -352,7 +487,7 @@ async function runAgent(sb: SupabaseClient, messages: ChatMessage[]): Promise<{ 
 
   const toolsUsed: string[] = [];
   for (let i = 0; i < 5; i++) {
-    const content = await callGeminiRaw(MODELS.flash, contents);
+    const content = await callGeminiRaw(contents);
     const parts = content.parts ?? [];
     const calls = parts.filter(p => p.functionCall);
 

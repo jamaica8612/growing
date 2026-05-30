@@ -1129,6 +1129,20 @@ body {
   .chart-bar-wrapper {
     font-size: 0.7rem !important;
   }
+
+  .kiosk-alert-card {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+  }
+
+  .kiosk-alert-card > div:last-child {
+    grid-column: 1 / -1;
+    justify-content: stretch !important;
+  }
+
+  .kiosk-alert-card > div:last-child > * {
+    flex: 1 1 90px;
+    justify-content: center;
+  }
 }
 
 /* --- Print optimization --- */

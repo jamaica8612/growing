@@ -1,17 +1,22 @@
 import { useRef, useState, useEffect } from 'react';
-import { Sparkles, Send, User, Loader2, X } from 'lucide-react';
+import { Check, Clipboard, MessageSquare, Sparkles, Send, User, Loader2, X } from 'lucide-react';
 import { sendAssistantMessage, type ChatMessage } from '../lib/assistant';
 
 // AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯 (Phase 0).
 // 메뉴 탭이 아니라 모든 화면에 떠 있는 런처 버튼으로, 클릭하면 채팅 팝업이
-// 열린다. 현재는 Gemini와의 대화 파이프만 검증하며, DB 조회/쓰기 tool과
-// 멀티 에이전트는 이후 Phase에서 연결된다.
-export const Assistant: React.FC = () => {
+// 열린다. 현재는 DB 조회와 학부모 안내문 초안 작성을 지원하며, 실제 발송과
+// 데이터 변경 도구는 이후 Phase에서 연결된다.
+interface AssistantProps {
+  onSendToMessaging?: (content: string) => void;
+}
+
+export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 새 메시지/패널 오픈 시 항상 맨 아래로 스크롤.
@@ -46,10 +51,32 @@ export const Assistant: React.FC = () => {
     }
   };
 
+  const handleCopy = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      window.setTimeout(() => setCopiedIndex(current => (current === index ? null : current)), 1600);
+    } catch {
+      setError('클립보드 복사에 실패했습니다. 문구를 직접 선택해 복사해 주세요.');
+    }
+  };
+
+  const isDraftMessage = (content: string) => (
+    content.includes('학부모님') ||
+    content.includes('안내문') ||
+    content.includes('초안') ||
+    content.includes('발송')
+  );
+
+  const handleSendToMessaging = (content: string) => {
+    onSendToMessaging?.(content);
+    setOpen(false);
+  };
+
   const suggestions = [
-    '미납 학부모에게 보낼 안내 문구 만들어줘',
+    '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
+    '오늘 출석 현황 알려줘',
     '결석이 잦은 학생 관리 팁 알려줘',
-    '신규 상담 시 체크할 항목 정리해줘',
   ];
 
   return (
@@ -205,7 +232,78 @@ export const Assistant: React.FC = () => {
                     border: m.role === 'user' ? 'none' : '1px solid var(--color-border)',
                   }}
                 >
+                  {m.role === 'assistant' && isDraftMessage(m.content) && (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        padding: '0.1rem 0.4rem',
+                        marginBottom: '0.45rem',
+                        borderRadius: 'var(--radius-full)',
+                        backgroundColor: 'var(--color-accent-mint-light, #d1fae5)',
+                        color: 'var(--color-primary-dark, #0c2e20)',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <Sparkles size={11} /> 초안
+                    </div>
+                  )}
                   {m.content}
+                  {m.role === 'assistant' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.55rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopy(m.content, i)}
+                        aria-label="아이비 답변 복사"
+                        title="답변 복사"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          minHeight: '28px',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: copiedIndex === i ? 'var(--color-success-light)' : '#fff',
+                          color: copiedIndex === i ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)',
+                          font: 'inherit',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {copiedIndex === i ? <Check size={13} /> : <Clipboard size={13} />}
+                        {copiedIndex === i ? '복사됨' : '복사'}
+                      </button>
+                      {onSendToMessaging && isDraftMessage(m.content) && (
+                        <button
+                          type="button"
+                          onClick={() => handleSendToMessaging(m.content)}
+                          aria-label="아이비 답변을 알림장으로 보내기"
+                          title="알림장으로 보내기"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            minHeight: '28px',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--color-accent-mint, #10b981)',
+                            backgroundColor: 'var(--color-accent-mint-light, #d1fae5)',
+                            color: 'var(--color-primary-dark, #0c2e20)',
+                            font: 'inherit',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <MessageSquare size={13} /> 알림장으로
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

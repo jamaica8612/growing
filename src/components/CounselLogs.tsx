@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import type { Student, CounselLog, CounselLogType } from '../types';
-import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X } from 'lucide-react';
+import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X, Copy, Check } from 'lucide-react';
 
 interface CounselLogsProps {
   counselLogs: CounselLog[];
   students: Student[];
   onAddCounselLog: (log: Omit<CounselLog, 'id'>) => void;
   onDeleteCounselLog: (id: string) => void;
+  onSendDraftToMessaging?: (content: string) => void;
 }
 
 export const CounselLogs: React.FC<CounselLogsProps> = ({
@@ -14,10 +15,12 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
   students,
   onAddCounselLog,
   onDeleteCounselLog,
+  onSendDraftToMessaging,
 }) => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<CounselLogType | 'all'>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
 
   // Form Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -64,6 +67,33 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     }
   };
 
+  const typeLabel = (type: CounselLogType) =>
+    type === 'counsel' ? '상담' : type === 'test' ? '테스트' : '진도/학습';
+
+  const buildParentMessage = (log: CounselLog, student?: Student) => {
+    const studentName = student?.name ?? '학생';
+    const scoreLine = log.type === 'test' && log.score ? `\n- 평가 결과: ${log.score}` : '';
+    return (
+      `안녕하세요, 그로잉영어입니다. 🌱\n\n` +
+      `${studentName} 학생의 ${typeLabel(log.type)} 내용을 안내드립니다.\n\n` +
+      `- 일자: ${log.date}\n` +
+      `- 제목: ${log.title}${scoreLine}\n\n` +
+      `${log.content}\n\n` +
+      `가정에서도 이어서 관심과 격려 부탁드립니다. 궁금하신 점은 편하게 말씀 주세요.`
+    );
+  };
+
+  const handleCopyParentMessage = (log: CounselLog, student?: Student) => {
+    navigator.clipboard.writeText(buildParentMessage(log, student)).then(() => {
+      setCopiedLogId(log.id);
+      setTimeout(() => setCopiedLogId(null), 2000);
+    });
+  };
+
+  const handleSendToMessaging = (log: CounselLog, student?: Student) => {
+    onSendDraftToMessaging?.(buildParentMessage(log, student));
+  };
+
   // Filter logs
   const filteredLogs = counselLogs.filter(log => {
     const student = students.find(s => s.id === log.studentId);
@@ -79,6 +109,11 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
 
     return matchesSearch && matchesType && matchesStudent;
   });
+
+  const recentShareCandidates = [...counselLogs]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .filter(log => students.find(s => s.id === log.studentId)?.status === 'active')
+    .slice(0, 6);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -126,6 +161,82 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
           <Plus size={16} /> 일지 신규 등록
         </button>
       </div>
+
+      {recentShareCandidates.length > 0 && (
+        <div className="card" style={{ borderLeft: '5px solid var(--color-info)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <div>
+              <h3 className="card-title" style={{ marginBottom: '0.35rem' }}>
+                <MessageSquare size={20} className="text-primary" /> 최근 일지 공유 후보
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                최근 상담/진도/평가 기록을 학부모 안내문 초안으로 빠르게 복사하거나 알림장 조립기로 넘길 수 있습니다.
+              </p>
+            </div>
+            <span className="badge badge-makeup" style={{ fontSize: '0.78rem' }}>최근 {recentShareCandidates.length}건</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+            {recentShareCandidates.map(log => {
+              const student = students.find(s => s.id === log.studentId);
+              return (
+                <div
+                  key={log.id}
+                  style={{
+                    padding: '0.9rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: '#fafcfb',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.65rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start' }}>
+                    <div>
+                      <strong style={{ color: 'var(--color-primary-dark)' }}>{student?.name ?? '퇴원생'}</strong>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '0.1rem' }}>
+                        {typeLabel(log.type)} · {log.date}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '4px',
+                        color: '#fff',
+                        backgroundColor: log.type === 'counsel' ? 'var(--color-warning)' : log.type === 'test' ? 'var(--color-accent-mint)' : 'var(--color-info)',
+                      }}
+                    >
+                      {typeLabel(log.type)}
+                    </span>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>{log.title}</div>
+                  <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.8rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {log.content}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ flex: '1 1 110px', padding: '0.4rem 0.6rem', fontSize: '0.76rem', gap: '0.25rem' }}
+                      onClick={() => handleCopyParentMessage(log, student)}
+                    >
+                      {copiedLogId === log.id ? <><Check size={12} className="text-success" /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
+                    </button>
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: '1 1 120px', padding: '0.4rem 0.6rem', fontSize: '0.76rem', gap: '0.25rem' }}
+                      onClick={() => handleSendToMessaging(log, student)}
+                    >
+                      <MessageSquare size={12} /> 알림장으로
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Logs List */}
       <div className="card">
@@ -188,10 +299,26 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <Calendar size={13} /> {log.date}
                       </span>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '0.3rem 0.55rem', fontSize: '0.74rem', gap: '0.25rem' }}
+                        onClick={() => handleCopyParentMessage(log, student)}
+                      >
+                        {copiedLogId === log.id ? <><Check size={12} className="text-success" /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
+                      </button>
+                      {onSendDraftToMessaging && (
+                        <button
+                          className="btn btn-primary"
+                          style={{ padding: '0.3rem 0.55rem', fontSize: '0.74rem', gap: '0.25rem' }}
+                          onClick={() => handleSendToMessaging(log, student)}
+                        >
+                          <MessageSquare size={12} /> 알림장으로
+                        </button>
+                      )}
                       <button
                         className="btn-icon-only text-danger"
                         onClick={() => handleDelete(log.id, log.title)}
