@@ -1,6 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Check, Clipboard, MessageSquare, Sparkles, Send, User, Loader2, X } from 'lucide-react';
 import { sendAssistantMessage, type ChatMessage } from '../lib/assistant';
+
 
 // AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯 (Phase 0).
 // 메뉴 탭이 아니라 모든 화면에 떠 있는 런처 버튼으로, 클릭하면 채팅 팝업이
@@ -250,7 +252,11 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                       <Sparkles size={11} /> 초안
                     </div>
                   )}
-                  {m.content}
+                  {m.role === 'assistant' ? (
+                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                    ) : (
+                      m.content
+                  )}
                   {m.role === 'assistant' && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.55rem', flexWrap: 'wrap' }}>
                       <button

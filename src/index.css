@@ -1202,3 +1202,25 @@ body {
     margin: 1.5cm;
   }
 }
+
+.assistant-markdown p {
+  margin: 0 0 0.45rem;
+}
+
+.assistant-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-markdown ul,
+.assistant-markdown ol {
+  margin: 0.35rem 0 0.45rem 1.1rem;
+  padding: 0;
+}
+
+.assistant-markdown li {
+  margin: 0.18rem 0;
+}
+
+.assistant-markdown strong {
+  font-weight: 700;
+}
