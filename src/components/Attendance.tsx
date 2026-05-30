@@ -208,14 +208,14 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>클래스 필터</label>
+              <label>반 필터</label>
               <select
                 className="form-control"
                 style={{ width: '220px' }}
                 value={selectedClassId}
                 onChange={e => setSelectedClassId(e.target.value)}
               >
-                <option value="all">전체 클래스보기</option>
+                <option value="all">전체 반</option>
                 {classes.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -415,10 +415,10 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
               <tr>
                 <th>학생 이름</th>
                 <th>학교 / 학년</th>
-                <th style={{ textAlign: 'center', color: 'var(--color-success)' }}>출석 (Present)</th>
-                <th style={{ textAlign: 'center', color: 'var(--color-warning)' }}>지각 (Late)</th>
-                <th style={{ textAlign: 'center', color: 'var(--color-danger)' }}>결석 (Absent)</th>
-                <th style={{ textAlign: 'center', color: 'var(--color-info)' }}>보강 (Makeup)</th>
+                <th style={{ textAlign: 'center', color: 'var(--color-success)' }}>출석</th>
+                <th style={{ textAlign: 'center', color: 'var(--color-warning)' }}>지각</th>
+                <th style={{ textAlign: 'center', color: 'var(--color-danger)' }}>결석</th>
+                <th style={{ textAlign: 'center', color: 'var(--color-info)' }}>보강</th>
                 <th style={{ textAlign: 'center', fontWeight: 700 }}>출결 진행률</th>
               </tr>
             </thead>
