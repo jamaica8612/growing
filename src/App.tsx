@@ -1,25 +1,20 @@
-import type { Student, Class, Attendance, Payment, CounselLog, PaymentMethod, KioskAlert } from './types';
-import {
-  initialStudents,
-  initialClasses,
-  initialAttendance,
-  initialPayments,
-  initialCounselLogs,
-} from './utils/mockData';
-import { usePersistentState } from './utils/usePersistentState';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from './lib/supabase';
+import { useAcademyData } from './hooks/useAcademyData';
+import { Login } from './components/Login';
 
 // Import Tab Components
 import { Dashboard } from './components/Dashboard';
 import { Students } from './components/Students';
 import { Classes } from './components/Classes';
 import { AttendanceManager } from './components/Attendance';
+import { AttendanceStats } from './components/AttendanceStats';
 import { Payments } from './components/Payments';
 import { CounselLogs } from './components/CounselLogs';
 import { Backup } from './components/Backup';
 import { Kiosk } from './components/Kiosk';
 import { Messaging } from './components/Messaging';
-import { AttendanceStats } from './components/AttendanceStats';
 
 // Import Icons
 import {
@@ -36,10 +31,9 @@ import {
   Smartphone,
   Monitor,
   BarChart3,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
-
-const DEFAULT_KIOSK_PIN = '1234';
 
 // Single source of truth for the primary navigation, rendered by both the
 // desktop sidebar and the mobile drawer to avoid duplicated markup.
@@ -121,235 +115,70 @@ function NavItemButton({
   );
 }
 
+// Centered full-screen message (loading / error states).
+function FullScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem',
+        color: 'var(--color-text-secondary)',
+        textAlign: 'center',
+      }}
+    >
+      <div>{children}</div>
+    </div>
+  );
+}
+
+// Top-level: resolve the auth session, then gate the app behind login.
 function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (!authReady) {
+    return <FullScreen><Sprout size={28} className="text-primary" /><div style={{ marginTop: '0.75rem' }}>불러오는 중...</div></FullScreen>;
+  }
+  if (!session) {
+    return <Login />;
+  }
+  return <AcademyApp session={session} />;
+}
+
+// The signed-in application: loads data for the owner and renders the UI.
+function AcademyApp({ session }: { session: Session }) {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // On a truly fresh install (no students/classes yet) we seed the sample
-  // data; an existing install restores exactly what's stored and must not get
-  // mock attendance/payments/logs re-injected.
-  const freshInstall = !(
-    localStorage.getItem('growing_students') && localStorage.getItem('growing_classes')
-  );
+  const data = useAcademyData(session.user.id);
+  const {
+    loading,
+    error,
+    reload,
+    students,
+    classes,
+    attendance,
+    payments,
+    counselLogs,
+    kioskAlerts,
+    kioskPin,
+  } = data;
 
-  // Core States — each one auto-persists to localStorage on change.
-  const [kioskPin, setKioskPin] = usePersistentState<string>('growing_kiosk_pin', DEFAULT_KIOSK_PIN);
-  const [students, setStudents] = usePersistentState<Student[]>('growing_students', initialStudents);
-  const [classes, setClasses] = usePersistentState<Class[]>('growing_classes', initialClasses);
-  const [attendance, setAttendance] = usePersistentState<Attendance[]>(
-    'growing_attendance',
-    freshInstall ? initialAttendance : []
-  );
-  const [payments, setPayments] = usePersistentState<Payment[]>(
-    'growing_payments',
-    freshInstall ? initialPayments : []
-  );
-  const [counselLogs, setCounselLogs] = usePersistentState<CounselLog[]>(
-    'growing_logs',
-    freshInstall ? initialCounselLogs : []
-  );
-  // Kiosk check-in/out events awaiting a parent notification (queue only).
-  const [kioskAlerts, setKioskAlerts] = usePersistentState<KioskAlert[]>('growing_kiosk_alerts', []);
-
-  // --- Student Operations ---
-  const handleAddStudent = (studentData: Omit<Student, 'id'>) => {
-    const newStudent: Student = { ...studentData, id: `std_${Date.now()}` };
-    setStudents(prev => [...prev, newStudent]);
+  const handleLogout = () => {
+    void supabase.auth.signOut();
   };
-
-  const handleUpdateStudent = (updatedStudent: Student) => {
-    setStudents(prev => prev.map(s => (s.id === updatedStudent.id ? updatedStudent : s)));
-  };
-
-  const handleDeleteStudent = (id: string) => {
-    setStudents(prev => prev.filter(s => s.id !== id));
-
-    // Clean up student references across every related collection.
-    setClasses(prev => prev.map(c => ({ ...c, studentIds: c.studentIds.filter(sid => sid !== id) })));
-    setAttendance(prev => prev.filter(a => a.studentId !== id));
-    setPayments(prev => prev.filter(p => p.studentId !== id));
-    setCounselLogs(prev => prev.filter(l => l.studentId !== id));
-  };
-
-  // --- Class Operations ---
-  const handleAddClass = (classData: Omit<Class, 'id'>) => {
-    const newClass: Class = { ...classData, id: `cls_${Date.now()}` };
-    setClasses(prev => [...prev, newClass]);
-  };
-
-  const handleUpdateClass = (updatedClass: Class) => {
-    setClasses(prev => prev.map(c => (c.id === updatedClass.id ? updatedClass : c)));
-  };
-
-  const handleDeleteClass = (id: string) => {
-    setClasses(prev => prev.filter(c => c.id !== id));
-    // Remove attendance references for this class
-    setAttendance(prev => prev.filter(a => a.classId !== id));
-  };
-
-  // --- Attendance Operations ---
-  const handleSaveAttendance = (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => {
-    setAttendance(prev => {
-      const existingIndex = prev.findIndex(
-        a =>
-          a.studentId === attendanceData.studentId &&
-          a.classId === attendanceData.classId &&
-          a.date === attendanceData.date
-      );
-
-      if (existingIndex > -1) {
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          status: attendanceData.status,
-          memo: attendanceData.memo !== undefined ? attendanceData.memo : updated[existingIndex].memo,
-          homeworkStatus:
-            attendanceData.homeworkStatus !== undefined
-              ? attendanceData.homeworkStatus
-              : updated[existingIndex].homeworkStatus,
-        };
-        return updated;
-      }
-
-      const newAttendance: Attendance = {
-        ...attendanceData,
-        id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        memo: attendanceData.memo || '',
-        homeworkStatus: attendanceData.homeworkStatus || '',
-      };
-      return [...prev, newAttendance];
-    });
-  };
-
-  // --- Payment Operations ---
-  const handleGenerateMonthlyBills = (month: string) => {
-    const newPayments: Payment[] = [];
-    const activeStudents = students.filter(s => s.status === 'active');
-
-    activeStudents.forEach(student => {
-      // Find classes student attends
-      const studentClasses = classes.filter(c => c.studentIds.includes(student.id));
-      if (studentClasses.length === 0) return;
-
-      // Sum tuition fee
-      const totalTuition = studentClasses.reduce((sum, c) => sum + c.tuitionFee, 0);
-
-      // Check if bill already exists for this student & month
-      const billExists = payments.some(p => p.studentId === student.id && p.billingMonth === month);
-
-      if (!billExists && totalTuition > 0) {
-        newPayments.push({
-          id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          studentId: student.id,
-          billingMonth: month,
-          amount: totalTuition,
-          status: 'unpaid',
-        });
-      }
-    });
-
-    if (newPayments.length === 0) {
-      alert('생성할 대상 학생이 없거나 이미 해당 월의 모든 청구서가 등록되어 있습니다.');
-      return;
-    }
-
-    setPayments(prev => [...prev, ...newPayments]);
-    alert(`성공적으로 ${newPayments.length}건의 청구서를 일괄 발행하였습니다!`);
-  };
-
-  const handleRecordPayment = (paymentId: string, paymentDate: string, method: PaymentMethod) => {
-    setPayments(prev =>
-      prev.map(p =>
-        p.id === paymentId ? { ...p, status: 'paid' as const, paymentDate, paymentMethod: method } : p
-      )
-    );
-  };
-
-  const handleCancelPayment = (paymentId: string) => {
-    setPayments(prev =>
-      prev.map(p =>
-        p.id === paymentId
-          ? { ...p, status: 'unpaid' as const, paymentDate: undefined, paymentMethod: undefined }
-          : p
-      )
-    );
-  };
-
-  const handleDeletePayment = (paymentId: string) => {
-    setPayments(prev => prev.filter(p => p.id !== paymentId));
-  };
-
-  const handleAddManualPayment = (paymentData: Omit<Payment, 'id'>) => {
-    const newPayment: Payment = {
-      ...paymentData,
-      id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    };
-    setPayments(prev => [...prev, newPayment]);
-  };
-
-  // --- Counsel Log Operations ---
-  const handleAddCounselLog = (logData: Omit<CounselLog, 'id'>) => {
-    const newLog: CounselLog = { ...logData, id: `log_${Date.now()}` };
-    setCounselLogs(prev => [...prev, newLog]);
-  };
-
-  const handleUpdateCounselLog = (updatedLog: CounselLog) => {
-    setCounselLogs(prev => prev.map(l => (l.id === updatedLog.id ? updatedLog : l)));
-  };
-
-  const handleDeleteCounselLog = (id: string) => {
-    setCounselLogs(prev => prev.filter(l => l.id !== id));
-  };
-
-  // --- Backup & Restore Operations ---
-  const handleImportData = (data: {
-    students: Student[];
-    classes: Class[];
-    attendance: Attendance[];
-    payments: Payment[];
-    counselLogs: CounselLog[];
-  }) => {
-    setStudents(data.students);
-    setClasses(data.classes);
-    setAttendance(data.attendance);
-    setPayments(data.payments);
-    setCounselLogs(data.counselLogs);
-  };
-
-  const handleResetData = () => {
-    setStudents(initialStudents);
-    setClasses(initialClasses);
-    setAttendance(initialAttendance);
-    setPayments(initialPayments);
-    setCounselLogs(initialCounselLogs);
-  };
-
-  const handleChangeKioskPin = (newPin: string) => {
-    setKioskPin(newPin);
-  };
-
-  // --- Kiosk Alert Queue ---
-  const handleQueueKioskAlert = (studentId: string, kind: 'in' | 'out', date: string, time: string) => {
-    const alert: KioskAlert = {
-      id: `ka_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      studentId,
-      kind,
-      date,
-      time,
-      createdAt: Date.now(),
-    };
-    setKioskAlerts(prev => [...prev, alert]);
-  };
-
-  const handleDismissKioskAlert = (id: string) => {
-    setKioskAlerts(prev => prev.filter(a => a.id !== id));
-  };
-
-  const handleClearKioskAlerts = () => {
-    setKioskAlerts([]);
-  };
-
-  const getAllData = () => ({ students, classes, attendance, payments, counselLogs });
 
   // Render Page Content based on tab Selection
   const renderContent = () => {
@@ -361,7 +190,7 @@ function App() {
             classes={classes}
             attendance={attendance}
             payments={payments}
-            onSaveAttendance={handleSaveAttendance}
+            onSaveAttendance={data.handleSaveAttendance}
           />
         );
       case 'students':
@@ -372,11 +201,11 @@ function App() {
             attendance={attendance}
             payments={payments}
             counselLogs={counselLogs}
-            onAddStudent={handleAddStudent}
-            onUpdateStudent={handleUpdateStudent}
-            onDeleteStudent={handleDeleteStudent}
-            onAddCounselLog={handleAddCounselLog}
-            onUpdateCounselLog={handleUpdateCounselLog}
+            onAddStudent={data.handleAddStudent}
+            onUpdateStudent={data.handleUpdateStudent}
+            onDeleteStudent={data.handleDeleteStudent}
+            onAddCounselLog={data.handleAddCounselLog}
+            onUpdateCounselLog={data.handleUpdateCounselLog}
           />
         );
       case 'classes':
@@ -384,9 +213,9 @@ function App() {
           <Classes
             classes={classes}
             students={students}
-            onAddClass={handleAddClass}
-            onUpdateClass={handleUpdateClass}
-            onDeleteClass={handleDeleteClass}
+            onAddClass={data.handleAddClass}
+            onUpdateClass={data.handleUpdateClass}
+            onDeleteClass={data.handleDeleteClass}
           />
         );
       case 'attendance':
@@ -395,20 +224,22 @@ function App() {
             attendance={attendance}
             students={students}
             classes={classes}
-            onSaveAttendance={handleSaveAttendance}
+            onSaveAttendance={data.handleSaveAttendance}
           />
         );
+      case 'stats':
+        return <AttendanceStats students={students} classes={classes} attendance={attendance} />;
       case 'payments':
         return (
           <Payments
             payments={payments}
             students={students}
             classes={classes}
-            onGenerateMonthlyBills={handleGenerateMonthlyBills}
-            onRecordPayment={handleRecordPayment}
-            onCancelPayment={handleCancelPayment}
-            onDeletePayment={handleDeletePayment}
-            onAddManualPayment={handleAddManualPayment}
+            onGenerateMonthlyBills={data.handleGenerateMonthlyBills}
+            onRecordPayment={data.handleRecordPayment}
+            onCancelPayment={data.handleCancelPayment}
+            onDeletePayment={data.handleDeletePayment}
+            onAddManualPayment={data.handleAddManualPayment}
           />
         );
       case 'counsel':
@@ -416,19 +247,17 @@ function App() {
           <CounselLogs
             counselLogs={counselLogs}
             students={students}
-            onAddCounselLog={handleAddCounselLog}
-            onDeleteCounselLog={handleDeleteCounselLog}
+            onAddCounselLog={data.handleAddCounselLog}
+            onDeleteCounselLog={data.handleDeleteCounselLog}
           />
         );
-      case 'stats':
-        return <AttendanceStats students={students} classes={classes} attendance={attendance} />;
       case 'messaging':
         return (
           <Messaging
             students={students}
             kioskAlerts={kioskAlerts}
-            onDismissAlert={handleDismissKioskAlert}
-            onClearAlerts={handleClearKioskAlerts}
+            onDismissAlert={data.handleDismissKioskAlert}
+            onClearAlerts={data.handleClearKioskAlerts}
           />
         );
       case 'kiosk':
@@ -437,19 +266,19 @@ function App() {
             students={students}
             classes={classes}
             kioskPin={kioskPin}
-            onSaveAttendance={handleSaveAttendance}
-            onQueueAlert={handleQueueKioskAlert}
+            onSaveAttendance={data.handleSaveAttendance}
+            onQueueAlert={data.handleQueueKioskAlert}
             onExitKiosk={() => setActiveTab('dashboard')}
           />
         );
       case 'backup':
         return (
           <Backup
-            onImportData={handleImportData}
-            onResetData={handleResetData}
-            getAllData={getAllData}
+            onImportData={data.handleImportData}
+            onResetData={data.handleResetData}
+            getAllData={data.getAllData}
             kioskPin={kioskPin}
-            onChangeKioskPin={handleChangeKioskPin}
+            onChangeKioskPin={data.handleChangeKioskPin}
           />
         );
       default:
@@ -508,6 +337,22 @@ function App() {
       </>
     );
   };
+
+  if (loading) {
+    return <FullScreen><Sprout size={28} className="text-primary" /><div style={{ marginTop: '0.75rem' }}>데이터를 불러오는 중...</div></FullScreen>;
+  }
+
+  if (error) {
+    return (
+      <FullScreen>
+        <div style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '1rem' }}>
+          데이터를 불러오지 못했습니다.<br />{error}
+        </div>
+        <button className="btn btn-primary" onClick={() => void reload()}>다시 시도</button>
+        <button className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={handleLogout}>로그아웃</button>
+      </FullScreen>
+    );
+  }
 
   if (activeTab === 'kiosk') {
     return renderContent();
@@ -570,9 +415,16 @@ function App() {
             <p className="page-subtitle">그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.</p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#eaf6f0', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-accent-mint-light)' }}>
-            <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--color-success)', borderRadius: '50%', display: 'inline-block' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary)' }}>로컬 보안 접속 중</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#eaf6f0', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-accent-mint-light)' }}>
+              <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--color-success)', borderRadius: '50%', display: 'inline-block' }}></span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary)' }} title={session.user.email ?? ''}>
+                클라우드 동기화 중
+              </span>
+            </div>
+            <button className="btn btn-secondary" style={{ gap: '0.4rem' }} onClick={handleLogout} title={session.user.email ?? ''}>
+              <LogOut size={15} /> 로그아웃
+            </button>
           </div>
         </header>
 

@@ -95,7 +95,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           throw new Error('이 백업 파일은 더 최신 버전에서 생성되었습니다. 프로그램을 업데이트한 후 다시 시도해 주세요.');
         }
 
-        if (window.confirm('기존 브라우저 데이터가 모두 지워지고 백업 파일 데이터로 덮어씌워집니다. 진행하시겠습니까?')) {
+        if (window.confirm('클라우드에 저장된 기존 데이터가 모두 지워지고 백업 파일 데이터로 덮어씌워집니다. 진행하시겠습니까?')) {
           onImportData({
             students: json.students,
             classes: json.classes,
@@ -144,13 +144,13 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
 
   const handleResetClick = () => {
     if (
-      window.confirm('경고: 교습소의 모든 데이터가 완전히 초기화되고 기본 샘플 데이터로 리셋됩니다.\n이 작업은 되돌릴 수 없습니다. 진행하시겠습니까?')
+      window.confirm('경고: 클라우드에 저장된 이 계정의 모든 학원 데이터(학생/반/출결/수납/상담)가 영구 삭제됩니다.\n이 작업은 되돌릴 수 없습니다. 진행하시겠습니까?')
     ) {
-      if (window.confirm('정말 진행하시겠습니까? (이전 데이터는 모두 삭제됩니다)')) {
+      if (window.confirm('정말 진행하시겠습니까? (삭제 전 백업 파일을 먼저 받으시길 권장합니다)')) {
         onResetData();
         setImportStatus({
           success: true,
-          message: '데이터가 기본 샘플 상태로 리셋되었습니다.',
+          message: '모든 학원 데이터가 삭제되었습니다.',
         });
         setTimeout(() => setImportStatus(null), 4000);
       }
@@ -162,14 +162,14 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       
       {/* Introduction Card */}
       <div className="card" style={{ borderLeft: '5px solid var(--color-primary)' }}>
-        <h3 className="card-title">🌱 안전한 로컬 저장소 백업 안내</h3>
+        <h3 className="card-title">🌱 클라우드 데이터 백업 안내</h3>
         <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7' }}>
-          그로잉영어 교습소 관리 시스템은 **서버 전송이 없는 로컬 브라우저 보안 저장소(`localStorage`)**를 사용하고 있습니다. 
-          따라서 입력하신 학생 정보와 수납 내역은 현재 사용 중이신 컴퓨터/브라우저에만 안전하게 저장되며 외부로 유출되지 않습니다.
+          그로잉영어 관리 시스템은 학생 정보와 수납 내역을 <strong>Supabase 클라우드 데이터베이스</strong>에 안전하게 저장합니다.
+          본인 계정으로 로그인한 기기 어디서나 동일한 데이터를 보고 관리할 수 있으며, 행 수준 보안(RLS)으로 다른 사용자와 완전히 분리됩니다.
         </p>
         <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7', marginTop: '0.75rem' }}>
-          단, 브라우저 캐시를 강제로 청소하거나 다른 컴퓨터에서 접속할 때는 기존 데이터가 보이지 않거나 소실될 수 있습니다. 
-          따라서 <strong>매주 또는 매달 한 번씩 데이터를 파일로 다운로드하여 백업하시는 것을 강력히 권장합니다.</strong>
+          평소에는 자동으로 클라우드에 저장되므로 안전하지만, <strong>중요한 시점마다 데이터를 파일(.json)로 한 번씩 내려받아 두시면</strong> 실수로 인한 삭제에도 대비할 수 있습니다.
+          내려받은 백업 파일은 [복원하기]로 언제든 다시 불러올 수 있습니다.
         </p>
       </div>
 
@@ -199,7 +199,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             </h4>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
               컴퓨터에 저장해 둔 그로잉영어 백업 파일(.json)을 업로드하여 데이터를 원래대로 복원합니다. 
-              <strong>주의: 현재 브라우저에 등록된 기존 내용이 백업 데이터로 대체됩니다.</strong>
+              <strong>주의: 클라우드에 등록된 기존 내용이 백업 데이터로 대체됩니다.</strong>
             </p>
           </div>
           <input
@@ -275,15 +275,15 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         </h4>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', maxWidth: '500px' }}>
-            프로그램 사용법 학습 및 테스트를 위해 데이터를 초기 샘플 데이터 상태로 재설정할 수 있습니다. 
-            <strong>주의: 현재 브라우저의 실제 데이터가 모두 영구 삭제되므로 필요시 꼭 백업 파일을 먼저 받으세요.</strong>
+            이 계정의 모든 학원 데이터(학생/반/출결/수납/상담)를 한 번에 비울 수 있습니다.
+            <strong>주의: 클라우드의 실제 데이터가 모두 영구 삭제되므로 필요시 꼭 백업 파일을 먼저 받으세요.</strong>
           </p>
           <button
             className="btn btn-danger"
             style={{ backgroundColor: '#fee2e2', color: 'var(--color-danger)', border: '1px solid #fca5a5' }}
             onClick={handleResetClick}
           >
-            기본 샘플 데이터로 리셋
+            전체 데이터 삭제
           </button>
         </div>
       </div>
