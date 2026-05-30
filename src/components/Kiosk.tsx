@@ -93,8 +93,8 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
 
     // Find class of student for today
     const studentClasses = classes.filter(c => c.studentIds.includes(selectedStudent.id));
-    // Default to first class if enrolled in multiple, or placeholder class
-    const classId = studentClasses[0]?.id || 'cls_none';
+    // Default to first class if enrolled in multiple; empty => no class (null in DB)
+    const classId = studentClasses[0]?.id || '';
 
     const actionText = type === 'in' ? '등원' : '하원';
     const memoText = `${actionText}: ${currentTimeStr}`;
