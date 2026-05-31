@@ -301,6 +301,7 @@ function AcademyApp({ session }: { session: Session }) {
             students={students}
             classes={classes}
             attendance={attendance}
+            payments={payments}
             onSendDraftToMessaging={handleAssistantDraftToMessaging}
           />
         );
