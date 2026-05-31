@@ -17,13 +17,13 @@ export interface MessageTemplates {
 export type MessageTemplateKey = keyof MessageTemplates;
 
 export const DEFAULT_TEMPLATES: MessageTemplates = {
-  checkIn: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 {시간} 등원했습니다.',
-  checkOut: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 {시간} 하원했습니다.',
-  homeworkDone: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 숙제 확인 완료했습니다.',
-  homeworkIncomplete: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 숙제가 일부 미흡합니다. 가정에서 한 번 더 확인 부탁드립니다.',
-  homeworkUndone: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 숙제가 제출되지 않았습니다. 다음 수업 전까지 확인 부탁드립니다.',
-  makeup: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 보강 수업은 {날짜} {시간}입니다.',
-  test: '안녕하세요, 그로잉영어입니다.\n{학생명} 학생 {평가명} 결과는 {점수}입니다.',
+  checkIn: '{학생명} {시간} 등원완료',
+  checkOut: '{학생명} {시간} 하원완료',
+  homeworkDone: '{학생명} 숙제완료',
+  homeworkIncomplete: '{학생명} 숙제미흡',
+  homeworkUndone: '{학생명} 숙제미제출',
+  makeup: '{학생명} {날짜} {시간} 보강',
+  test: '{학생명} {평가명} {점수}',
 };
 
 export const TEMPLATE_META: { key: MessageTemplateKey; label: string; tokens: string[] }[] = [
