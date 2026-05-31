@@ -16,6 +16,8 @@ import { Backup } from './components/Backup';
 import { Kiosk } from './components/Kiosk';
 import { Messaging } from './components/Messaging';
 import { Assistant } from './components/Assistant';
+import { DataQuality } from './components/DataQuality';
+import { MakeupManager } from './components/MakeupManager';
 
 // Import Icons
 import {
@@ -46,6 +48,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
       { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
+      { id: 'makeup', label: '\uBCF4\uAC15 \uAD00\uB9AC', icon: CalendarCheck },
       { id: 'messaging', label: '알림장 발송', icon: Smartphone },
       { id: 'kiosk', label: '키오스크 모드', icon: Monitor, kind: 'kiosk' },
     ],
@@ -63,6 +66,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
       { id: 'stats', label: '출결 통계', icon: BarChart3 },
+      { id: 'data-quality', label: '\uB370\uC774\uD130 \uC810\uAC80', icon: ShieldCheck },
     ],
   },
 ];
@@ -80,7 +84,9 @@ const TAB_TITLES: Record<string, string> = {
   students: '재원생 주소록 및 관리',
   classes: '학급 개설 및 시간표',
   attendance: '출석 및 보강 관리',
+  makeup: '\uBCF4\uAC15 \uAD00\uB9AC',
   stats: '월별 출결 통계 리포트',
+  'data-quality': '\uB370\uC774\uD130 \uC810\uAC80',
   payments: '교육비 수납 장부',
   counsel: '상담 및 학습/성적 일지',
   messaging: '알림장 발송 도우미',
@@ -224,6 +230,7 @@ function AcademyApp({ session }: { session: Session }) {
   const mobileQuickNavItems: NavItem[] = [
     { id: 'dashboard', label: '홈', icon: LayoutDashboard },
     { id: 'attendance', label: '출결', icon: CalendarCheck },
+    { id: 'makeup', label: '\uBCF4\uAC15', icon: CalendarCheck },
     { id: 'messaging', label: '알림장', icon: Smartphone },
     { id: 'students', label: '학생', icon: Users },
     { id: 'backup', label: '설정', icon: ShieldCheck },
@@ -280,6 +287,15 @@ function AcademyApp({ session }: { session: Session }) {
             onQueueHomeworkAlert={data.handleQueueHomeworkAlert}
           />
         );
+      case 'makeup':
+        return (
+          <MakeupManager
+            attendance={attendance}
+            students={students}
+            classes={classes}
+            onSaveAttendance={data.handleSaveAttendance}
+          />
+        );
       case 'stats':
         return (
           <AttendanceStats
@@ -287,6 +303,20 @@ function AcademyApp({ session }: { session: Session }) {
             classes={classes}
             attendance={attendance}
             onSendDraftToMessaging={handleAssistantDraftToMessaging}
+          />
+        );
+      case 'data-quality':
+        return (
+          <DataQuality
+            students={students}
+            classes={classes}
+            attendance={attendance}
+            payments={payments}
+            counselLogs={counselLogs}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              setIsMobileMenuOpen(false);
+            }}
           />
         );
       case 'payments':
