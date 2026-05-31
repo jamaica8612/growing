@@ -181,28 +181,39 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
 
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-
-    const next: ChatMessage[] = [...messages, { role: 'user', content: text }];
-    setMessages(next);
-    setInput('');
+  // 대화 메시지 배열(마지막이 사용자 메시지)을 보내고 답변을 덧붙인다.
+  const runConversation = async (msgs: ChatMessage[]) => {
     setError(null);
     setLoading(true);
     try {
-      const { reply, action } = await sendAssistantMessage(next);
+      const { reply, action } = await sendAssistantMessage(msgs);
       const assistantMsg: ChatMessage = {
         role: 'assistant',
         content: reply,
         ...(action ? { action, actionStatus: 'pending' } : {}),
       };
-      setMessages([...next, assistantMsg]);
+      setMessages([...msgs, assistantMsg]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'AI 비서 응답에 실패했습니다.');
+      setError(e instanceof Error ? e.message : '아이비가 잠시 답하지 못했어요. 다시 시도해 주세요. 🙏');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    const next: ChatMessage[] = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    setInput('');
+    await runConversation(next);
+  };
+
+  // 마지막 사용자 메시지로 다시 시도(에러로 답변이 비었을 때).
+  const handleRetry = async () => {
+    if (loading || messages.length === 0) return;
+    if (messages[messages.length - 1].role !== 'user') return;
+    await runConversation(messages);
   };
 
   const handleApproveAction = async (msgIndex: number, action: PendingAction) => {
@@ -564,8 +575,17 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
           </div>
 
           {error && (
-            <div style={{ padding: '0.5rem 0.85rem', backgroundColor: '#fff5f5', borderTop: '1px solid var(--color-danger-light, #fecaca)', color: 'var(--color-danger)', fontSize: '0.78rem' }}>
-              ⚠️ {error}
+            <div style={{ padding: '0.5rem 0.85rem', backgroundColor: '#fff5f5', borderTop: '1px solid var(--color-danger-light, #fecaca)', color: 'var(--color-danger)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <span>⚠️ {error}</span>
+              {!loading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', minWidth: 'auto', flexShrink: 0 }}
+                  onClick={() => void handleRetry()}
+                >
+                  다시 시도
+                </button>
+              )}
             </div>
           )}
 

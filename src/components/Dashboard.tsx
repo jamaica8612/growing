@@ -69,9 +69,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
     a => isAttendedStatus(a.status) && expectedPairs.has(`${a.classId}|${a.studentId}`)
   ).length;
 
-  const attendanceRate = totalExpectedAttendance > 0 
-    ? Math.round((attendedCount / totalExpectedAttendance) * 100) 
+  const attendanceRate = totalExpectedAttendance > 0
+    ? Math.round((attendedCount / totalExpectedAttendance) * 100)
     : 100;
+
+  // ---- 오늘의 브리핑 (규칙 기반·토큰 0) ----
+  // 이미 로드된 데이터로 즉석 계산해, AI 호출 없이 매 진입마다 무료로 보여준다.
+  const checkedPairCount = selectedAttendanceRecords.filter(a => expectedPairs.has(`${a.classId}|${a.studentId}`)).length;
+  const uncheckedCount = Math.max(totalExpectedAttendance - checkedPairCount, 0);
+  const todayMakeups = selectedAttendanceRecords
+    .filter(a => a.status === 'makeup' && expectedPairs.has(`${a.classId}|${a.studentId}`))
+    .map(a => students.find(s => s.id === a.studentId)?.name)
+    .filter((n): n is string => Boolean(n));
+  // 최근 14일 결석이 잦은(2회 이상) 재원생
+  const briefCutoff = (() => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    d.setDate(d.getDate() - 13);
+    return d.toISOString().split('T')[0];
+  })();
+  const absenceCount = new Map<string, number>();
+  attendance.forEach(a => {
+    if (a.status === 'absent' && a.date >= briefCutoff && a.date <= selectedDate && activeStudentIds.has(a.studentId)) {
+      absenceCount.set(a.studentId, (absenceCount.get(a.studentId) ?? 0) + 1);
+    }
+  });
+  const frequentAbsentees = [...absenceCount.entries()]
+    .filter(([, n]) => n >= 2)
+    .map(([id, n]) => ({ name: students.find(s => s.id === id)?.name ?? '?', count: n }))
+    .sort((a, b) => b.count - a.count);
 
   // List of unpaid students with details for SMS copy
   const unpaidDetails = currentMonthPayments
@@ -165,6 +190,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onChange={event => setSelectedDate(event.target.value)}
           />
         </div>
+      </div>
+
+      {/* 오늘의 브리핑 (규칙 기반·AI 호출 없음) */}
+      <div
+        className="card"
+        style={{
+          marginBottom: '1.5rem',
+          borderLeft: '4px solid var(--color-primary)',
+          background: 'linear-gradient(135deg, #f0f7f3, #ffffff)',
+        }}
+      >
+        <h3 className="card-title" style={{ marginBottom: '0.6rem' }}>
+          🌅 오늘의 브리핑
+          <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '0.4rem' }}>
+            {selectedDay}요일 · {selectedDate}
+          </span>
+        </h3>
+        <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>
+          <li>
+            오늘 수업 <strong>{selectedClasses.length}개 반</strong>
+            {totalExpectedAttendance > 0 && (
+              uncheckedCount > 0
+                ? <> · 출결 미체크 <strong style={{ color: 'var(--color-warning)' }}>{uncheckedCount}명</strong> 남음</>
+                : <> · 출결 체크 <strong style={{ color: 'var(--color-success)' }}>완료</strong> 👍</>
+            )}
+          </li>
+          {todayMakeups.length > 0 && (
+            <li>오늘 보강 <strong>{todayMakeups.length}명</strong> ({todayMakeups.join(', ')})</li>
+          )}
+          <li>
+            이번 달 미납{' '}
+            {unpaidCount > 0
+              ? <><strong style={{ color: 'var(--color-danger)' }}>{unpaidCount}건</strong> ({totalUnpaid.toLocaleString()}원) — 우측 도우미에서 안내장 발송</>
+              : <><strong style={{ color: 'var(--color-success)' }}>없음</strong> 👍</>}
+          </li>
+          {frequentAbsentees.length > 0 && (
+            <li style={{ color: 'var(--color-danger)' }}>
+              최근 2주 결석 잦은 학생: <strong>{frequentAbsentees.map(f => `${f.name}(${f.count}회)`).join(', ')}</strong> — 상담을 챙겨보세요
+            </li>
+          )}
+        </ul>
       </div>
 
       {/* Metrics Row */}
