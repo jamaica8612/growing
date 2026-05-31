@@ -720,7 +720,7 @@ export const Messaging: React.FC<MessagingProps> = ({
 
           <textarea
             className="form-control"
-            rows={12}
+            rows={8}
             readOnly={selectedTemplate !== 'custom'}
             style={{
               fontFamily: 'inherit',
