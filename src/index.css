@@ -478,7 +478,33 @@ body {
   }
   
   .timetable-grid {
-    min-width: 650px; /* Force scrollbar instead of squishing */
+    /* 모바일: 상단헤더(60px) + 하단네비(96px) + 카드크롬(114px) = 270px */
+    height: calc(100vh - 270px);
+    height: calc(100dvh - 270px);
+    max-height: none;
+    grid-template-columns: 48px repeat(5, 1fr);
+  }
+
+  .timetable-header-cell {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.1rem;
+  }
+
+  .timetable-time-col {
+    font-size: 0.65rem;
+  }
+
+  .class-slot {
+    left: 2px;
+    right: 2px;
+    padding: 0.2rem 0.25rem;
+    font-size: 0.68rem;
+    border-left-width: 3px;
+  }
+
+  .class-slot-time,
+  .class-slot-count {
+    display: none;
   }
 
   .cols-4, .cols-3, .cols-2 {
