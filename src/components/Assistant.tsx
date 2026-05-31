@@ -19,7 +19,18 @@ const ACTION_TITLE: Record<PendingAction['type'], string> = {
   update_attendance: '출결 변경',
   create_attendance: '출결 등록',
   update_payment: '수납 처리',
+  create_counsel_log: '일지 작성',
+  update_student_memo: '메모 수정',
 };
+
+const LOG_TYPE_KO: Record<string, string> = {
+  counsel: '상담', progress: '진도', test: '시험',
+};
+
+// 긴 메모를 카드에서 보기 좋게 줄임
+function truncate(text: string, max = 80) {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
 
 function formatWon(amount: number) {
   return `${Math.round(amount).toLocaleString('ko-KR')}원`;
@@ -46,6 +57,17 @@ function ConfirmationCard({ action, onApprove, onReject, disabled }: Confirmatio
     rows.push({ label: '청구 월', value: action.billing_month });
     rows.push({ label: '금액', value: formatWon(action.amount) });
     rows.push({ label: '처리', value: '미납 → 완납' });
+  } else if (action.type === 'create_counsel_log') {
+    rows.push({ label: '학생', value: action.student_name });
+    rows.push({ label: '종류', value: LOG_TYPE_KO[action.log_type] ?? action.log_type });
+    rows.push({ label: '날짜', value: action.date });
+    rows.push({ label: '제목', value: action.title });
+    rows.push({ label: '내용', value: truncate(action.content) });
+    if (action.score) rows.push({ label: '점수', value: action.score });
+  } else if (action.type === 'update_student_memo') {
+    rows.push({ label: '학생', value: action.student_name });
+    rows.push({ label: '현재 메모', value: action.old_memo ? truncate(action.old_memo) : '(없음)' });
+    rows.push({ label: '변경 후', value: truncate(action.new_memo) });
   }
 
   return (
@@ -235,6 +257,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   };
 
   const suggestions = [
+    '🌅 오늘 브리핑 해줘',
     '오늘 출석 현황 알려줘',
     '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
     '홍길동 오늘 결석 → 출석으로 바꿔줘',

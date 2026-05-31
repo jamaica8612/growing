@@ -70,7 +70,31 @@ interface UpdatePaymentAction {
   amount: number;
 }
 
-type PendingAction = UpdateAttendanceAction | CreateAttendanceAction | UpdatePaymentAction;
+interface CreateCounselLogAction {
+  type: 'create_counsel_log';
+  student_id: string;
+  student_name: string;
+  date: string;
+  title: string;
+  content: string;
+  log_type: string;
+  score?: string;
+}
+
+interface UpdateStudentMemoAction {
+  type: 'update_student_memo';
+  student_id: string;
+  student_name: string;
+  old_memo: string;
+  new_memo: string;
+}
+
+type PendingAction =
+  | UpdateAttendanceAction
+  | CreateAttendanceAction
+  | UpdatePaymentAction
+  | CreateCounselLogAction
+  | UpdateStudentMemoAction;
 
 // =====================================================================
 // tool 정의
@@ -203,6 +227,35 @@ const TOOL_DECLARATIONS = [
         billingMonth: { type: 'STRING', description: '청구 월 YYYY-MM 형식. 생략 시 이번 달' },
       },
       required: ['studentName'],
+    },
+  },
+  {
+    name: 'propose_counsel_log',
+    description: '학생의 상담/진도/시험 일지 작성을 제안한다. 실제 DB를 저장하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 상담/진도/시험 기록 작성 요청 시 반드시 이 도구를 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색 가능)' },
+        logType: { type: 'STRING', enum: ['counsel', 'progress', 'test'], description: '상담(counsel)/진도(progress)/시험(test)' },
+        title: { type: 'STRING', description: '일지 제목(간결하게)' },
+        content: { type: 'STRING', description: '일지 본문' },
+        score: { type: 'STRING', description: '시험 점수(logType=test일 때, 예: 95/100). 선택' },
+        date: { type: 'STRING', description: '날짜 YYYY-MM-DD. 생략 시 오늘' },
+      },
+      required: ['studentName', 'logType', 'title', 'content'],
+    },
+  },
+  {
+    name: 'propose_student_memo',
+    description: '학생의 메모(특이사항)에 내용을 추가하거나 교체할 것을 제안한다. 실제 DB를 변경하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 학생 메모 수정 요청 시 반드시 이 도구를 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색 가능)' },
+        memo: { type: 'STRING', description: '추가하거나 교체할 메모 내용' },
+        mode: { type: 'STRING', enum: ['append', 'replace'], description: '기존 메모에 덧붙이기(append, 기본) 또는 통째로 교체(replace)' },
+      },
+      required: ['studentName', 'memo'],
     },
   },
   {
@@ -631,6 +684,65 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    case 'propose_counsel_log': {
+      const studentName = (args.studentName as string) ?? '';
+      const logType = (args.logType as string) ?? 'counsel';
+      const title = (args.title as string) ?? '';
+      const content = (args.content as string) ?? '';
+      const score = (args.score as string) ?? '';
+      const date = (args.date as string) || kstToday();
+      if (!studentName || !title || !content) return { error: '학생 이름·제목·본문은 필수입니다.' };
+
+      const students = await fetchStudents(sb);
+      const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+      if (matched.length === 0) return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+      if (matched.length > 1) {
+        return { found: false, message: `'${studentName}'로 검색된 학생이 여러 명입니다: ${matched.map((s: Json) => s.name).join(', ')}. 더 구체적인 이름을 사용해 주세요.` };
+      }
+      const student = matched[0] as Json;
+      const typeKo = logType === 'progress' ? '진도' : logType === 'test' ? '시험' : '상담';
+      return {
+        action_proposed: true,
+        action: {
+          type: 'create_counsel_log',
+          student_id: student.id as string,
+          student_name: norm(student.name),
+          date, title, content, log_type: logType,
+          ...(logType === 'test' && score ? { score } : {}),
+        } satisfies CreateCounselLogAction,
+        summary: `${student.name} 학생의 ${date} ${typeKo} 일지 '${title}'을(를) 새로 작성합니다.`,
+      };
+    }
+
+    case 'propose_student_memo': {
+      const studentName = (args.studentName as string) ?? '';
+      const memo = (args.memo as string) ?? '';
+      const mode = (args.mode as string) === 'replace' ? 'replace' : 'append';
+      if (!studentName || !memo.trim()) return { error: '학생 이름과 메모 내용은 필수입니다.' };
+
+      const students = await fetchStudents(sb);
+      const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+      if (matched.length === 0) return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+      if (matched.length > 1) {
+        return { found: false, message: `'${studentName}'로 검색된 학생이 여러 명입니다: ${matched.map((s: Json) => s.name).join(', ')}. 더 구체적인 이름을 사용해 주세요.` };
+      }
+      const student = matched[0] as Json;
+      const oldMemo = norm(student.memo);
+      const newMemo = mode === 'replace'
+        ? memo.trim()
+        : (oldMemo ? `${oldMemo}\n${memo.trim()}` : memo.trim());
+      return {
+        action_proposed: true,
+        action: {
+          type: 'update_student_memo',
+          student_id: student.id as string,
+          student_name: norm(student.name),
+          old_memo: oldMemo, new_memo: newMemo,
+        } satisfies UpdateStudentMemoAction,
+        summary: `${student.name} 학생의 메모를 ${mode === 'replace' ? '교체' : '추가'}합니다.`,
+      };
+    }
+
     case 'list_data_sources': {
       const { data, error } = await sb.rpc('growing_list_tables');
       if (error) throw error;
@@ -691,6 +803,24 @@ async function executeAction(sb: SupabaseClient, action: PendingAction): Promise
       if (error) throw error;
       return { success: true, message: `${action.student_name} 학생의 ${action.billing_month} 수납 **${formatWon(action.amount)}** 완납 처리했습니다.` };
     }
+    case 'create_counsel_log': {
+      const { error } = await sb.from('growing_counsel_logs').insert({
+        student_id: action.student_id,
+        date: action.date,
+        title: action.title,
+        content: action.content,
+        type: action.log_type,
+        ...(action.score ? { score: action.score } : {}),
+      });
+      if (error) throw error;
+      const typeKo = action.log_type === 'progress' ? '진도' : action.log_type === 'test' ? '시험' : '상담';
+      return { success: true, message: `${action.student_name} 학생의 ${typeKo} 일지 **${action.title}**을(를) 저장했습니다.` };
+    }
+    case 'update_student_memo': {
+      const { error } = await sb.from('growing_students').update({ memo: action.new_memo }).eq('id', action.student_id);
+      if (error) throw error;
+      return { success: true, message: `${action.student_name} 학생의 메모를 업데이트했습니다.` };
+    }
     default:
       throw new Error('알 수 없는 action type입니다.');
   }
@@ -733,8 +863,10 @@ function systemPrompt(memory: string): string {
 - 사용자를 직접 부를 일이 있으면 반드시 "지선쌤"이라고 부릅니다. "원장님"은 역할 설명이 필요할 때만 쓰고, 호칭으로는 쓰지 않습니다.
 - 학원 데이터에 대한 질문은 반드시 제공된 도구로 실제 데이터를 조회한 뒤 답합니다. 절대 추측하거나 지어내지 않습니다.
 - 도구 결과가 비어 있으면 해당 데이터가 없다고 솔직히 답합니다.
-- 출결 변경·수납 처리 같은 DB 변경 요청은 반드시 propose_attendance_change 또는 propose_payment_change 도구를 사용해 원장님의 승인을 구합니다. 직접 변경하지 않습니다.
+- 출결 변경·수납 처리·상담일지 작성·학생 메모 수정 같은 DB 변경 요청은 반드시 propose_attendance_change / propose_payment_change / propose_counsel_log / propose_student_memo 도구를 사용해 원장님의 승인을 구합니다. 직접 변경하지 않습니다.
 - propose_* 도구가 action_proposed: true를 반환하면 "아래 내용으로 변경하시겠어요? 확인 버튼을 눌러 승인해 주세요."처럼 안내합니다.
+- 데이터를 근거로 답할 때는 마지막에 어떤 자료를 봤는지 한 줄로 덧붙입니다(예: "(오늘 현황·이번 달 수납 기준)"). 여러 자료가 필요하면 한 번에 여러 도구를 호출해도 됩니다.
+- "브리핑" 또는 "오늘 어때" 같은 요청에는 get_today_overview로 오늘 수업·출결·미납을 확인하고, 필요하면 출결 요약도 함께 본 뒤, 챙겨야 할 학생(잦은 결석·미납 등)을 짚어 간결한 아침 브리핑으로 정리합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.
 - 대화에서 운영에 반복적으로 유용할 안정적 사실·선호를 알게 되면 remember_note로 간결히 저장합니다. 추측·일시적 정보·민감정보는 저장하지 않습니다.
@@ -768,7 +900,7 @@ async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise
             systemInstruction: { parts: [{ text: systemPrompt(memory) }] },
             contents,
             tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
+            generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
           }),
         }
       );

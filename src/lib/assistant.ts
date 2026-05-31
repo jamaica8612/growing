@@ -26,7 +26,31 @@ export interface UpdatePaymentAction {
   amount: number;
 }
 
-export type PendingAction = UpdateAttendanceAction | CreateAttendanceAction | UpdatePaymentAction;
+export interface CreateCounselLogAction {
+  type: 'create_counsel_log';
+  student_id: string;
+  student_name: string;
+  date: string;
+  title: string;
+  content: string;
+  log_type: string;
+  score?: string;
+}
+
+export interface UpdateStudentMemoAction {
+  type: 'update_student_memo';
+  student_id: string;
+  student_name: string;
+  old_memo: string;
+  new_memo: string;
+}
+
+export type PendingAction =
+  | UpdateAttendanceAction
+  | CreateAttendanceAction
+  | UpdatePaymentAction
+  | CreateCounselLogAction
+  | UpdateStudentMemoAction;
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
