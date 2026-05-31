@@ -37,49 +37,28 @@
 ### 상담일지
 - **내보내기(마크다운 다운로드)** — `CounselLogs.tsx` `handleExport` (✅ 방금 완료)
 
+### 운영 분석
+- **출결 통계 최근 3개월 추세 카드** — 선택 월 포함 3개월 출석률/기록 건수 표시
+- **출결+미납 우선 관리 대상 카드** — 출석률 80% 미만·결석 3회 이상·해당 월 미납 학생 통합 표시
+- **반별 수강료 분석 카드** — 재원생 기준 반별 인원과 개별 원비 반영 월 예상 수강료 집계
+
 ---
 
 ## ⏳ 진행 예정 (다음 세션에서 이어서)
 
-순서대로 진행. 모두 **프론트엔드 전용**(엣지 재배포 불필요), 빌드는 `npm run verify`.
+순서대로 진행. 빌드는 `npm run verify`.
 
-### 1) 출석 추세 (AttendanceStats.tsx)
-- 목적: 최근 3개월 출석률 추세를 보여줘 이탈 조짐 감지.
-- 구현: `attendance` + `activeStudentIds`로 selectedMonth 포함 직전 3개월 rate 계산(useMemo).
-  ```ts
-  const trend = useMemo(() => {
-    const [y, m] = selectedMonth.split('-').map(Number);
-    return [2,1,0].map(i => {
-      const d = new Date(y, m-1-i, 1);
-      const mo = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      const recs = attendance.filter(a => a.date.startsWith(mo) && activeStudentIds.has(a.studentId));
-      const attended = recs.filter(r => normalizeAttendanceStatus(r.status) !== 'absent').length;
-      return { month: mo, total: recs.length, rate: recs.length ? Math.round(attended/recs.length*100) : -1 };
-    });
-  }, [attendance, selectedMonth, activeStudentIds]);
-  ```
-- 위치: KPI 그리드(라인 ~221) 다음, `<>` 블록 안에 카드로 렌더(막대 3개).
+### 1) 메시지 템플릿 설정화 (Messaging.tsx + Attendance.tsx + Backup.tsx)
+- 목적: 등원/하원/숙제/보강/평가 알림 문구를 `growing_settings.message_templates`에서 관리.
+- 현재 일부 기본 구조는 있음. 하드코딩된 문구가 남아 있는지 검색 후 설정값 우선 사용으로 정리.
+- 외부 API 불필요, 엣지 함수 재배포 불필요.
 
-### 2) 위험군 탐지 D (AttendanceStats.tsx + App.tsx)
-- App.tsx의 `<AttendanceStats ... />`에 `payments={payments}` prop 추가, Props/인터페이스에 `payments: Payment[]` 추가.
-- selectedMonth 미납 집합 + 기존 `studentRows`(rate/absent) 결합한 "🚨 우선 관리 대상" 카드:
-  ```ts
-  const unpaidIds = new Set(payments.filter(p => p.billingMonth === selectedMonth && p.status === 'unpaid').map(p => p.studentId));
-  const riskList = studentRows.map(r => ({ ...r, unpaid: unpaidIds.has(r.studentId) }))
-    .filter(r => (r.total>0 && (r.rate<80 || r.absent>=3)) || r.unpaid)
-    .sort((a,b) => (Number(b.unpaid)+Number(b.rate<80||b.absent>=3)) - (Number(a.unpaid)+Number(a.rate<80||a.absent>=3)));
-  ```
-- 각 항목에 사유 배지(출결/미납) 표시. KPI 그리드 다음에 카드로.
+### 2) 출결 캘린더 뷰
+- 기존 출결 데이터를 월간 달력 그리드로 시각화.
+- 날짜 클릭 시 해당 날짜 기록 확인/관리 흐름으로 점프.
+- 신규 DB 테이블 없이 프론트엔드 전용으로 시작 가능.
 
-### 3) 반별 분석 (Classes.tsx)
-- `getStudentClassTuition`(src/lib/classTuition.ts) import 추가.
-- 클래스 그리드 위에 요약 카드: 반별 재원생 수 + 월 예상 수강료 합계(개별원비 반영), 전체 합계.
-  ```ts
-  const activeIdSet = new Set(students.filter(s=>s.status==='active').map(s=>s.id));
-  // 반별: cls.studentIds.filter(id=>activeIdSet.has(id)) 수, sum(getStudentClassTuition(cls, id))
-  ```
-
-### 4) C — 의미검색 RAG (보류, 별도 세션 권장)
+### 3) C — 의미검색 RAG (보류, 별도 세션 권장)
 - 위험·대규모: pgvector 확장 + 임베딩 컬럼 + 기존 행 백필(Gemini 임베딩 API) +
   엣지 벡터검색 RPC + 신규 일지/노트 저장 시 임베딩 생성.
 - 동작 중인 아이비 회귀 위험이 커서 단독으로 신중히 진행할 것.
