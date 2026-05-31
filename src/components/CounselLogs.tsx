@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Student, CounselLog, CounselLogType } from '../types';
-import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X, Copy, Check } from 'lucide-react';
+import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X, Copy, Check, Download } from 'lucide-react';
 
 interface CounselLogsProps {
   counselLogs: CounselLog[];
@@ -95,6 +95,31 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     onSendDraftToMessaging?.(buildParentMessage(log, student));
   };
 
+  // 현재 필터된 일지를 마크다운 파일로 내보낸다(상담 자료·인수인계용).
+  const handleExport = () => {
+    if (filteredLogs.length === 0) {
+      alert('내보낼 일지가 없습니다. 필터를 확인해 주세요.');
+      return;
+    }
+    const lines: string[] = [`# 상담/진도 일지 (${filteredLogs.length}건)`, ''];
+    [...filteredLogs]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .forEach(log => {
+        const student = students.find(s => s.id === log.studentId);
+        lines.push(`## ${student?.name ?? '(퇴원생)'} · ${typeLabel(log.type)} · ${log.date}`);
+        lines.push(`**${log.title}**`);
+        if (log.type === 'test' && log.score) lines.push(`- 점수: ${log.score}`);
+        lines.push('', log.content, '');
+      });
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `상담일지_${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Filter logs
   const filteredLogs = counselLogs.filter(log => {
     const student = students.find(s => s.id === log.studentId);
@@ -158,6 +183,9 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
           </select>
         </div>
 
+        <button className="btn btn-secondary" onClick={handleExport} title="현재 목록을 마크다운 파일로 저장">
+          <Download size={16} /> 내보내기
+        </button>
         <button className="btn btn-primary" onClick={handleOpenAdd}>
           <Plus size={16} /> 일지 신규 등록
         </button>
