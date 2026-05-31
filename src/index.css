@@ -264,6 +264,17 @@ body {
   display: none !important;
 }
 
+.mobile-bottom-nav {
+  display: none;
+}
+
+.dashboard-date-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .menu-toggle-btn {
   background: none;
   border: none;
@@ -358,9 +369,90 @@ body {
   }
   
   .main-content {
-    padding: 1rem 0.75rem;
+    padding: 1rem 0.75rem calc(6rem + env(safe-area-inset-bottom));
     height: calc(100vh - 60px);
     overflow-y: auto;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 95;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.15rem;
+    padding: 0.45rem 0.65rem calc(0.45rem + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -8px 24px rgba(15, 46, 33, 0.12);
+    backdrop-filter: blur(10px);
+  }
+
+  .mobile-bottom-nav button {
+    min-width: 0;
+    min-height: 48px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    cursor: pointer;
+  }
+
+  .mobile-bottom-nav button.active {
+    background: #eaf6f0;
+    color: var(--color-primary-dark);
+  }
+
+  .mobile-bottom-nav-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-bottom-nav-icon em {
+    position: absolute;
+    top: -8px;
+    right: -12px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--color-danger);
+    color: #ffffff;
+    font-size: 0.64rem;
+    font-style: normal;
+    line-height: 17px;
+    text-align: center;
+  }
+
+  .assistant-fab {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+    right: 1rem !important;
+    width: 54px !important;
+    height: 54px !important;
+  }
+
+  .assistant-panel {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+    right: 0.75rem !important;
+    width: calc(100vw - 1.5rem) !important;
+    height: min(560px, calc(100vh - 7rem - env(safe-area-inset-bottom))) !important;
+  }
+
+  .dashboard-date-card {
+    flex-direction: column;
+    align-items: stretch;
   }
   
   .header {
@@ -1435,16 +1527,19 @@ body {
     font-size: 0.7rem !important;
   }
 
-  .kiosk-alert-card {
+  .kiosk-alert-card,
+  .pending-alert-card {
     grid-template-columns: auto minmax(0, 1fr) !important;
   }
 
-  .kiosk-alert-card > div:last-child {
+  .kiosk-alert-card > div:last-child,
+  .pending-alert-card > div:last-child {
     grid-column: 1 / -1;
     justify-content: stretch !important;
   }
 
-  .kiosk-alert-card > div:last-child > * {
+  .kiosk-alert-card > div:last-child > *,
+  .pending-alert-card > div:last-child > * {
     flex: 1 1 90px;
     justify-content: center;
   }

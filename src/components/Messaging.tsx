@@ -19,7 +19,23 @@ interface MessagingProps {
 }
 
 type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test' | 'custom';
-type AlertFilter = 'all' | 'in' | 'out' | 'missing-contact';
+type AlertFilter = 'all' | 'in' | 'out' | 'homework' | 'missing-contact';
+type PendingAlertType = 'in' | 'out' | 'homework';
+
+interface PendingAlertRow {
+  id: string;
+  source: 'kiosk' | 'homework';
+  sourceId: string;
+  type: PendingAlertType;
+  label: string;
+  badgeClass: string;
+  name: string;
+  contact: string;
+  date: string;
+  time?: string;
+  message: string;
+  createdAt: number;
+}
 
 // Shared check-in / check-out message body, reused by both the manual
 // composer and the kiosk auto-queue so the wording stays in one place.
@@ -152,40 +168,57 @@ export const Messaging: React.FC<MessagingProps> = ({
     });
   };
 
-  const alertRows = useMemo(() => [...kioskAlerts].reverse().map(alert => {
-    const student = students.find(s => s.id === alert.studentId);
-    const name = student?.name ?? '알수없음';
-    const contact = student?.parentContact ?? '';
-    return {
-      alert,
-      student,
-      name,
-      contact,
-      message: buildCheckMessage(messageTemplates, name, alert.kind, alert.time),
-    };
-  }), [kioskAlerts, students, messageTemplates]);
+  const pendingRows = useMemo<PendingAlertRow[]>(() => {
+    const kioskRows: PendingAlertRow[] = kioskAlerts.map(alert => {
+      const student = students.find(s => s.id === alert.studentId);
+      const name = student?.name ?? '알수없음';
+      const contact = student?.parentContact ?? '';
+      return {
+        id: `kiosk-${alert.id}`,
+        source: 'kiosk',
+        sourceId: alert.id,
+        type: alert.kind,
+        label: alert.kind === 'in' ? '등원' : '하원',
+        badgeClass: alert.kind === 'in' ? 'badge-present' : 'badge-makeup',
+        name,
+        contact,
+        date: alert.date,
+        time: alert.time,
+        message: buildCheckMessage(messageTemplates, name, alert.kind, alert.time),
+        createdAt: alert.createdAt,
+      };
+    });
 
-  const homeworkRows = useMemo(() => [...homeworkAlerts].reverse().map(alert => {
-    const student = students.find(s => s.id === alert.studentId);
-    const name = student?.name ?? '알수없음';
-    const contact = student?.parentContact ?? '';
-    return {
-      alert,
-      student,
-      name,
-      contact,
-      label: HOMEWORK_LABEL[alert.homeworkStatus],
-      message: buildHomeworkMessage(messageTemplates, name, alert.homeworkStatus),
-    };
-  }), [homeworkAlerts, students, messageTemplates]);
+    const homeworkRows: PendingAlertRow[] = homeworkAlerts.map(alert => {
+      const student = students.find(s => s.id === alert.studentId);
+      const name = student?.name ?? '알수없음';
+      const contact = student?.parentContact ?? '';
+      return {
+        id: `homework-${alert.id}`,
+        source: 'homework',
+        sourceId: alert.id,
+        type: 'homework',
+        label: `숙제 ${HOMEWORK_LABEL[alert.homeworkStatus]}`,
+        badgeClass: alert.homeworkStatus === 'done' ? 'badge-present' : alert.homeworkStatus === 'incomplete' ? 'badge-late' : 'badge-absent',
+        name,
+        contact,
+        date: alert.date,
+        message: buildHomeworkMessage(messageTemplates, name, alert.homeworkStatus),
+        createdAt: alert.createdAt,
+      };
+    });
 
-  const filteredAlertRows = alertRows.filter(row => {
-    if (alertFilter === 'in') return row.alert.kind === 'in';
-    if (alertFilter === 'out') return row.alert.kind === 'out';
+    return [...kioskRows, ...homeworkRows].sort((a, b) => b.createdAt - a.createdAt);
+  }, [kioskAlerts, homeworkAlerts, students, messageTemplates]);
+
+  const filteredAlertRows = pendingRows.filter(row => {
+    if (alertFilter === 'in') return row.type === 'in';
+    if (alertFilter === 'out') return row.type === 'out';
+    if (alertFilter === 'homework') return row.type === 'homework';
     if (alertFilter === 'missing-contact') return !row.contact;
     return true;
   });
-  const visibleAlertIds = filteredAlertRows.map(row => row.alert.id);
+  const visibleAlertIds = filteredAlertRows.map(row => row.id);
   const selectedVisibleAlertIds = selectedAlertIds.filter(id => visibleAlertIds.includes(id));
   const hasAllVisibleSelected = visibleAlertIds.length > 0 && visibleAlertIds.every(id => selectedAlertIds.includes(id));
 
@@ -201,10 +234,10 @@ export const Messaging: React.FC<MessagingProps> = ({
   };
 
   const handleCopySelectedAlerts = () => {
-    const selectedRows = alertRows.filter(row => selectedAlertIds.includes(row.alert.id));
+    const selectedRows = pendingRows.filter(row => selectedAlertIds.includes(row.id));
     if (selectedRows.length === 0) return;
     const text = selectedRows
-      .map(row => `[${row.alert.kind === 'in' ? '등원' : '하원'}] ${row.name} ${row.alert.time}\n${row.message}`)
+      .map(row => `[${row.label}] ${row.name}${row.time ? ` ${row.time}` : ` ${row.date}`}\n${row.message}`)
       .join('\n\n---\n\n');
     navigator.clipboard.writeText(text).then(() => {
       setBulkCopied(true);
@@ -212,8 +245,22 @@ export const Messaging: React.FC<MessagingProps> = ({
     });
   };
 
+  const dismissPendingRow = (row: PendingAlertRow) => {
+    if (row.source === 'homework') {
+      onDismissHomeworkAlert(row.sourceId);
+      return;
+    }
+    onDismissAlert(row.sourceId);
+  };
+
   const handleDismissSelectedAlerts = () => {
-    selectedAlertIds.forEach(id => onDismissAlert(id));
+    pendingRows.filter(row => selectedAlertIds.includes(row.id)).forEach(dismissPendingRow);
+    setSelectedAlertIds([]);
+  };
+
+  const handleClearPendingAlerts = () => {
+    onClearHomeworkAlerts();
+    onClearAlerts();
     setSelectedAlertIds([]);
   };
 
@@ -222,87 +269,11 @@ export const Messaging: React.FC<MessagingProps> = ({
 
   return (
     <div>
-      {/* Kiosk check-in/out notifications awaiting send */}
-      {homeworkAlerts.length > 0 && (
-        <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--color-primary)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <h3 className="card-title" style={{ margin: 0 }}>
-              <MessageSquare size={20} className="text-primary" /> 숙제 알림 대기 ({homeworkAlerts.length}건)
-            </h3>
-            <button
-              className="btn btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
-              onClick={onClearHomeworkAlerts}
-            >
-              <Trash2 size={14} /> 전체 비우기
-            </button>
-          </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-            출결 관리에서 숙제 상태를 체크한 뒤 [알림장]을 누르면 여기에 쌓입니다. 복사하거나 문자로 보낸 뒤 [완료]로 정리하세요.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '320px', overflowY: 'auto' }}>
-            {homeworkRows.map(({ alert, name, contact, label, message }) => (
-              <div
-                key={alert.id}
-                className="homework-alert-card"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1fr) auto',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.85rem 1rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  backgroundColor: '#fafcfb',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
-                  <span className={`badge ${alert.homeworkStatus === 'done' ? 'badge-present' : alert.homeworkStatus === 'incomplete' ? 'badge-late' : 'badge-absent'}`} style={{ fontSize: '0.72rem' }}>
-                    숙제 {label}
-                  </span>
-                  <strong style={{ color: 'var(--color-primary-dark)' }}>{name}</strong>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>{alert.date}</span>
-                  <span style={{ fontSize: '0.78rem', color: contact ? 'var(--color-text-muted)' : 'var(--color-danger)' }}>
-                    {contact ? `📞 ${contact}` : '연락처 없음'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
-                    onClick={() => handleCopyAlert(`homework-${alert.id}`, message)}
-                  >
-                    {copiedAlertId === `homework-${alert.id}` ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
-                  </button>
-                  {contact && (
-                    <a
-                      href={buildSMSLink(contact, message)}
-                      className="btn btn-primary"
-                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem', textDecoration: 'none' }}
-                    >
-                      <Send size={13} /> 문자
-                    </a>
-                  )}
-                  <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
-                    onClick={() => onDismissHomeworkAlert(alert.id)}
-                  >
-                    완료
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Kiosk check-in/out notifications awaiting send */}
-      {kioskAlerts.length > 0 && (
+      {pendingRows.length > 0 && (
         <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--color-warning)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <h3 className="card-title" style={{ margin: 0 }}>
-              <Bell size={20} className="text-secondary" /> 키오스크 자동 발송 대기 ({kioskAlerts.length}건)
+              <Bell size={20} className="text-secondary" /> 알림장 발송 대기 ({pendingRows.length}건)
             </h3>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               <button
@@ -324,22 +295,23 @@ export const Messaging: React.FC<MessagingProps> = ({
               <button
                 className="btn btn-secondary"
                 style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
-                onClick={onClearAlerts}
+                onClick={handleClearPendingAlerts}
               >
                 <Trash2 size={14} /> 전체 비우기
               </button>
             </div>
           </div>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-            학생이 키오스크에서 등·하원을 체크하면 자동으로 여기에 쌓입니다. 복사하거나 문자로 보낸 뒤 [완료]를 눌러 정리하세요.
+            키오스크 등·하원 알림과 출결 관리의 숙제 알림을 한곳에 모았습니다. 필요한 항목만 필터링해서 복사하거나 문자 발송 후 완료 처리하세요.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
             <Filter size={15} className="text-secondary" />
             {[
-              ['all', `전체 ${alertRows.length}`],
-              ['in', `등원 ${alertRows.filter(row => row.alert.kind === 'in').length}`],
-              ['out', `하원 ${alertRows.filter(row => row.alert.kind === 'out').length}`],
-              ['missing-contact', `연락처 없음 ${alertRows.filter(row => !row.contact).length}`],
+              ['all', `전체 ${pendingRows.length}`],
+              ['in', `등원 ${pendingRows.filter(row => row.type === 'in').length}`],
+              ['out', `하원 ${pendingRows.filter(row => row.type === 'out').length}`],
+              ['homework', `숙제 ${pendingRows.filter(row => row.type === 'homework').length}`],
+              ['missing-contact', `연락처 없음 ${pendingRows.filter(row => !row.contact).length}`],
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -369,12 +341,12 @@ export const Messaging: React.FC<MessagingProps> = ({
                 이 필터에 해당하는 대기 알림이 없습니다.
               </div>
             )}
-            {filteredAlertRows.map(({ alert, name, contact, message }) => {
-              const selected = selectedAlertIds.includes(alert.id);
+            {filteredAlertRows.map(row => {
+              const selected = selectedAlertIds.includes(row.id);
               return (
                 <div
-                  key={alert.id}
-                  className="kiosk-alert-card"
+                  key={row.id}
+                  className="pending-alert-card"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'auto minmax(0, 1fr) auto',
@@ -388,33 +360,33 @@ export const Messaging: React.FC<MessagingProps> = ({
                 >
                   <button
                     type="button"
-                    aria-label={`${name} 알림 선택`}
-                    onClick={() => toggleAlertSelection(alert.id)}
+                    aria-label={`${row.name} 알림 선택`}
+                    onClick={() => toggleAlertSelection(row.id)}
                     style={{ background: 'none', border: 'none', color: selected ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', padding: 0 }}
                   >
                     {selected ? <CheckSquare size={20} /> : <Square size={20} />}
                   </button>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
-                    <span className={`badge ${alert.kind === 'in' ? 'badge-present' : 'badge-makeup'}`} style={{ fontSize: '0.72rem' }}>
-                      {alert.kind === 'in' ? '등원' : '하원'}
+                    <span className={`badge ${row.badgeClass}`} style={{ fontSize: '0.72rem' }}>
+                      {row.label}
                     </span>
-                    <strong style={{ color: 'var(--color-primary-dark)' }}>{name}</strong>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>{alert.time}</span>
-                    <span style={{ fontSize: '0.78rem', color: contact ? 'var(--color-text-muted)' : 'var(--color-danger)' }}>
-                      {contact ? `📞 ${contact}` : '연락처 없음'}
+                    <strong style={{ color: 'var(--color-primary-dark)' }}>{row.name}</strong>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>{row.time ?? row.date}</span>
+                    <span style={{ fontSize: '0.78rem', color: row.contact ? 'var(--color-text-muted)' : 'var(--color-danger)' }}>
+                      {row.contact ? `📞 ${row.contact}` : '연락처 없음'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <button
                       className="btn btn-secondary"
                       style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
-                      onClick={() => handleCopyAlert(alert.id, message)}
+                      onClick={() => handleCopyAlert(row.id, row.message)}
                     >
-                      {copiedAlertId === alert.id ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
+                      {copiedAlertId === row.id ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
                     </button>
-                    {contact && (
+                    {row.contact && (
                       <a
-                        href={buildSMSLink(contact, message)}
+                        href={buildSMSLink(row.contact, row.message)}
                         className="btn btn-primary"
                         style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem', textDecoration: 'none' }}
                       >
@@ -424,7 +396,7 @@ export const Messaging: React.FC<MessagingProps> = ({
                     <button
                       className="btn btn-secondary"
                       style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
-                      onClick={() => onDismissAlert(alert.id)}
+                      onClick={() => dismissPendingRow(row)}
                     >
                       완료
                     </button>

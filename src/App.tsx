@@ -221,6 +221,13 @@ function AcademyApp({ session }: { session: Session }) {
     setIsMobileMenuOpen(false);
   };
 
+  const mobileQuickNavItems: NavItem[] = [
+    { id: 'dashboard', label: '홈', icon: LayoutDashboard },
+    { id: 'attendance', label: '출결', icon: CalendarCheck },
+    { id: 'messaging', label: '알림장', icon: Smartphone },
+    { id: 'students', label: '학생', icon: Users },
+  ];
+
   // Render Page Content based on tab Selection
   const renderContent = () => {
     switch (activeTab) {
@@ -489,6 +496,30 @@ function AcademyApp({ session }: { session: Session }) {
           {renderContent()}
         </div>
       </main>
+
+      <nav className="mobile-bottom-nav" aria-label="빠른 이동">
+        {mobileQuickNavItems.map(item => {
+          const Icon = item.icon;
+          const badge = item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : 0;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={activeTab === item.id ? 'active' : ''}
+              onClick={() => {
+                setActiveTab(item.id);
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <span className="mobile-bottom-nav-icon">
+                <Icon size={19} />
+                {badge > 0 ? <em>{badge}</em> : null}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {/* AI 비서 아이비 — 모든 화면 오른쪽 하단 플로팅 위젯 (키오스크 모드 제외) */}
       <Assistant onSendToMessaging={handleAssistantDraftToMessaging} />

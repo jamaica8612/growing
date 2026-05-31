@@ -244,6 +244,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
     <>
       {!open && (
         <button
+          className="assistant-fab"
           onClick={() => setOpen(true)}
           aria-label="AI 비서 아이비 열기"
           style={{
@@ -273,6 +274,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
 
       {open && (
         <div
+          className="assistant-panel"
           style={{
             position: 'fixed',
             bottom: '1.5rem',

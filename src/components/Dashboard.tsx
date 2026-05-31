@@ -18,23 +18,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSaveAttendance,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  // Helper for today's day of the week
-  const getKoreanDayOfWeek = (): DayOfWeek => {
+  // Helper for the selected date's day of the week.
+  const getKoreanDayOfWeek = (dateStr: string): DayOfWeek => {
     const days: DayOfWeek[] = ['일', '월', '화', '수', '목', '금', '토'];
-    const today = new Date();
-    return days[today.getDay()];
+    const date = new Date(`${dateStr}T00:00:00`);
+    return days[date.getDay()];
   };
 
-  const todayDay = getKoreanDayOfWeek();
-  const todayDateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const selectedDay = getKoreanDayOfWeek(selectedDate);
 
   // Active students
   const activeStudents = students.filter(s => s.status === 'active');
   const activeCount = activeStudents.length;
 
-  // Today's classes
-  const todayClasses = classes.filter(c => c.days.includes(todayDay));
+  // Classes for the selected date.
+  const selectedClasses = classes.filter(c => c.days.includes(selectedDay));
 
   // Payment Stats for Current Month
   const currentMonthStr = new Date().toISOString().substring(0, 7); // YYYY-MM
@@ -45,10 +45,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .filter(p => p.status === 'unpaid')
     .reduce((sum, p) => sum + p.amount, 0);
 
-  // Today's Attendance Rate
-  const todayAttendanceRecords = attendance.filter(a => a.date === todayDateStr);
-  const totalExpectedAttendance = todayClasses.reduce((sum, c) => sum + c.studentIds.length, 0);
-  const presentOrLateCount = todayAttendanceRecords.filter(
+  // Selected date attendance rate.
+  const selectedAttendanceRecords = attendance.filter(a => a.date === selectedDate);
+  const totalExpectedAttendance = selectedClasses.reduce((sum, c) => sum + c.studentIds.length, 0);
+  const presentOrLateCount = selectedAttendanceRecords.filter(
     a => a.status === 'present' || a.status === 'late'
   ).length;
 
@@ -84,25 +84,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const getCurrentTimeStr = (): string =>
     new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  const getRecordForToday = (studentId: string, classId: string) =>
-    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === todayDateStr);
+  const getRecordForSelectedDate = (studentId: string, classId: string) =>
+    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === selectedDate);
 
   // 등원/하원 시각은 정식 필드(checkInTime/checkOutTime)에 기록한다. 한쪽만
   // 전달하면 useAcademyData가 반대쪽 값은 그대로 유지한다.
   const handleArrival = (studentId: string, classId: string) => {
-    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkInTime: getCurrentTimeStr() });
+    onSaveAttendance({ studentId, classId, date: selectedDate, status: 'present', checkInTime: getCurrentTimeStr() });
   };
 
   const handleDeparture = (studentId: string, classId: string) => {
-    onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkOutTime: getCurrentTimeStr() });
+    onSaveAttendance({ studentId, classId, date: selectedDate, status: 'present', checkOutTime: getCurrentTimeStr() });
   };
 
   const handleHomework = (studentId: string, classId: string, homeworkStatus: HomeworkStatus) => {
-    const record = getRecordForToday(studentId, classId);
+    const record = getRecordForSelectedDate(studentId, classId);
     onSaveAttendance({
       studentId,
       classId,
-      date: todayDateStr,
+      date: selectedDate,
       status: record?.status ?? 'present',
       memo: record?.memo ?? '',
       homeworkStatus,
@@ -111,6 +111,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div>
+      <div className="card dashboard-date-card" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>
+            <Calendar size={20} className="text-primary" /> 조회 날짜
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+            선택한 날짜의 수업, 출결, 숙제 체크를 한 화면에서 관리합니다.
+          </p>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: '180px' }}>
+          <label>날짜 선택</label>
+          <input
+            type="date"
+            className="form-control"
+            value={selectedDate}
+            onChange={event => setSelectedDate(event.target.value)}
+          />
+        </div>
+      </div>
+
       {/* Metrics Row */}
       <div className="grid-container cols-4" style={{ marginBottom: '2rem' }}>
         <div className="card metric-card">
@@ -126,9 +146,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="card metric-card accent-mint">
           <div className="metric-info">
-            <h4>오늘의 수업</h4>
-            <div className="metric-value">{todayClasses.length}개 반</div>
-            <div className="metric-sub">요일: {todayDay}요일</div>
+            <h4>선택일 수업</h4>
+            <div className="metric-value">{selectedClasses.length}개 반</div>
+            <div className="metric-sub">요일: {selectedDay}요일</div>
           </div>
           <div className="metric-icon-wrapper">
             <BookOpen size={24} />
@@ -137,7 +157,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="card metric-card accent-sage">
           <div className="metric-info">
-            <h4>오늘 등원율</h4>
+            <h4>선택일 등원율</h4>
             <div className="metric-value">{attendanceRate}%</div>
             <div className="metric-sub">
               {presentOrLateCount} / {totalExpectedAttendance} 명 등원 완료
@@ -160,21 +180,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Main Grid: Today's Attendance & Unpaid Bills */}
+      {/* Main Grid: Selected Date Attendance & Unpaid Bills */}
       <div className="grid-container cols-2-1">
-        {/* Left: Today's Classes & Attendance Check */}
+        {/* Left: Selected Date Classes & Attendance Check */}
         <div className="card">
           <h3 className="card-title">
-            <Clock size={20} className="text-primary" /> 오늘 수업 출결/숙제 체크 ({todayDateStr})
+            <Clock size={20} className="text-primary" /> 선택일 수업 출결/숙제 체크 ({selectedDate})
           </h3>
 
-          {todayClasses.length === 0 ? (
+          {selectedClasses.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-secondary)' }}>
-              🌱 오늘은 예정된 정규 수업이 없습니다. 편안한 하루 보내세요!
+              🌱 {selectedDay}요일에는 예정된 정규 수업이 없습니다.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {todayClasses.map(cls => (
+              {selectedClasses.map(cls => (
                 <div key={cls.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <div>
@@ -199,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {cls.studentIds.map(studentId => {
                         const student = students.find(s => s.id === studentId);
                         if (!student) return null;
-                        const record = getRecordForToday(student.id, cls.id);
+                        const record = getRecordForSelectedDate(student.id, cls.id);
                         const arrivalTime = record?.checkInTime ?? null;
                         const departureTime = record?.checkOutTime ?? null;
                         const homeworkStatus = record?.homeworkStatus ?? '';
