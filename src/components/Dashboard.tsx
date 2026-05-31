@@ -34,6 +34,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Active students
   const activeStudents = students.filter(s => s.status === 'active');
   const activeCount = activeStudents.length;
+  const pausedCount = students.filter(s => s.status === 'paused').length;
+  const inactiveCount = students.filter(s => s.status === 'inactive').length;
+  // 출결 대상은 재원생만. 휴원/퇴원생은 출석 집계와 출결판에서 제외한다.
+  const activeStudentIds = new Set(activeStudents.map(s => s.id));
 
   // Classes for the selected date.
   const selectedClasses = classes.flatMap(cls =>
@@ -51,8 +55,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Selected date attendance rate.
   const selectedAttendanceRecords = attendance.filter(a => a.date === selectedDate);
-  const totalExpectedAttendance = selectedClasses.reduce((sum, item) => sum + item.cls.studentIds.length, 0);
-  const attendedCount = selectedAttendanceRecords.filter(a => isAttendedStatus(a.status)).length;
+  const totalExpectedAttendance = selectedClasses.reduce(
+    (sum, item) => sum + item.cls.studentIds.filter(sid => activeStudentIds.has(sid)).length,
+    0
+  );
+  const attendedCount = selectedAttendanceRecords.filter(
+    a => isAttendedStatus(a.status) && activeStudentIds.has(a.studentId)
+  ).length;
 
   const attendanceRate = totalExpectedAttendance > 0 
     ? Math.round((attendedCount / totalExpectedAttendance) * 100) 
@@ -158,7 +167,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="metric-info">
             <h4>재원생 수</h4>
             <div className="metric-value">{activeCount}명</div>
-            <div className="metric-sub">총 등록 학생: {students.length}명</div>
+            <div className="metric-sub">
+              휴원 {pausedCount} · 퇴원 {inactiveCount} (총 {students.length}명)
+            </div>
           </div>
           <div className="metric-icon-wrapper">
             <Users size={24} />
@@ -215,7 +226,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {selectedClasses.map(({ cls, schedule }) => (
+              {selectedClasses.map(({ cls, schedule }) => {
+                const activeMemberIds = cls.studentIds.filter(sid => activeStudentIds.has(sid));
+                const pausedMemberCount = cls.studentIds.filter(
+                  sid => students.find(s => s.id === sid)?.status === 'paused'
+                ).length;
+                return (
                 <div key={`${cls.id}-${schedule.day}-${schedule.startTime}-${schedule.endTime}`} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <div>
@@ -227,17 +243,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </span>
                     </div>
                     <span className="badge badge-present" style={{ fontSize: '0.7rem' }}>
-                      학생 {cls.studentIds.length}명
+                      재원생 {activeMemberIds.length}명
+                      {pausedMemberCount > 0 && ` · 휴원 ${pausedMemberCount}`}
                     </span>
                   </div>
 
-                  {cls.studentIds.length === 0 ? (
+                  {activeMemberIds.length === 0 ? (
                     <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', paddingLeft: '0.5rem' }}>
-                      배정된 학생이 없습니다. [반/시간표 관리]에서 학생을 추가해 주세요.
+                      {cls.studentIds.length === 0
+                        ? '배정된 학생이 없습니다. [반/시간표 관리]에서 학생을 추가해 주세요.'
+                        : '출결 대상인 재원생이 없습니다. (휴원/퇴원생은 제외됩니다)'}
                     </div>
                   ) : (
                     <div className="quick-att-grid">
-                      {cls.studentIds.map(studentId => {
+                      {activeMemberIds.map(studentId => {
                         const student = students.find(s => s.id === studentId);
                         if (!student) return null;
                         const record = getRecordForSelectedDate(student.id, cls.id);
@@ -314,7 +333,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

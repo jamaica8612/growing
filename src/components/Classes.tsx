@@ -32,8 +32,11 @@ export const Classes: React.FC<ClassesProps> = ({
   const [formTuitionOverrides, setFormTuitionOverrides] = useState<Record<string, number>>({});
   const [formStudentIds, setFormStudentIds] = useState<string[]>([]);
 
-  // List of active students to choose from
-  const activeStudents = students.filter(s => s.status === 'active');
+  // 배정 대상: 재원생 + 이미 이 반에 속한 학생(휴원생 포함)을 노출해
+  // 휴원 멤버의 배정 해제나 개별 원비 관리가 가능하도록 한다.
+  const activeStudents = students.filter(
+    s => s.status === 'active' || formStudentIds.includes(s.id)
+  );
 
   const daysOfWeek: DayOfWeek[] = ['월', '화', '수', '목', '금'];
 
@@ -321,20 +324,21 @@ export const Classes: React.FC<ClassesProps> = ({
                       ) : (
                         cls.studentIds.map(sid => {
                           const student = students.find(s => s.id === sid);
+                          const isPaused = student?.status === 'paused';
                           return (
                             <span
                               key={sid}
                               style={{
                                 display: 'inline-block',
-                                backgroundColor: '#f0f7f3',
-                                color: 'var(--color-primary)',
+                                backgroundColor: isPaused ? '#fef3c7' : '#f0f7f3',
+                                color: isPaused ? '#92400e' : 'var(--color-primary)',
                                 padding: '0.1rem 0.4rem',
                                 borderRadius: '4px',
                                 fontSize: '0.75rem',
                                 fontWeight: 600,
                               }}
                             >
-                              {student?.name || '미등록'}
+                              {student?.name || '미등록'}{isPaused ? ' (휴원)' : ''}
                             </span>
                           );
                         })
@@ -535,6 +539,9 @@ export const Classes: React.FC<ClassesProps> = ({
                               />
                               <span style={{ minWidth: 0 }}>
                                 {student.name} ({student.grade.split(' ')[1] || student.grade})
+                                {student.status === 'paused' && (
+                                  <span style={{ marginLeft: '0.3rem', fontSize: '0.7rem', color: '#92400e', fontWeight: 700 }}>휴원</span>
+                                )}
                               </span>
                             </label>
                             {isChecked && (
