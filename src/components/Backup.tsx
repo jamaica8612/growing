@@ -220,6 +220,72 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
     fileInputRef.current?.click();
   };
 
+  const downloadCsv = (filename: string, rows: string[][]) => {
+    const bom = '﻿';
+    const csv = bom + rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportStudentsCsv = () => {
+    const { students, classes } = getAllData();
+    const statusLabel: Record<string, string> = { active: '재원', paused: '휴원', inactive: '퇴원' };
+    const header = ['이름', '학년', '학교', '학부모 연락처', '상태', '수강반'];
+    const rows = students.map(s => {
+      const classNames = classes.filter(c => c.studentIds.includes(s.id)).map(c => c.name).join(' / ');
+      return [s.name, s.grade, s.school, s.parentContact, statusLabel[s.status] ?? s.status, classNames];
+    });
+    downloadCsv(`그로잉영어_학생목록_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows]);
+  };
+
+  const handleExportAttendanceCsv = () => {
+    const { students, classes, attendance } = getAllData();
+    const studentMap = Object.fromEntries(students.map(s => [s.id, s.name]));
+    const classMap = Object.fromEntries(classes.map(c => [c.id, c.name]));
+    const statusLabel: Record<string, string> = { present: '출석', absent: '결석', makeup: '보강', late: '지각' };
+    const hwLabel: Record<string, string> = { done: '완료', incomplete: '미흡', undone: '안함', '': '' };
+    const header = ['날짜', '학생', '반', '출결', '숙제', '등원시간', '하원시간', '메모'];
+    const rows = [...attendance]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(a => [
+        a.date,
+        studentMap[a.studentId] ?? '',
+        classMap[a.classId] ?? '',
+        statusLabel[a.status] ?? a.status,
+        hwLabel[a.homeworkStatus ?? ''] ?? '',
+        a.checkInTime ?? '',
+        a.checkOutTime ?? '',
+        a.memo ?? '',
+      ]);
+    downloadCsv(`그로잉영어_출결기록_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows]);
+  };
+
+  const handleExportPaymentsCsv = () => {
+    const { students, payments } = getAllData();
+    const studentMap = Object.fromEntries(students.map(s => [s.id, s.name]));
+    const statusLabel: Record<string, string> = { paid: '납부', unpaid: '미납' };
+    const methodLabel: Record<string, string> = { card: '카드', cash: '현금', transfer: '이체', '': '' };
+    const header = ['청구월', '학생', '금액', '상태', '납부일', '납부방법'];
+    const rows = [...payments]
+      .sort((a, b) => a.billingMonth.localeCompare(b.billingMonth))
+      .map(p => [
+        p.billingMonth,
+        studentMap[p.studentId] ?? '',
+        String(p.amount),
+        statusLabel[p.status] ?? p.status,
+        p.paymentDate ?? '',
+        methodLabel[p.paymentMethod ?? ''] ?? '',
+      ]);
+    downloadCsv(`그로잉영어_수납내역_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows]);
+  };
+
   const handleSavePin = () => {
     const trimmed = pinInput.trim();
     if (!/^\d{4,8}$/.test(trimmed)) {
@@ -296,6 +362,27 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           />
           <button className="btn btn-secondary" onClick={triggerFileInput} style={{ width: '100%', borderColor: 'var(--color-primary)' }}>
             백업 파일 업로드하여 복원하기
+          </button>
+        </div>
+      </div>
+
+      {/* CSV Export */}
+      <div className="card" style={{ order: 52 }}>
+        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Download size={18} /> CSV 내보내기 (엑셀 호환)
+        </h4>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+          학생, 출결, 수납 데이터를 엑셀에서 바로 열 수 있는 CSV 형식으로 다운로드합니다.
+        </p>
+        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={handleExportStudentsCsv} style={{ gap: '0.35rem' }}>
+            <Download size={14} /> 학생 목록
+          </button>
+          <button className="btn btn-secondary" onClick={handleExportAttendanceCsv} style={{ gap: '0.35rem' }}>
+            <Download size={14} /> 출결 기록
+          </button>
+          <button className="btn btn-secondary" onClick={handleExportPaymentsCsv} style={{ gap: '0.35rem' }}>
+            <Download size={14} /> 수납 내역
           </button>
         </div>
       </div>
