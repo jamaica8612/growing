@@ -314,7 +314,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           {/* Per-student table */}
           <div className="card">
             <h3 className="card-title">학생별 출결 현황 (출석률 낮은 순)</h3>
-            <div className="table-wrapper">
+            <div className="table-wrapper mobile-card-desktop">
               <table className="custom-table">
                 <thead>
                   <tr>
@@ -392,6 +392,46 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                 </tbody>
               </table>
             </div>
+            <div className="mobile-card-list">
+              {studentRows.map(row => (
+                <div key={`${row.studentId}-mobile`} className="mobile-data-card">
+                  <div className="mobile-data-card-header">
+                    <div>
+                      <strong>{row.name}</strong>
+                      <span>{row.school || '교습소'} · {row.grade.split(' ')[1] || row.grade}</span>
+                    </div>
+                    <strong style={{ color: row.total === 0 ? 'var(--color-text-muted)' : rateColor(row.rate), fontSize: '1rem' }}>
+                      {row.total === 0 ? '기록 없음' : `${row.rate}%`}
+                    </strong>
+                  </div>
+
+                  <div className="mobile-stat-strip">
+                    <span className="badge badge-present">출석 {row.present}</span>
+                    <span className="badge badge-late">지각 {row.late}</span>
+                    <span className="badge badge-absent">결석 {row.absent}</span>
+                    <span className="badge badge-makeup">보강 {row.makeup}</span>
+                  </div>
+
+                  {row.total > 0 && (
+                    <>
+                      <div className="mobile-progress">
+                        <div style={{ width: `${row.rate}%`, backgroundColor: rateColor(row.rate) }} />
+                      </div>
+                      <div className="mobile-card-actions">
+                        <button className="btn btn-secondary" onClick={() => handleCopyMessage(row)}>
+                          {copiedId === row.studentId ? <><Check size={14} className="text-success" /> 복사됨</> : <><Copy size={14} /> 출결 안내</>}
+                        </button>
+                        {onSendDraftToMessaging && (
+                          <button className="btn btn-primary" onClick={() => handleSendToMessaging(row)}>
+                            <MessageSquare size={14} /> 보내기
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
             <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.85rem' }}>
               ※ 출석률 = (출석 + 지각 + 보강) ÷ 전체 기록. 활성 재원생 {studentRows.length}명 기준이며, 보강은 출석으로 인정합니다.
             </p>
@@ -410,16 +450,16 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                   const attended = records.filter(r => r.status !== 'absent').length;
                   const rate = total > 0 ? Math.round((attended / total) * 100) : -1;
                   return (
-                    <div key={cls.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <span style={{ width: '180px', flexShrink: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div key={cls.id} className="class-rate-row">
+                      <span className="class-rate-name">
                         {cls.name}
                       </span>
-                      <div style={{ flexGrow: 1, height: '10px', backgroundColor: '#eef2f0', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                      <div className="class-rate-bar">
                         {rate >= 0 && (
                           <div style={{ width: `${rate}%`, height: '100%', backgroundColor: rateColor(rate) }} />
                         )}
                       </div>
-                      <span style={{ width: '90px', textAlign: 'right', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+                      <span className="class-rate-value">
                         {rate >= 0 ? `${rate}% (${total}건)` : '기록 없음'}
                       </span>
                     </div>

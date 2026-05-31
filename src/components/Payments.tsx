@@ -250,7 +250,7 @@ export const Payments: React.FC<PaymentsProps> = ({
         </div>
 
         {/* Payments List Table */}
-        <div className="table-wrapper">
+        <div className="table-wrapper mobile-card-desktop">
           <table className="custom-table">
             <thead>
               <tr>
@@ -343,6 +343,82 @@ export const Payments: React.FC<PaymentsProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="mobile-card-list">
+          {filteredPayments.length === 0 ? (
+            <div className="mobile-empty-card">
+              🌱 이번 달에 청구된 수납 내역이 없습니다. [청구 일괄 생성] 버튼을 누르면 재원생 시간표 요금을 기준으로 청구서가 일괄 자동 생성됩니다.
+            </div>
+          ) : (
+            filteredPayments.map(pay => {
+              const student = students.find(s => s.id === pay.studentId);
+              const studentClasses = classes.filter(c => c.studentIds.includes(pay.studentId));
+              const classNamesStr = studentClasses.map(c => c.name).join(', ') || '개별 지정 코스';
+              const methodLabel =
+                pay.paymentMethod === 'card' ? '카드' :
+                pay.paymentMethod === 'cash' ? '현금' :
+                pay.paymentMethod === 'transfer' ? '계좌이체' : '-';
+
+              return (
+                <div key={`${pay.id}-mobile`} className="mobile-data-card">
+                  <div className="mobile-data-card-header">
+                    <div>
+                      <strong>{student?.name || '알수없음'}</strong>
+                      <span>{student?.school || '-'} · {classNamesStr}</span>
+                    </div>
+                    <span className={`badge ${pay.status === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
+                      {pay.status === 'paid' ? '완납' : '미납'}
+                    </span>
+                  </div>
+
+                  <div className="mobile-data-grid">
+                    <div>
+                      <span>청구 금액</span>
+                      <strong>{pay.amount.toLocaleString()}원</strong>
+                    </div>
+                    <div>
+                      <span>납부일자</span>
+                      <strong>{pay.paymentDate || '-'}</strong>
+                    </div>
+                    <div>
+                      <span>결제수단</span>
+                      <strong>{methodLabel}</strong>
+                    </div>
+                  </div>
+
+                  <div className="mobile-card-actions">
+                    {pay.status === 'unpaid' ? (
+                      <button className="btn btn-primary" onClick={() => handleOpenRecordPayment(pay.id)}>
+                        수납 처리
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          if (window.confirm('완납 처리를 취소하고 다시 미납 상태로 되돌리시겠습니까?')) {
+                            onCancelPayment(pay.id);
+                          }
+                        }}
+                      >
+                        수납 취소
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => {
+                        if (window.confirm('이 청구 내역을 완전히 삭제하시겠습니까?')) {
+                          onDeletePayment(pay.id);
+                        }
+                      }}
+                    >
+                      <Trash2 size={14} /> 삭제
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

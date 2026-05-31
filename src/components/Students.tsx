@@ -329,7 +329,7 @@ export const Students: React.FC<StudentsProps> = ({
       </div>
 
       {/* Students Table */}
-      <div className="table-wrapper">
+      <div className="table-wrapper mobile-card-desktop">
         <table className="custom-table">
           <thead>
             <tr>
@@ -410,6 +410,62 @@ export const Students: React.FC<StudentsProps> = ({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mobile-card-list">
+        {filteredStudents.length === 0 ? (
+          <div className="mobile-empty-card">
+            🌱 조건에 맞는 학생이 없습니다. 학생을 새로 등록해 보세요.
+          </div>
+        ) : (
+          filteredStudents.map(student => {
+            const attRate = calculateAttendanceRate(student.id);
+            return (
+              <div key={`${student.id}-mobile`} className="mobile-data-card" onClick={() => handleOpenDetail(student)}>
+                <div className="mobile-data-card-header">
+                  <div>
+                    <strong>{student.name}</strong>
+                    <span>{student.school || '-'} · {student.grade}</span>
+                  </div>
+                  <span className={`badge ${student.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
+                    {student.status === 'active' ? '재원' : '퇴원'}
+                  </span>
+                </div>
+
+                <div className="mobile-data-grid">
+                  <div>
+                    <span>학부모 연락처</span>
+                    <strong>{student.parentContact || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>등록일</span>
+                    <strong>{student.registrationDate || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>출석률</span>
+                    <strong>{attRate}%</strong>
+                  </div>
+                </div>
+
+                <div className="mobile-progress">
+                  <div style={{ width: `${attRate}%`, backgroundColor: attRate > 80 ? 'var(--color-success)' : attRate > 50 ? 'var(--color-warning)' : 'var(--color-danger)' }} />
+                </div>
+
+                <div className="mobile-card-actions" onClick={e => e.stopPropagation()}>
+                  <button className="btn btn-secondary" onClick={() => handleOpenDetail(student)}>
+                    <Eye size={14} /> 상세
+                  </button>
+                  <button className="btn btn-secondary" onClick={e => handleOpenEdit(student, e)}>
+                    <Edit2 size={14} /> 수정
+                  </button>
+                  <button className="btn btn-danger" onClick={e => handleDeleteClick(student.id, student.name, e)}>
+                    <Trash2 size={14} /> 삭제
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Modal: Add/Edit Student */}
