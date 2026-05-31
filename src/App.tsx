@@ -347,6 +347,7 @@ function AcademyApp({ session }: { session: Session }) {
             key={assistantDraft?.id ?? 'manual-messaging'}
             students={students}
             classes={classes}
+            attendance={attendance}
             kioskAlerts={kioskAlerts}
             homeworkAlerts={homeworkAlerts}
             onDismissAlert={data.handleDismissKioskAlert}

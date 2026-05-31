@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Student, Class, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
+import type { Student, Class, Attendance, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
 import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles, Filter, CheckSquare, Square } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 import { sendAlimtalk, type AlimtalkAlertType } from '../lib/alimtalk';
@@ -7,6 +7,7 @@ import { sendAlimtalk, type AlimtalkAlertType } from '../lib/alimtalk';
 interface MessagingProps {
   students: Student[];
   classes: Class[];
+  attendance: Attendance[];
   kioskAlerts: KioskAlert[];
   homeworkAlerts: HomeworkAlert[];
   onDismissAlert: (id: string) => void;
@@ -20,7 +21,7 @@ interface MessagingProps {
   messageTemplates: MessageTemplates;
 }
 
-type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test' | 'custom';
+type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test' | 'custom' | 'daily';
 type AlertFilter = 'all' | 'in' | 'out' | 'homework' | 'missing-contact';
 type PendingAlertType = 'in' | 'out' | 'homework';
 
@@ -85,6 +86,7 @@ const findDraftStudentId = (students: Student[], draft?: string): string => {
 export const Messaging: React.FC<MessagingProps> = ({
   students,
   classes,
+  attendance,
   kioskAlerts,
   homeworkAlerts,
   onDismissAlert,
@@ -121,6 +123,33 @@ export const Messaging: React.FC<MessagingProps> = ({
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+  // Today's date string (YYYY-MM-DD, local time)
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  // Today's attendance records for the selected student
+  const todayAttendances = useMemo(() => {
+    if (!selectedStudentId) return [];
+    return attendance.filter(a => a.studentId === selectedStudentId && a.date === todayStr);
+  }, [attendance, selectedStudentId, todayStr]);
+
+  // Summary of today's 4 key pieces of info
+  const todaySummary = useMemo(() => {
+    const first = todayAttendances[0];
+    const checkIn = todayAttendances.map(a => a.checkInTime).filter(Boolean).join(', ') || '-';
+    const checkOut = todayAttendances.map(a => a.checkOutTime).filter(Boolean).join(', ') || '-';
+
+    const hwStatus = first?.homeworkStatus;
+    const hwLabel = hwStatus === 'done' ? '완료 ✅' : hwStatus === 'incomplete' ? '미흡 📝' : hwStatus === 'undone' ? '미완 ❌' : '미기록';
+
+    const isMakeup = todayAttendances.some(a => a.status === 'makeup');
+    const makeupLabel = isMakeup ? '보강 수업' : '없음';
+
+    return { checkIn, checkOut, hwLabel, makeupLabel, hasTodayRecord: todayAttendances.length > 0 };
+  }, [todayAttendances]);
 
   // Group active students by class
   const studentsByClass = useMemo(() => {
@@ -160,10 +189,14 @@ export const Messaging: React.FC<MessagingProps> = ({
         return renderTemplate(messageTemplates.makeup, { 학생명: studentName, 날짜: paramDate, 시간: paramTime });
       case 'test':
         return renderTemplate(messageTemplates.test, { 학생명: studentName, 평가명: paramTestName, 점수: paramScore });
+      case 'daily': {
+        const { checkIn, checkOut, hwLabel, makeupLabel } = todaySummary;
+        return `[그로잉영어] ${studentName} 오늘의 수업 안내 🌱\n\n✅ 등원: ${checkIn}\n🏡 하원: ${checkOut}\n📝 숙제: ${hwLabel}\n🔄 보강: ${makeupLabel}\n\n오늘도 수고했어요! 감사합니다 😊`;
+      }
       default:
         return '';
     }
-  }, [selectedStudentId, selectedTemplate, customMessage, paramTime, paramDate, paramTestName, paramScore, students, messageTemplates]);
+  }, [selectedStudentId, selectedTemplate, customMessage, paramTime, paramDate, paramTestName, paramScore, students, messageTemplates, todaySummary]);
 
   // Clipboard copy helper
   const handleCopy = () => {
@@ -503,10 +536,36 @@ export const Messaging: React.FC<MessagingProps> = ({
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--color-accent-mint-light)',
               fontSize: '0.85rem',
-              marginBottom: '1.5rem',
+              marginBottom: '0.75rem',
             }}
           >
             📞 <strong>학부모 연락처:</strong> {currentStudent.parentContact || '연락처가 등록되지 않았습니다.'}
+          </div>
+        )}
+
+        {currentStudent && (
+          <div
+            style={{
+              padding: '0.85rem 1rem',
+              backgroundColor: todaySummary.hasTodayRecord ? '#f0f7f3' : '#fafbfc',
+              borderRadius: 'var(--radius-md)',
+              border: `1px solid ${todaySummary.hasTodayRecord ? 'var(--color-accent-mint-light)' : 'var(--color-border)'}`,
+              fontSize: '0.83rem',
+              marginBottom: '1.25rem',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '0.5rem 1rem',
+            }}
+          >
+            <div><strong>✅ 등원</strong> {todaySummary.checkIn}</div>
+            <div><strong>🏡 하원</strong> {todaySummary.checkOut}</div>
+            <div><strong>📝 숙제</strong> {todaySummary.hwLabel}</div>
+            <div><strong>🔄 보강</strong> {todaySummary.makeupLabel}</div>
+            {!todaySummary.hasTodayRecord && (
+              <div style={{ gridColumn: 'span 2', color: 'var(--color-text-muted)', fontSize: '0.78rem', marginTop: '0.15rem' }}>
+                오늘 출결 기록이 없습니다.
+              </div>
+            )}
           </div>
         )}
 
@@ -563,9 +622,16 @@ export const Messaging: React.FC<MessagingProps> = ({
             <button
               className={`btn ${selectedTemplate === 'test' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setSelectedTemplate('test')}
-              style={{ gridColumn: 'span 2', fontSize: '0.85rem', padding: '0.5rem' }}
+              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
             >
               평가 결과 통보 🎯
+            </button>
+            <button
+              className={`btn ${selectedTemplate === 'daily' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setSelectedTemplate('daily')}
+              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
+            >
+              종합 알림장 📋
             </button>
             {customMessage && (
               <button
