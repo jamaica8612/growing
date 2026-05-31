@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, DayOfWeek, HomeworkStatus } from '../types';
 import { Users, BookOpen, CreditCard, AlertCircle, Copy, Check, Clock, Calendar, ClipboardCheck } from 'lucide-react';
 import { isAttendedStatus } from '../lib/attendanceStatus';
+import { getSchedulesForDay } from '../lib/classSchedules';
 
 interface DashboardProps {
   students: Student[];
@@ -35,7 +36,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const activeCount = activeStudents.length;
 
   // Classes for the selected date.
-  const selectedClasses = classes.filter(c => c.days.includes(selectedDay));
+  const selectedClasses = classes.flatMap(cls =>
+    getSchedulesForDay(cls, selectedDay).map(schedule => ({ cls, schedule }))
+  );
 
   // Payment Stats for Current Month
   const currentMonthStr = new Date().toISOString().substring(0, 7); // YYYY-MM
@@ -48,7 +51,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Selected date attendance rate.
   const selectedAttendanceRecords = attendance.filter(a => a.date === selectedDate);
-  const totalExpectedAttendance = selectedClasses.reduce((sum, c) => sum + c.studentIds.length, 0);
+  const totalExpectedAttendance = selectedClasses.reduce((sum, item) => sum + item.cls.studentIds.length, 0);
   const attendedCount = selectedAttendanceRecords.filter(a => isAttendedStatus(a.status)).length;
 
   const attendanceRate = totalExpectedAttendance > 0 
@@ -193,15 +196,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {selectedClasses.map(cls => (
-                <div key={cls.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
+              {selectedClasses.map(({ cls, schedule }) => (
+                <div key={`${cls.id}-${schedule.day}-${schedule.startTime}-${schedule.endTime}`} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <div>
                       <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>
                         {cls.name}
                       </span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginLeft: '0.5rem' }}>
-                        🕒 {cls.startTime} - {cls.endTime}
+                        🕒 {schedule.startTime} - {schedule.endTime}
                       </span>
                     </div>
                     <span className="badge badge-present" style={{ fontSize: '0.7rem' }}>

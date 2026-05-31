@@ -20,8 +20,15 @@ export interface Class {
   days: DayOfWeek[];
   startTime: string; // e.g. "14:00"
   endTime: string; // e.g. "15:30"
+  schedules: ClassSchedule[];
   tuitionFee: number;
   studentIds: string[]; // List of Student IDs in this class
+}
+
+export interface ClassSchedule {
+  day: DayOfWeek;
+  startTime: string;
+  endTime: string;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'makeup';

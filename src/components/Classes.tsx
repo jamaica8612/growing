@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import type { Student, Class, DayOfWeek } from '../types';
+import type { Student, Class, ClassSchedule, DayOfWeek } from '../types';
 import { BookOpen, Plus, Clock, X, Users, Calendar } from 'lucide-react';
+import { deriveLegacyClassScheduleFields, getClassScheduleLabel, getClassSchedules, getSchedulesForDay } from '../lib/classSchedules';
 
 interface ClassesProps {
   classes: Class[];
@@ -25,6 +26,7 @@ export const Classes: React.FC<ClassesProps> = ({
   const [formDays, setFormDays] = useState<DayOfWeek[]>([]);
   const [formStartTime, setFormStartTime] = useState('14:00');
   const [formEndTime, setFormEndTime] = useState('15:30');
+  const [formSchedules, setFormSchedules] = useState<ClassSchedule[]>([]);
   const [formTuitionFee, setFormTuitionFee] = useState(200000);
   const [formStudentIds, setFormStudentIds] = useState<string[]>([]);
 
@@ -62,6 +64,21 @@ export const Classes: React.FC<ClassesProps> = ({
     }
   };
 
+  const handleAddSchedule = () => {
+    setFormSchedules(prev => [
+      ...prev,
+      { day: daysOfWeek[0], startTime: '14:00', endTime: '15:30' },
+    ]);
+  };
+
+  const handleScheduleChange = (index: number, patch: Partial<ClassSchedule>) => {
+    setFormSchedules(prev => prev.map((schedule, i) => (i === index ? { ...schedule, ...patch } : schedule)));
+  };
+
+  const handleRemoveSchedule = (index: number) => {
+    setFormSchedules(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Toggle student selection
   const handleStudentToggle = (studentId: string) => {
     if (formStudentIds.includes(studentId)) {
@@ -78,6 +95,10 @@ export const Classes: React.FC<ClassesProps> = ({
     setFormDays(['월', '수']);
     setFormStartTime('14:00');
     setFormEndTime('15:30');
+    setFormSchedules([
+      { day: '월', startTime: '14:00', endTime: '15:30' },
+      { day: '수', startTime: '14:00', endTime: '15:30' },
+    ]);
     setFormTuitionFee(200000);
     setFormStudentIds([]);
     setIsFormOpen(true);
@@ -90,6 +111,7 @@ export const Classes: React.FC<ClassesProps> = ({
     setFormDays(cls.days);
     setFormStartTime(cls.startTime);
     setFormEndTime(cls.endTime);
+    setFormSchedules(getClassSchedules(cls));
     setFormTuitionFee(cls.tuitionFee);
     setFormStudentIds(cls.studentIds);
     setIsFormOpen(true);
@@ -98,22 +120,23 @@ export const Classes: React.FC<ClassesProps> = ({
   // Submit Class Add/Edit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || formDays.length === 0) {
-      alert('클래스 이름과 요일을 최소 1개 선택해 주세요.');
+    if (!formName.trim() || formSchedules.length === 0) {
+      alert('클래스 이름과 시간표를 최소 1개 입력해 주세요.');
       return;
     }
 
-    // Verify time validation
-    if (formStartTime >= formEndTime) {
-      alert('종료 시간은 시작 시간보다 늦어야 합니다.');
+    if (formSchedules.some(schedule => schedule.startTime >= schedule.endTime)) {
+      alert('각 시간표의 종료 시간은 시작 시간보다 늦어야 합니다.');
       return;
     }
 
+    const legacyFields = deriveLegacyClassScheduleFields(formSchedules);
     const classData = {
       name: formName.trim(),
-      days: formDays,
-      startTime: formStartTime,
-      endTime: formEndTime,
+      days: legacyFields.days,
+      startTime: legacyFields.startTime,
+      endTime: legacyFields.endTime,
+      schedules: formSchedules,
       tuitionFee: Number(formTuitionFee),
       studentIds: formStudentIds,
     };
@@ -173,10 +196,10 @@ export const Classes: React.FC<ClassesProps> = ({
             {daysOfWeek.map(day => (
               <div key={day} className="timetable-day-col">
                 {classes
-                  .filter(cls => cls.days.includes(day))
-                  .map(cls => {
-                    const startMins = getMinutesFromStart(cls.startTime);
-                    const duration = getDurationMinutes(cls.startTime, cls.endTime);
+                  .flatMap(cls => getSchedulesForDay(cls, day).map(schedule => ({ cls, schedule })))
+                  .map(({ cls, schedule }) => {
+                    const startMins = getMinutesFromStart(schedule.startTime);
+                    const duration = getDurationMinutes(schedule.startTime, schedule.endTime);
 
                     // Calculate percentage style
                     const topPercent = (startMins / TOTAL_MINUTES) * 100;
@@ -184,19 +207,19 @@ export const Classes: React.FC<ClassesProps> = ({
 
                     return (
                       <div
-                        key={`${cls.id}-${day}`}
+                        key={`${cls.id}-${day}-${schedule.startTime}-${schedule.endTime}`}
                         className="class-slot"
                         style={{
                           top: `${topPercent}%`,
                           height: `${heightPercent}%`,
                         }}
                         onClick={() => handleOpenEdit(cls)}
-                        title={`${cls.name} (${cls.startTime} - ${cls.endTime})`}
+                        title={`${cls.name} (${schedule.startTime} - ${schedule.endTime})`}
                       >
                         <div>
                           <div className="class-slot-name">{cls.name}</div>
                           <div className="class-slot-time">
-                            {cls.startTime} - {cls.endTime}
+                            {schedule.startTime} - {schedule.endTime}
                           </div>
                         </div>
                         <div className="class-slot-count">
@@ -252,10 +275,7 @@ export const Classes: React.FC<ClassesProps> = ({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
                   <div>
-                    📅 <strong>요일:</strong> {cls.days.join(', ')}요일
-                  </div>
-                  <div>
-                    🕒 <strong>시간:</strong> {cls.startTime} ~ {cls.endTime}
+                    🕒 <strong>시간표:</strong> {getClassScheduleLabel(cls)}
                   </div>
                   <div>
                     💰 <strong>원비:</strong> {cls.tuitionFee.toLocaleString()}원
@@ -323,6 +343,62 @@ export const Classes: React.FC<ClassesProps> = ({
                 </div>
 
                 <div className="form-group">
+                  <label>요일별 수업 시간표 *</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.35rem' }}>
+                    {formSchedules.map((schedule, index) => (
+                      <div
+                        key={`${schedule.day}-${schedule.startTime}-${index}`}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr auto',
+                          gap: '0.45rem',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <select
+                          className="form-control"
+                          value={schedule.day}
+                          onChange={e => handleScheduleChange(index, { day: e.target.value as DayOfWeek })}
+                          aria-label="수업 요일"
+                        >
+                          {daysOfWeek.map(day => (
+                            <option key={day} value={day}>{day}요일</option>
+                          ))}
+                        </select>
+                        <input
+                          type="time"
+                          className="form-control"
+                          value={schedule.startTime}
+                          onChange={e => handleScheduleChange(index, { startTime: e.target.value })}
+                          aria-label="시작 시간"
+                          required
+                        />
+                        <input
+                          type="time"
+                          className="form-control"
+                          value={schedule.endTime}
+                          onChange={e => handleScheduleChange(index, { endTime: e.target.value })}
+                          aria-label="종료 시간"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="btn-icon-only"
+                          title="시간표 삭제"
+                          onClick={() => handleRemoveSchedule(index)}
+                          disabled={formSchedules.length === 1}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className="btn btn-secondary" onClick={handleAddSchedule} style={{ alignSelf: 'flex-start' }}>
+                      <Plus size={15} /> 시간 추가
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ display: 'none' }}>
                   <label>수업 요일 선택 (중복 가능) *</label>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
                     {daysOfWeek.map(day => {
@@ -348,7 +424,7 @@ export const Classes: React.FC<ClassesProps> = ({
                   </div>
                 </div>
 
-                <div className="form-row">
+                <div className="form-row" style={{ display: 'none' }}>
                   <div className="form-group">
                     <label>수업 시작 시간</label>
                     <input

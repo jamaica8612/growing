@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type {
   Student,
   Class,
+  ClassSchedule,
   Attendance,
   Payment,
   CounselLog,
@@ -15,6 +16,7 @@ import type {
   CounselLogType,
 } from '../types';
 import { type MessageTemplates, mergeTemplates } from './messageTemplates';
+import { deriveLegacyClassScheduleFields } from './classSchedules';
 
 type Row = Record<string, unknown>;
 
@@ -24,6 +26,24 @@ const orNull = (v: string | undefined | null) => (v && v.length > 0 ? v : null);
 // non-uuid placeholder when a student has no class.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const classIdParam = (id: string | undefined) => (id && UUID_RE.test(id) ? id : null);
+
+const toSchedules = (r: Row): ClassSchedule[] => {
+  const schedules = Array.isArray(r.schedules) ? r.schedules : [];
+  if (schedules.length > 0) {
+    return schedules
+      .map(item => item as Record<string, unknown>)
+      .filter(item => typeof item.day === 'string' && typeof item.startTime === 'string' && typeof item.endTime === 'string')
+      .map(item => ({
+        day: item.day as ClassSchedule['day'],
+        startTime: item.startTime as string,
+        endTime: item.endTime as string,
+      }));
+  }
+  const days = (r.days as Class['days']) ?? [];
+  const startTime = s(r.start_time);
+  const endTime = s(r.end_time);
+  return days.map(day => ({ day, startTime, endTime }));
+};
 
 // ---- DB row -> app type mappers ----
 const toStudent = (r: Row): Student => ({
@@ -44,6 +64,7 @@ const toClass = (r: Row): Class => ({
   days: (r.days as Class['days']) ?? [],
   startTime: s(r.start_time),
   endTime: s(r.end_time),
+  schedules: toSchedules(r),
   tuitionFee: (r.tuition_fee as number) ?? 0,
   studentIds: (r.student_ids as string[]) ?? [],
 });
@@ -187,13 +208,16 @@ export const api = {
 
   // ---- Classes ----
   async addClass(data: Omit<Class, 'id'>): Promise<Class> {
+    const schedules = data.schedules?.length ? data.schedules : data.days.map(day => ({ day, startTime: data.startTime, endTime: data.endTime }));
+    const legacy = deriveLegacyClassScheduleFields(schedules);
     const { data: row, error } = await supabase
       .from('growing_classes')
       .insert({
         name: data.name,
-        days: data.days,
-        start_time: data.startTime,
-        end_time: data.endTime,
+        days: legacy.days,
+        start_time: legacy.startTime,
+        end_time: legacy.endTime,
+        schedules,
         tuition_fee: data.tuitionFee,
         student_ids: data.studentIds,
       })
@@ -204,13 +228,16 @@ export const api = {
   },
 
   async updateClass(cls: Class): Promise<Class> {
+    const schedules = cls.schedules?.length ? cls.schedules : cls.days.map(day => ({ day, startTime: cls.startTime, endTime: cls.endTime }));
+    const legacy = deriveLegacyClassScheduleFields(schedules);
     const { data: row, error } = await supabase
       .from('growing_classes')
       .update({
         name: cls.name,
-        days: cls.days,
-        start_time: cls.startTime,
-        end_time: cls.endTime,
+        days: legacy.days,
+        start_time: legacy.startTime,
+        end_time: legacy.endTime,
+        schedules,
         tuition_fee: cls.tuitionFee,
         student_ids: cls.studentIds,
       })

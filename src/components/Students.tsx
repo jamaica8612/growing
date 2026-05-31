@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
 import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone, UserX } from 'lucide-react';
 import { isAttendedStatus, normalizeAttendanceStatus } from '../lib/attendanceStatus';
+import { getClassScheduleLabel } from '../lib/classSchedules';
 
 interface StudentsProps {
   students: Student[];
@@ -694,7 +695,7 @@ export const Students: React.FC<StudentsProps> = ({
                           <div>
                             <span style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>{cls.name}</span>
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
-                              🗓 요일: {cls.days.join(', ')} | 🕒 시간: {cls.startTime} - {cls.endTime}
+                              🕒 시간표: {getClassScheduleLabel(cls)}
                             </div>
                           </div>
                           <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
