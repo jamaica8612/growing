@@ -112,6 +112,41 @@ body {
   margin-bottom: 2rem;
 }
 
+.logo-button,
+.mobile-logo-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.logo-button {
+  width: 100%;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.logo-button:hover {
+  background-color: var(--color-bg-sidebar-hover);
+  transform: translateX(2px);
+}
+
+.logo-button:focus-visible,
+.mobile-logo-button:focus-visible {
+  outline: 2px solid var(--color-accent-mint);
+  outline-offset: 3px;
+}
+
+.mobile-logo-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .logo-icon {
   background: linear-gradient(135deg, var(--color-accent-mint), var(--color-accent-sage));
   color: var(--color-bg-sidebar);
@@ -977,6 +1012,7 @@ body {
 .quick-att-buttons {
   display: flex;
   gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .btn-att-select {
@@ -988,6 +1024,12 @@ body {
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: 30px;
+  white-space: nowrap;
 }
 
 .btn-att-select:hover {
@@ -1142,6 +1184,29 @@ body {
   .kiosk-alert-card > div:last-child > * {
     flex: 1 1 90px;
     justify-content: center;
+  }
+
+  .homework-alert-card {
+    grid-template-columns: 1fr !important;
+  }
+
+  .homework-alert-card > div:last-child {
+    justify-content: stretch !important;
+  }
+
+  .homework-alert-card > div:last-child > * {
+    flex: 1 1 90px;
+    justify-content: center;
+  }
+
+  .quick-att-card-header {
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .quick-att-card-header > span:last-child {
+    text-align: right;
+    overflow-wrap: anywhere;
   }
 }
 

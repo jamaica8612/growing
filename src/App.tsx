@@ -216,6 +216,11 @@ function AcademyApp({ session }: { session: Session }) {
     setIsMobileMenuOpen(false);
   };
 
+  const goDashboard = () => {
+    setActiveTab('dashboard');
+    setIsMobileMenuOpen(false);
+  };
+
   // Render Page Content based on tab Selection
   const renderContent = () => {
     switch (activeTab) {
@@ -413,7 +418,7 @@ function AcademyApp({ session }: { session: Session }) {
     <div className="app-container">
       {/* Sidebar Navigation (Desktop only) */}
       <aside className="sidebar desktop-sidebar">
-        <div className="logo-container">
+        <button className="logo-container logo-button" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
           <div className="logo-icon">
             <Sprout size={24} />
           </div>
@@ -421,19 +426,19 @@ function AcademyApp({ session }: { session: Session }) {
             <h1 className="logo-text">그로잉영어</h1>
             <span className="logo-sub">Growing English</span>
           </div>
-        </div>
+        </button>
 
         {renderNavSection({ closeOnNav: false, kioskAccent: 'var(--color-primary-dark)' })}
       </aside>
 
       {/* Mobile Top Header (Mobile only) */}
       <header className="mobile-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <button className="mobile-logo-button" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
           <div className="logo-icon" style={{ padding: '0.35rem', borderRadius: '6px' }}>
             <Sprout size={18} />
           </div>
           <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>그로잉영어</span>
-        </div>
+        </button>
         <button className="menu-toggle-btn" onClick={() => setIsMobileMenuOpen(true)}>
           <Menu size={24} />
         </button>
@@ -444,10 +449,10 @@ function AcademyApp({ session }: { session: Session }) {
         <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)}>
           <div className="mobile-menu-drawer" onClick={e => e.stopPropagation()}>
             <div className="mobile-menu-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button className="mobile-logo-button" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
                 <Sprout size={20} className="text-primary" />
                 <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#ffffff' }}>그로잉영어</span>
-              </div>
+              </button>
               <button className="btn-icon-only" style={{ color: '#ffffff' }} onClick={() => setIsMobileMenuOpen(false)}>
                 <X size={22} />
               </button>

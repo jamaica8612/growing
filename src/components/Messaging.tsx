@@ -244,6 +244,7 @@ export const Messaging: React.FC<MessagingProps> = ({
             {homeworkRows.map(({ alert, name, contact, label, message }) => (
               <div
                 key={alert.id}
+                className="homework-alert-card"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'minmax(0, 1fr) auto',
