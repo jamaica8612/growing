@@ -1,13 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import type { Student, KioskAlert } from '../types';
+import type { Student, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
 import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles, Filter, CheckSquare, Square } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 
 interface MessagingProps {
   students: Student[];
   kioskAlerts: KioskAlert[];
+  homeworkAlerts: HomeworkAlert[];
   onDismissAlert: (id: string) => void;
   onClearAlerts: () => void;
+  onDismissHomeworkAlert: (id: string) => void;
+  onClearHomeworkAlerts: () => void;
   assistantDraft?: {
     id: number;
     content: string;
@@ -23,6 +26,21 @@ type AlertFilter = 'all' | 'in' | 'out' | 'missing-contact';
 // Wording comes from the owner-editable templates (settings).
 const buildCheckMessage = (templates: MessageTemplates, studentName: string, kind: 'in' | 'out', time: string) =>
   renderTemplate(kind === 'in' ? templates.checkIn : templates.checkOut, { 학생명: studentName, 시간: time });
+
+const HOMEWORK_TEMPLATE_KEY: Record<Exclude<HomeworkStatus, ''>, keyof MessageTemplates> = {
+  done: 'homeworkDone',
+  incomplete: 'homeworkIncomplete',
+  undone: 'homeworkUndone',
+};
+
+const HOMEWORK_LABEL: Record<Exclude<HomeworkStatus, ''>, string> = {
+  done: '완료',
+  incomplete: '미흡',
+  undone: '안함',
+};
+
+const buildHomeworkMessage = (templates: MessageTemplates, studentName: string, status: Exclude<HomeworkStatus, ''>) =>
+  renderTemplate(templates[HOMEWORK_TEMPLATE_KEY[status]], { 학생명: studentName });
 
 // Build an SMS deep link prefilled with the message, tailored for iOS / Android.
 const buildSMSLink = (parentContact: string, message: string): string => {
@@ -44,7 +62,17 @@ const findDraftStudentId = (students: Student[], draft?: string): string => {
   return activeMatches[0].id;
 };
 
-export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts, assistantDraft, messageTemplates }) => {
+export const Messaging: React.FC<MessagingProps> = ({
+  students,
+  kioskAlerts,
+  homeworkAlerts,
+  onDismissAlert,
+  onClearAlerts,
+  onDismissHomeworkAlert,
+  onClearHomeworkAlerts,
+  assistantDraft,
+  messageTemplates,
+}) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(() => findDraftStudentId(students, assistantDraft?.content));
   const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(() => assistantDraft?.content ? 'custom' : 'in');
@@ -137,6 +165,20 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
     };
   }), [kioskAlerts, students, messageTemplates]);
 
+  const homeworkRows = useMemo(() => [...homeworkAlerts].reverse().map(alert => {
+    const student = students.find(s => s.id === alert.studentId);
+    const name = student?.name ?? '알수없음';
+    const contact = student?.parentContact ?? '';
+    return {
+      alert,
+      student,
+      name,
+      contact,
+      label: HOMEWORK_LABEL[alert.homeworkStatus],
+      message: buildHomeworkMessage(messageTemplates, name, alert.homeworkStatus),
+    };
+  }), [homeworkAlerts, students, messageTemplates]);
+
   const filteredAlertRows = alertRows.filter(row => {
     if (alertFilter === 'in') return row.alert.kind === 'in';
     if (alertFilter === 'out') return row.alert.kind === 'out';
@@ -180,6 +222,80 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
 
   return (
     <div>
+      {/* Kiosk check-in/out notifications awaiting send */}
+      {homeworkAlerts.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--color-primary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <h3 className="card-title" style={{ margin: 0 }}>
+              <MessageSquare size={20} className="text-primary" /> 숙제 알림 대기 ({homeworkAlerts.length}건)
+            </h3>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
+              onClick={onClearHomeworkAlerts}
+            >
+              <Trash2 size={14} /> 전체 비우기
+            </button>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+            출결 관리에서 숙제 상태를 체크한 뒤 [알림장]을 누르면 여기에 쌓입니다. 복사하거나 문자로 보낸 뒤 [완료]로 정리하세요.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '320px', overflowY: 'auto' }}>
+            {homeworkRows.map(({ alert, name, contact, label, message }) => (
+              <div
+                key={alert.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) auto',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.85rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: '#fafcfb',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
+                  <span className={`badge ${alert.homeworkStatus === 'done' ? 'badge-present' : alert.homeworkStatus === 'incomplete' ? 'badge-late' : 'badge-absent'}`} style={{ fontSize: '0.72rem' }}>
+                    숙제 {label}
+                  </span>
+                  <strong style={{ color: 'var(--color-primary-dark)' }}>{name}</strong>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>{alert.date}</span>
+                  <span style={{ fontSize: '0.78rem', color: contact ? 'var(--color-text-muted)' : 'var(--color-danger)' }}>
+                    {contact ? `📞 ${contact}` : '연락처 없음'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
+                    onClick={() => handleCopyAlert(`homework-${alert.id}`, message)}
+                  >
+                    {copiedAlertId === `homework-${alert.id}` ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
+                  </button>
+                  {contact && (
+                    <a
+                      href={buildSMSLink(contact, message)}
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem', textDecoration: 'none' }}
+                    >
+                      <Send size={13} /> 문자
+                    </a>
+                  )}
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
+                    onClick={() => onDismissHomeworkAlert(alert.id)}
+                  >
+                    완료
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Kiosk check-in/out notifications awaiting send */}
       {kioskAlerts.length > 0 && (
         <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--color-warning)' }}>

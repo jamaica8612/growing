@@ -201,6 +201,7 @@ function AcademyApp({ session }: { session: Session }) {
     payments,
     counselLogs,
     kioskAlerts,
+    homeworkAlerts,
     kioskPin,
     messageTemplates,
   } = data;
@@ -261,7 +262,7 @@ function AcademyApp({ session }: { session: Session }) {
             classes={classes}
             messageTemplates={messageTemplates}
             onSaveAttendance={data.handleSaveAttendance}
-            onSendDraftToMessaging={handleAssistantDraftToMessaging}
+            onQueueHomeworkAlert={data.handleQueueHomeworkAlert}
           />
         );
       case 'stats':
@@ -302,8 +303,11 @@ function AcademyApp({ session }: { session: Session }) {
             key={assistantDraft?.id ?? 'manual-messaging'}
             students={students}
             kioskAlerts={kioskAlerts}
+            homeworkAlerts={homeworkAlerts}
             onDismissAlert={data.handleDismissKioskAlert}
             onClearAlerts={data.handleClearKioskAlerts}
+            onDismissHomeworkAlert={data.handleDismissHomeworkAlert}
+            onClearHomeworkAlerts={data.handleClearHomeworkAlerts}
             assistantDraft={assistantDraft}
             messageTemplates={messageTemplates}
           />
@@ -363,7 +367,7 @@ function AcademyApp({ session }: { session: Session }) {
                       icon={item.icon}
                       label={item.label}
                       onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
-                      badge={item.id === 'messaging' ? kioskAlerts.length : undefined}
+                      badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : undefined}
                       style={item.kind === 'kiosk' ? { color: opts.kioskAccent, fontWeight: 'bold' } : undefined}
                     />
                   </li>

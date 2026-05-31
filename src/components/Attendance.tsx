@@ -10,7 +10,7 @@ interface AttendanceProps {
   classes: Class[];
   messageTemplates: MessageTemplates;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
-  onSendDraftToMessaging?: (content: string) => void;
+  onQueueHomeworkAlert?: (studentId: string, date: string, homeworkStatus: Exclude<HomeworkStatus, ''>) => void;
 }
 
 // 숙제 상태 → 템플릿 키 매핑. 상태가 없으면 메시지도 없음.
@@ -27,7 +27,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   classes,
   messageTemplates,
   onSaveAttendance,
-  onSendDraftToMessaging,
+  onQueueHomeworkAlert,
 }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
@@ -134,10 +134,9 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
     });
   };
 
-  const handleSendHomeworkToMessaging = (studentName: string, status: HomeworkStatus) => {
-    const msg = getHomeworkMessage(studentName, status);
-    if (!msg) return;
-    onSendDraftToMessaging?.(msg);
+  const handleQueueHomeworkAlert = (studentId: string, status: HomeworkStatus) => {
+    if (!status) return;
+    onQueueHomeworkAlert?.(studentId, selectedDate, status);
   };
 
   // Handle memo input change
@@ -400,12 +399,12 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               )}
                               카톡
                             </button>
-                            {onSendDraftToMessaging && (
+                            {onQueueHomeworkAlert && (
                               <button
                                 className="btn btn-secondary"
                                 style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', gap: '0.2rem', minWidth: 'auto', margin: 0, display: 'inline-flex', alignItems: 'center' }}
-                                onClick={() => handleSendHomeworkToMessaging(student.name, currentHomework)}
-                                title="숙제 안내문을 알림장 조립기로 보내기"
+                                onClick={() => handleQueueHomeworkAlert(student.id, currentHomework)}
+                                title="숙제 안내문을 알림장 대기열에 추가"
                               >
                                 <MessageSquare size={12} className="text-secondary" />
                                 알림장

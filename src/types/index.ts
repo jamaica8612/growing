@@ -62,6 +62,15 @@ export interface KioskAlert {
   createdAt: number;
 }
 
+// A homework follow-up queued for parent notification.
+export interface HomeworkAlert {
+  id: string;
+  studentId: string;
+  date: string; // YYYY-MM-DD
+  homeworkStatus: Exclude<HomeworkStatus, ''>;
+  createdAt: number;
+}
+
 export type CounselLogType = 'counsel' | 'progress' | 'test';
 
 export interface CounselLog {

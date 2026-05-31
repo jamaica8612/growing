@@ -6,6 +6,7 @@ import type {
   Payment,
   CounselLog,
   KioskAlert,
+  HomeworkAlert,
   StudentStatus,
   AttendanceStatus,
   HomeworkStatus,
@@ -88,6 +89,14 @@ const toKioskAlert = (r: Row): KioskAlert => ({
   createdAt: r.created_at ? new Date(r.created_at as string).getTime() : Date.now(),
 });
 
+const toHomeworkAlert = (r: Row): HomeworkAlert => ({
+  id: r.id as string,
+  studentId: r.student_id as string,
+  date: r.date as string,
+  homeworkStatus: r.homework_status as Exclude<HomeworkStatus, ''>,
+  createdAt: r.created_at ? new Date(r.created_at as string).getTime() : Date.now(),
+});
+
 export interface AcademySnapshot {
   students: Student[];
   classes: Class[];
@@ -95,24 +104,26 @@ export interface AcademySnapshot {
   payments: Payment[];
   counselLogs: CounselLog[];
   kioskAlerts: KioskAlert[];
+  homeworkAlerts: HomeworkAlert[];
   kioskPin: string;
   messageTemplates: MessageTemplates;
 }
 
 export const api = {
   async loadAll(): Promise<AcademySnapshot> {
-    const [students, classes, attendance, payments, counselLogs, kioskAlerts, settings] = await Promise.all([
+    const [students, classes, attendance, payments, counselLogs, kioskAlerts, homeworkAlerts, settings] = await Promise.all([
       supabase.from('growing_students').select('*').order('created_at'),
       supabase.from('growing_classes').select('*').order('created_at'),
       supabase.from('growing_attendance').select('*'),
       supabase.from('growing_payments').select('*'),
       supabase.from('growing_counsel_logs').select('*'),
       supabase.from('growing_kiosk_alerts').select('*').order('created_at'),
+      supabase.from('growing_homework_alerts').select('*').order('created_at'),
       supabase.from('growing_settings').select('*').maybeSingle(),
     ]);
     const error =
       students.error || classes.error || attendance.error || payments.error ||
-      counselLogs.error || kioskAlerts.error || settings.error;
+      counselLogs.error || kioskAlerts.error || homeworkAlerts.error || settings.error;
     if (error) throw error;
 
     return {
@@ -122,6 +133,7 @@ export const api = {
       payments: (payments.data ?? []).map(toPayment),
       counselLogs: (counselLogs.data ?? []).map(toCounselLog),
       kioskAlerts: (kioskAlerts.data ?? []).map(toKioskAlert),
+      homeworkAlerts: (homeworkAlerts.data ?? []).map(toHomeworkAlert),
       kioskPin: (settings.data?.kiosk_pin as string) ?? '1234',
       messageTemplates: mergeTemplates(settings.data?.message_templates as Partial<MessageTemplates> | null),
     };
@@ -382,6 +394,28 @@ export const api = {
     if (error) throw error;
   },
 
+  // ---- Homework alerts ----
+  async addHomeworkAlert(studentId: string, date: string, homeworkStatus: Exclude<HomeworkStatus, ''>): Promise<HomeworkAlert> {
+    const { data: row, error } = await supabase
+      .from('growing_homework_alerts')
+      .insert({ student_id: studentId, date, homework_status: homeworkStatus })
+      .select()
+      .single();
+    if (error) throw error;
+    return toHomeworkAlert(row);
+  },
+
+  async deleteHomeworkAlert(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_homework_alerts').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async clearHomeworkAlerts(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const { error } = await supabase.from('growing_homework_alerts').delete().in('id', ids);
+    if (error) throw error;
+  },
+
   // ---- Settings ----
   async setKioskPin(ownerId: string, pin: string): Promise<void> {
     const { error } = await supabase
@@ -443,6 +477,7 @@ export const api = {
     // Order respects FKs; students last (cascades the rest), classes before.
     const tables = [
       'growing_kiosk_alerts',
+      'growing_homework_alerts',
       'growing_counsel_logs',
       'growing_payments',
       'growing_attendance',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, PaymentMethod } from '../types';
+import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, HomeworkAlert, HomeworkStatus, PaymentMethod } from '../types';
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
 
@@ -14,6 +14,7 @@ export function useAcademyData(userId: string) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [counselLogs, setCounselLogs] = useState<CounselLog[]>([]);
   const [kioskAlerts, setKioskAlerts] = useState<KioskAlert[]>([]);
+  const [homeworkAlerts, setHomeworkAlerts] = useState<HomeworkAlert[]>([]);
   const [kioskPin, setKioskPin] = useState('1234');
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplates>(DEFAULT_TEMPLATES);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,7 @@ export function useAcademyData(userId: string) {
       setPayments(snap.payments);
       setCounselLogs(snap.counselLogs);
       setKioskAlerts(snap.kioskAlerts);
+      setHomeworkAlerts(snap.homeworkAlerts);
       setKioskPin(snap.kioskPin);
       setMessageTemplates(snap.messageTemplates);
     } catch (e) {
@@ -84,6 +86,7 @@ export function useAcademyData(userId: string) {
       setPayments(prev => prev.filter(p => p.studentId !== id));
       setCounselLogs(prev => prev.filter(l => l.studentId !== id));
       setKioskAlerts(prev => prev.filter(a => a.studentId !== id));
+      setHomeworkAlerts(prev => prev.filter(a => a.studentId !== id));
     });
 
   // ---- Classes ----
@@ -228,6 +231,25 @@ export function useAcademyData(userId: string) {
       setKioskAlerts([]);
     });
 
+  // ---- Homework alerts ----
+  const handleQueueHomeworkAlert = (studentId: string, date: string, homeworkStatus: Exclude<HomeworkStatus, ''>) =>
+    guard(async () => {
+      const created = await api.addHomeworkAlert(studentId, date, homeworkStatus);
+      setHomeworkAlerts(prev => [...prev, created]);
+    });
+
+  const handleDismissHomeworkAlert = (id: string) =>
+    guard(async () => {
+      await api.deleteHomeworkAlert(id);
+      setHomeworkAlerts(prev => prev.filter(a => a.id !== id));
+    });
+
+  const handleClearHomeworkAlerts = () =>
+    guard(async () => {
+      await api.clearHomeworkAlerts(homeworkAlerts.map(a => a.id));
+      setHomeworkAlerts([]);
+    });
+
   // ---- Settings ----
   const handleChangeKioskPin = (newPin: string) =>
     guard(async () => {
@@ -304,6 +326,7 @@ export function useAcademyData(userId: string) {
       setPayments([]);
       setCounselLogs([]);
       setKioskAlerts([]);
+      setHomeworkAlerts([]);
     });
 
   return {
@@ -316,6 +339,7 @@ export function useAcademyData(userId: string) {
     payments,
     counselLogs,
     kioskAlerts,
+    homeworkAlerts,
     kioskPin,
     messageTemplates,
     handleAddStudent,
@@ -336,6 +360,9 @@ export function useAcademyData(userId: string) {
     handleQueueKioskAlert,
     handleDismissKioskAlert,
     handleClearKioskAlerts,
+    handleQueueHomeworkAlert,
+    handleDismissHomeworkAlert,
+    handleClearHomeworkAlerts,
     handleChangeKioskPin,
     handleSaveMessageTemplates,
     getAllData,

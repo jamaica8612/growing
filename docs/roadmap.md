@@ -17,6 +17,8 @@
 | — | 키오스크 자율출결 → `growing_attendance` + `growing_kiosk_alerts` | |
 | — | 알림장 발송 탭 (키오스크 대기열, 템플릿 조립기) | |
 | — | 출결 관리 탭 (출/결/지/보강 + 숙제 + 학부모 알림) | |
+| — | 숙제 알림 대기열 (`growing_homework_alerts`) + 출결관리 → 알림장 발송 연결 | |
+| — | 아이비 기본 호칭: 사용자를 `지선쌤`으로 부르기 | |
 | 2 | 아이비 쓰기 + 확인 카드 (human-in-the-loop) | **[PR #15](https://github.com/jamaica8612/growing/pull/15) 머지 대기** |
 
 ---
