@@ -1,35 +1,90 @@
 import { supabase } from './supabase';
 
-// AI 비서 채팅 메시지. role은 화면/전송 모두에서 쓰는 최소 형태.
+export interface UpdateAttendanceAction {
+  type: 'update_attendance';
+  attendance_id: string;
+  student_name: string;
+  date: string;
+  old_status: string;
+  new_status: string;
+}
+
+export interface CreateAttendanceAction {
+  type: 'create_attendance';
+  student_id: string;
+  student_name: string;
+  date: string;
+  old_status: string;
+  new_status: string;
+}
+
+export interface UpdatePaymentAction {
+  type: 'update_payment';
+  payment_id: string;
+  student_name: string;
+  billing_month: string;
+  amount: number;
+}
+
+export type PendingAction = UpdateAttendanceAction | CreateAttendanceAction | UpdatePaymentAction;
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  action?: PendingAction;
+  actionStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assistant`;
 
-// 'assistant' Edge Function을 호출한다. 로그인 세션의 access token을 실어
-// 보내 함수 측에서 사용자를 식별하고(추후 RLS 범위 DB 접근), 직접 fetch를
-// 써서 오류 본문(JSON의 error)을 그대로 읽어 사용자에게 보여준다.
-export async function sendAssistantMessage(
-  messages: ChatMessage[]
-): Promise<{ reply: string; model: string }> {
+async function getAuthHeaders(): Promise<HeadersInit> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('로그인이 필요합니다.');
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${session.access_token}`,
+    apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  };
+}
+
+export async function sendAssistantMessage(
+  messages: ChatMessage[]
+): Promise<{ reply: string; model: string; action?: PendingAction }> {
+  const headers = await getAuthHeaders();
+  // ChatMessage를 Edge Function이 기대하는 role/content 쌍만으로 정리
+  const payload = messages.map(m => ({ role: m.role, content: m.content }));
 
   const res = await fetch(FUNCTIONS_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ messages }),
+    headers,
+    body: JSON.stringify({ messages: payload }),
   });
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.error ?? `AI 비서 요청에 실패했습니다 (${res.status}).`);
   }
-  return { reply: data.reply as string, model: data.model as string };
+  return {
+    reply: data.reply as string,
+    model: data.model as string,
+    action: data.action as PendingAction | undefined,
+  };
+}
+
+export async function executeAction(
+  action: PendingAction
+): Promise<{ success: boolean; message: string }> {
+  const headers = await getAuthHeaders();
+
+  const res = await fetch(FUNCTIONS_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error ?? `처리에 실패했습니다 (${res.status}).`);
+  }
+  return { success: data.success as boolean, message: data.message as string };
 }

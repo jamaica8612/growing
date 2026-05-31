@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, PaymentMethod } from '../types';
 import { api } from '../lib/api';
+import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
 
 // Centralises all academy data: loads it from Supabase for the signed-in owner
 // and exposes the same handler surface the UI used with localStorage, so the
@@ -14,6 +15,7 @@ export function useAcademyData(userId: string) {
   const [counselLogs, setCounselLogs] = useState<CounselLog[]>([]);
   const [kioskAlerts, setKioskAlerts] = useState<KioskAlert[]>([]);
   const [kioskPin, setKioskPin] = useState('1234');
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplates>(DEFAULT_TEMPLATES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +31,7 @@ export function useAcademyData(userId: string) {
       setCounselLogs(snap.counselLogs);
       setKioskAlerts(snap.kioskAlerts);
       setKioskPin(snap.kioskPin);
+      setMessageTemplates(snap.messageTemplates);
     } catch (e) {
       console.error('Failed to load academy data:', e);
       setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.');
@@ -232,6 +235,12 @@ export function useAcademyData(userId: string) {
       setKioskPin(newPin);
     });
 
+  const handleSaveMessageTemplates = (templates: MessageTemplates) =>
+    guard(async () => {
+      await api.setMessageTemplates(userId, templates);
+      setMessageTemplates(templates);
+    });
+
   // ---- Backup: export current data / restore a JSON backup into the DB ----
   const getAllData = () => ({ students, classes, attendance, payments, counselLogs });
 
@@ -308,6 +317,7 @@ export function useAcademyData(userId: string) {
     counselLogs,
     kioskAlerts,
     kioskPin,
+    messageTemplates,
     handleAddStudent,
     handleUpdateStudent,
     handleDeleteStudent,
@@ -327,6 +337,7 @@ export function useAcademyData(userId: string) {
     handleDismissKioskAlert,
     handleClearKioskAlerts,
     handleChangeKioskPin,
+    handleSaveMessageTemplates,
     getAllData,
     handleImportData,
     handleResetData,

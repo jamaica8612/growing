@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen, MessageSquare, RotateCcw } from 'lucide-react';
 import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
 import { api } from '../lib/api';
+import { type MessageTemplates, DEFAULT_TEMPLATES, TEMPLATE_META } from '../lib/messageTemplates';
 
 // Bump when the backup file shape changes so old/foreign files can be detected.
 const SCHEMA_VERSION = 1;
@@ -24,6 +25,8 @@ interface BackupProps {
   };
   kioskPin: string;
   onChangeKioskPin: (newPin: string) => void;
+  messageTemplates: MessageTemplates;
+  onSaveMessageTemplates: (templates: MessageTemplates) => void;
 }
 
 // Verify each record is an object carrying a string id, so a corrupt or
@@ -32,7 +35,7 @@ const isRecordArray = (value: unknown): value is { id: unknown }[] =>
   Array.isArray(value) &&
   value.every(item => typeof item === 'object' && item !== null && typeof (item as { id?: unknown }).id === 'string');
 
-export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin }) => {
+export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin, messageTemplates, onSaveMessageTemplates }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -51,6 +54,28 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   const [memoryLoading, setMemoryLoading] = useState(true);
   const [memorySaving, setMemorySaving] = useState(false);
   const [memoryStatus, setMemoryStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  // 메시지 템플릿 편집 — 저장 전까지 로컬 초안으로 보관하고, 저장 시 상위로 올린다.
+  const [templateDraft, setTemplateDraft] = useState<MessageTemplates>(messageTemplates);
+  const [templateStatus, setTemplateStatus] = useState<string | null>(null);
+
+  // 상위 템플릿 참조가 바뀌면(저장/복원 등) 초안을 동기화. effect 대신 렌더 중
+  // 직접 비교하는 React 권장 패턴이라 편집 중 불필요한 리렌더가 없다.
+  const [prevTemplates, setPrevTemplates] = useState(messageTemplates);
+  if (prevTemplates !== messageTemplates) {
+    setPrevTemplates(messageTemplates);
+    setTemplateDraft(messageTemplates);
+  }
+
+  const handleSaveTemplates = () => {
+    onSaveMessageTemplates(templateDraft);
+    setTemplateStatus('알림 메시지 템플릿이 저장되었습니다.');
+    setTimeout(() => setTemplateStatus(null), 4000);
+  };
+
+  const handleResetTemplate = (key: keyof MessageTemplates) => {
+    setTemplateDraft(prev => ({ ...prev, [key]: DEFAULT_TEMPLATES[key] }));
+  };
 
   useEffect(() => {
     api.getAssistantMemory()
@@ -436,6 +461,57 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             ))}
           </div>
         )}
+      </div>
+
+      {/* 알림 메시지 템플릿 설정 */}
+      <div className="card" style={{ borderLeft: '5px solid var(--color-secondary, #f59e0b)' }}>
+        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <MessageSquare size={18} /> 알림 메시지 템플릿
+        </h4>
+        <p style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', marginBottom: '1rem', lineHeight: 1.65 }}>
+          출결 관리·알림장 발송에서 사용하는 학부모 알림 문구를 직접 수정할 수 있습니다.
+          <strong> {'{학생명}'}, {'{시간}'}, {'{날짜}'}, {'{평가명}'}, {'{점수}'}</strong> 토큰은 전송 시 실제 값으로 자동 치환됩니다.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {TEMPLATE_META.map(({ key, label, tokens }) => (
+            <div key={key}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                <label style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--color-primary-dark)' }}>
+                  {label}
+                  <span style={{ marginLeft: '0.5rem', fontWeight: 500, fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
+                    사용 가능: {tokens.join(', ')}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem', gap: '0.25rem' }}
+                  onClick={() => handleResetTemplate(key)}
+                  disabled={templateDraft[key] === DEFAULT_TEMPLATES[key]}
+                  title="이 문구를 기본값으로 되돌립니다"
+                >
+                  <RotateCcw size={12} /> 기본값
+                </button>
+              </div>
+              <textarea
+                className="form-control"
+                style={{ resize: 'vertical', minHeight: '92px', fontFamily: 'inherit', fontSize: '0.83rem', lineHeight: 1.6 }}
+                value={templateDraft[key]}
+                onChange={e => setTemplateDraft(prev => ({ ...prev, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
+          {templateStatus && (
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <CheckCircle size={15} /> {templateStatus}
+            </span>
+          )}
+          <button className="btn btn-primary" onClick={handleSaveTemplates} style={{ minWidth: '120px' }}>
+            템플릿 저장
+          </button>
+        </div>
       </div>
 
       {/* Danger Zone Reset Data */}
