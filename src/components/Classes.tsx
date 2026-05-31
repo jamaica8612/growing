@@ -4,6 +4,21 @@ import { BookOpen, Plus, Clock, X, Users, Calendar } from 'lucide-react';
 import { deriveLegacyClassScheduleFields, getClassScheduleLabel, getClassSchedules, getSchedulesForDay } from '../lib/classSchedules';
 import { getTuitionOverrideCount } from '../lib/classTuition';
 
+const CLASS_COLORS = [
+  '#10b981', // 에메랄드
+  '#3b82f6', // 파랑
+  '#f59e0b', // 호박
+  '#ef4444', // 빨강
+  '#8b5cf6', // 보라
+  '#ec4899', // 핑크
+  '#06b6d4', // 청록
+  '#f97316', // 주황
+  '#84cc16', // 연두
+  '#6366f1', // 인디고
+];
+
+const getClassColor = (cls: Class) => cls.color ?? CLASS_COLORS[0];
+
 interface ClassesProps {
   classes: Class[];
   students: Student[];
@@ -31,6 +46,7 @@ export const Classes: React.FC<ClassesProps> = ({
   const [formTuitionFee, setFormTuitionFee] = useState(200000);
   const [formTuitionOverrides, setFormTuitionOverrides] = useState<Record<string, number>>({});
   const [formStudentIds, setFormStudentIds] = useState<string[]>([]);
+  const [formColor, setFormColor] = useState(CLASS_COLORS[0]);
 
   // 배정 대상: 재원생 + 이미 이 반에 속한 학생(휴원생 포함)을 노출해
   // 휴원 멤버의 배정 해제나 개별 원비 관리가 가능하도록 한다.
@@ -125,6 +141,9 @@ export const Classes: React.FC<ClassesProps> = ({
     setFormTuitionFee(200000);
     setFormTuitionOverrides({});
     setFormStudentIds([]);
+    const usedColors = classes.map(c => c.color ?? CLASS_COLORS[0]);
+    const nextColor = CLASS_COLORS.find(c => !usedColors.includes(c)) ?? CLASS_COLORS[classes.length % CLASS_COLORS.length];
+    setFormColor(nextColor);
     setIsFormOpen(true);
   };
 
@@ -139,6 +158,7 @@ export const Classes: React.FC<ClassesProps> = ({
     setFormTuitionFee(cls.tuitionFee);
     setFormTuitionOverrides(cls.tuitionOverrides ?? {});
     setFormStudentIds(cls.studentIds);
+    setFormColor(cls.color ?? CLASS_COLORS[0]);
     setIsFormOpen(true);
   };
 
@@ -169,6 +189,7 @@ export const Classes: React.FC<ClassesProps> = ({
       tuitionFee: Number(formTuitionFee),
       tuitionOverrides,
       studentIds: formStudentIds,
+      color: formColor,
     };
 
     if (editingClass) {
@@ -212,14 +233,22 @@ export const Classes: React.FC<ClassesProps> = ({
 
             {/* Time markers on the left */}
             <div className="timetable-time-col">
-              <div style={{ height: '60px', padding: '4px' }}>13:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>14:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>15:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>16:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>17:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>18:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>19:00</div>
-              <div style={{ height: '60px', padding: '4px' }}>20:00</div>
+              {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    top: `${(i / (END_HOUR - START_HOUR)) * 100}%`,
+                    left: 0,
+                    right: 0,
+                    padding: '0 4px',
+                    transform: 'translateY(-0.6em)',
+                    textAlign: 'center',
+                  }}
+                >
+                  {String(START_HOUR + i).padStart(2, '0')}:00
+                </div>
+              ))}
             </div>
 
             {/* Day columns */}
@@ -230,10 +259,9 @@ export const Classes: React.FC<ClassesProps> = ({
                   .map(({ cls, schedule }) => {
                     const startMins = getMinutesFromStart(schedule.startTime);
                     const duration = getDurationMinutes(schedule.startTime, schedule.endTime);
-
-                    // Calculate percentage style
                     const topPercent = (startMins / TOTAL_MINUTES) * 100;
                     const heightPercent = (duration / TOTAL_MINUTES) * 100;
+                    const color = getClassColor(cls);
 
                     return (
                       <div
@@ -242,17 +270,20 @@ export const Classes: React.FC<ClassesProps> = ({
                         style={{
                           top: `${topPercent}%`,
                           height: `${heightPercent}%`,
+                          background: `${color}22`,
+                          borderLeftColor: color,
+                          color: color,
                         }}
                         onClick={() => handleOpenEdit(cls)}
                         title={`${cls.name} (${schedule.startTime} - ${schedule.endTime})`}
                       >
                         <div>
                           <div className="class-slot-name">{cls.name}</div>
-                          <div className="class-slot-time">
+                          <div className="class-slot-time" style={{ color: `${color}bb` }}>
                             {schedule.startTime} - {schedule.endTime}
                           </div>
                         </div>
-                        <div className="class-slot-count">
+                        <div className="class-slot-count" style={{ color: `${color}bb` }}>
                           👤 {cls.studentIds.length}명
                         </div>
                       </div>
@@ -276,11 +307,14 @@ export const Classes: React.FC<ClassesProps> = ({
           </p>
         ) : (
           <div className="grid-container cols-3">
-            {classes.map(cls => (
+            {classes.map(cls => {
+              const color = getClassColor(cls);
+              return (
               <div
                 key={cls.id}
                 style={{
-                  border: '1px solid var(--color-border)',
+                  border: `1px solid var(--color-border)`,
+                  borderTop: `3px solid ${color}`,
                   borderRadius: 'var(--radius-md)',
                   padding: '1.25rem',
                   backgroundColor: '#fafbfc',
@@ -289,7 +323,7 @@ export const Classes: React.FC<ClassesProps> = ({
                 onClick={() => handleOpenEdit(cls)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.05rem' }}>
+                  <h4 style={{ fontWeight: 700, color, fontSize: '1.05rem' }}>
                     {cls.name}
                   </h4>
                   <button
@@ -347,7 +381,8 @@ export const Classes: React.FC<ClassesProps> = ({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -376,6 +411,39 @@ export const Classes: React.FC<ClassesProps> = ({
                     onChange={e => setFormName(e.target.value)}
                     required
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>반 색상</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', alignItems: 'center' }}>
+                    {CLASS_COLORS.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setFormColor(color)}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          backgroundColor: color,
+                          border: formColor === color ? `3px solid #1f2937` : '3px solid transparent',
+                          outline: formColor === color ? `2px solid ${color}` : 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          transition: 'transform 0.15s',
+                          transform: formColor === color ? 'scale(1.2)' : 'scale(1)',
+                        }}
+                        title={color}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={formColor}
+                      onChange={e => setFormColor(e.target.value)}
+                      style={{ width: '28px', height: '28px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }}
+                      title="직접 색상 선택"
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">

@@ -720,7 +720,11 @@ body {
 /* Timetable Grid CSS */
 .timetable-grid {
   display: grid;
-  grid-template-columns: 80px repeat(5, 1fr);
+  grid-template-columns: 64px repeat(5, 1fr);
+  grid-template-rows: 44px 1fr;
+  height: calc(100vh - 320px);
+  min-height: 320px;
+  max-height: 600px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -729,12 +733,16 @@ body {
 
 .timetable-header-cell {
   background-color: #f8faf9;
-  padding: 0.75rem;
+  padding: 0.5rem 0.25rem;
   text-align: center;
   font-weight: 700;
+  font-size: 0.85rem;
   color: var(--color-primary-dark);
   border-bottom: 2px solid var(--color-border);
   border-right: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .timetable-header-cell:last-child {
@@ -745,21 +753,16 @@ body {
   grid-column: 1;
   border-right: 1px solid var(--color-border);
   background-color: #f8faf9;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  text-align: center;
-  font-size: 0.8rem;
+  position: relative;
+  font-size: 0.72rem;
   color: var(--color-text-secondary);
 }
 
 .timetable-day-col {
-  min-height: 480px;
   position: relative;
   border-right: 1px solid var(--color-border);
   background-image: linear-gradient(var(--color-border) 1px, transparent 1px);
-  background-size: 100% 60px; /* 1 hour increments */
+  background-size: 100% calc(100% / 7);
 }
 
 .timetable-day-col:last-child {
@@ -768,14 +771,12 @@ body {
 
 .class-slot {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  background: linear-gradient(135deg, #eaf6f0, #d1eedf);
-  border-left: 4px solid var(--color-primary);
+  left: 3px;
+  right: 3px;
+  border-left: 4px solid currentColor;
   border-radius: var(--radius-sm);
-  padding: 0.4rem;
-  font-size: 0.75rem;
-  color: var(--color-primary-dark);
+  padding: 0.3rem 0.4rem;
+  font-size: 0.73rem;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
@@ -799,15 +800,13 @@ body {
 }
 
 .class-slot-time {
-  font-size: 0.65rem;
-  color: var(--color-text-secondary);
-  margin-top: 0.15rem;
+  font-size: 0.62rem;
+  margin-top: 0.1rem;
 }
 
 .class-slot-count {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 600;
-  color: var(--color-primary-light);
   margin-top: auto;
   align-self: flex-end;
 }

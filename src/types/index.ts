@@ -24,6 +24,7 @@ export interface Class {
   tuitionFee: number;
   tuitionOverrides: Record<string, number>;
   studentIds: string[]; // List of Student IDs in this class
+  color?: string; // hex color e.g. "#10b981"
 }
 
 export interface ClassSchedule {
