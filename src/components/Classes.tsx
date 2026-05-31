@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Student, Class, ClassSchedule, DayOfWeek } from '../types';
 import { BookOpen, Plus, Clock, X, Users, Calendar } from 'lucide-react';
 import { deriveLegacyClassScheduleFields, getClassScheduleLabel, getClassSchedules, getSchedulesForDay } from '../lib/classSchedules';
-import { getTuitionOverrideCount } from '../lib/classTuition';
+import { getStudentClassTuition, getTuitionOverrideCount } from '../lib/classTuition';
 
 const CLASS_COLORS = [
   '#10b981', // 에메랄드
@@ -47,6 +47,21 @@ export const Classes: React.FC<ClassesProps> = ({
   const [formTuitionOverrides, setFormTuitionOverrides] = useState<Record<string, number>>({});
   const [formStudentIds, setFormStudentIds] = useState<string[]>([]);
   const [formColor, setFormColor] = useState(CLASS_COLORS[0]);
+
+  // Per-class summary: active student count + expected monthly tuition.
+  const classSummary = useMemo(() => {
+    const activeIdSet = new Set(students.filter(s => s.status === 'active').map(s => s.id));
+    return classes.map(cls => {
+      const activeMembers = cls.studentIds.filter(id => activeIdSet.has(id));
+      const tuitionSum = activeMembers.reduce((sum, id) => sum + getStudentClassTuition(cls, id), 0);
+      return { cls, count: activeMembers.length, tuitionSum };
+    });
+  }, [classes, students]);
+
+  const summaryTotals = useMemo(
+    () => classSummary.reduce((acc, c) => ({ count: acc.count + c.count, tuition: acc.tuition + c.tuitionSum }), { count: 0, tuition: 0 }),
+    [classSummary]
+  );
 
   // 배정 대상: 재원생 + 이미 이 반에 속한 학생(휴원생 포함)을 노출해
   // 휴원 멤버의 배정 해제나 개별 원비 관리가 가능하도록 한다.
@@ -294,6 +309,55 @@ export const Classes: React.FC<ClassesProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Per-class summary: student count + monthly tuition */}
+      {classes.length > 0 && (
+        <div className="card">
+          <h3 className="card-title" style={{ marginBottom: '0.85rem' }}>
+            <Users size={20} className="text-primary" /> 반별 현황 요약
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            {classSummary.map(({ cls, count, tuitionSum }) => {
+              const color = getClassColor(cls);
+              return (
+                <div
+                  key={cls.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.55rem 0.85rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    borderLeft: `4px solid ${color}`,
+                    backgroundColor: '#fafbfc',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color, minWidth: '110px', fontSize: '0.88rem' }}>{cls.name}</span>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', flex: 1 }}>재원생 {count}명</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{tuitionSum.toLocaleString()}원</span>
+                </div>
+              );
+            })}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.55rem 0.85rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#f0f7f3',
+                borderLeft: '4px solid var(--color-primary)',
+                fontWeight: 700,
+              }}
+            >
+              <span style={{ minWidth: '110px', fontSize: '0.88rem', color: 'var(--color-primary-dark)' }}>전체 합계</span>
+              <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>재원생 {summaryTotals.count}명</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-primary-dark)' }}>{summaryTotals.tuition.toLocaleString()}원</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Class Directory Cards */}
       <div className="card">

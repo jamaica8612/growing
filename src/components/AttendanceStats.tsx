@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Student, Class, Attendance, EditableAttendanceStatus } from '../types';
+import type { Student, Class, Attendance, EditableAttendanceStatus, Payment } from '../types';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown, Copy, Check, MessageSquare } from 'lucide-react';
 
@@ -7,6 +7,7 @@ interface AttendanceStatsProps {
   students: Student[];
   classes: Class[];
   attendance: Attendance[];
+  payments: Payment[];
   onSendDraftToMessaging?: (content: string) => void;
 }
 
@@ -33,7 +34,7 @@ const STATUS_META: Record<EditableAttendanceStatus, { label: string; badge: stri
 const rateColor = (rate: number) =>
   rate >= 90 ? 'var(--color-success)' : rate >= 75 ? 'var(--color-warning)' : 'var(--color-danger)';
 
-export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, classes, attendance, onSendDraftToMessaging }) => {
+export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, classes, attendance, payments, onSendDraftToMessaging }) => {
   const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -102,6 +103,42 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
         return b.absent - a.absent;
       });
   }, [students, monthRecords]);
+
+  // Last 3 months attendance trend (including selectedMonth).
+  const trend = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    return [2, 1, 0].map(i => {
+      const d = new Date(y, m - 1 - i, 1);
+      const mo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const recs = attendance.filter(a => a.date.startsWith(mo) && activeStudentIds.has(a.studentId));
+      const attended = recs.filter(r => normalizeAttendanceStatus(r.status) !== 'absent').length;
+      return {
+        month: mo,
+        label: `${d.getMonth() + 1}월`,
+        total: recs.length,
+        rate: recs.length ? Math.round((attended / recs.length) * 100) : -1,
+      };
+    });
+  }, [attendance, selectedMonth, activeStudentIds]);
+
+  // Combined risk: low attendance OR unpaid for selectedMonth.
+  const unpaidIds = useMemo(
+    () => new Set(payments.filter(p => p.billingMonth === selectedMonth && p.status === 'unpaid').map(p => p.studentId)),
+    [payments, selectedMonth]
+  );
+
+  const riskList = useMemo(
+    () =>
+      studentRows
+        .map(r => ({ ...r, unpaid: unpaidIds.has(r.studentId) }))
+        .filter(r => (r.total > 0 && (r.rate < 80 || r.absent >= 3)) || r.unpaid)
+        .sort(
+          (a, b) =>
+            (Number(b.unpaid) + Number(b.rate < 80 || b.absent >= 3)) -
+            (Number(a.unpaid) + Number(a.rate < 80 || a.absent >= 3))
+        ),
+    [studentRows, unpaidIds]
+  );
 
   // Students needing follow-up: at least one record and rate < 80% or >= 3 absences.
   const concernRows = studentRows.filter(r => r.total > 0 && (r.rate < 80 || r.absent >= 3));
@@ -219,6 +256,87 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
               </div>
             </div>
           </div>
+
+          {/* 3-month attendance trend */}
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '1rem' }}>
+              <BarChart3 size={18} className="text-primary" /> 최근 3개월 출석 추세
+            </h3>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', justifyContent: 'center', minHeight: '96px' }}>
+              {trend.map((t, i) => {
+                const isSelected = i === 2;
+                const color = t.rate >= 0 ? rateColor(t.rate) : '#d1d5db';
+                const barPct = t.rate >= 0 ? t.rate : 0;
+                return (
+                  <div key={t.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', flex: 1, maxWidth: '88px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: t.rate >= 0 ? color : 'var(--color-text-muted)' }}>
+                      {t.rate >= 0 ? `${t.rate}%` : '—'}
+                    </span>
+                    <div style={{ width: '100%', height: '68px', background: '#f3f4f6', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: '100%',
+                          height: `${barPct}%`,
+                          minHeight: barPct > 0 ? '4px' : '0',
+                          backgroundColor: color,
+                          opacity: isSelected ? 1 : 0.6,
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.78rem', fontWeight: isSelected ? 700 : 400, color: isSelected ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)' }}>
+                      {t.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 우선 관리 대상 — 출결 저조 또는 미납 */}
+          {riskList.length > 0 && (
+            <div className="card" style={{ borderLeft: '5px solid var(--color-warning)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+                <div>
+                  <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>🚨 우선 관리 대상</h3>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+                    {monthLabel} 기준 출석률 저조·결석 반복·미납 학생입니다.
+                  </p>
+                </div>
+                <span className="badge badge-absent" style={{ fontSize: '0.78rem' }}>{riskList.length}명</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {riskList.map(r => (
+                  <div
+                    key={r.studentId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.55rem 0.85rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: '#fffdf5',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <strong style={{ color: 'var(--color-primary-dark)', minWidth: '56px' }}>{r.name}</strong>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', flex: 1 }}>
+                      {r.total > 0 && (r.rate < 80 || r.absent >= 3) && (
+                        <span className="badge badge-absent" style={{ fontSize: '0.72rem' }}>
+                          출결 {r.rate}% · 결석 {r.absent}
+                        </span>
+                      )}
+                      {r.unpaid && (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', backgroundColor: '#fef3c7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                          미납
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {concernRows.length > 0 && (
             <div className="card" style={{ borderLeft: '5px solid var(--color-danger)' }}>
