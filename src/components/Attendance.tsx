@@ -418,19 +418,31 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             보강
                           </button>
                         </div>
-                        {currentStatus === 'makeup' && (
-                          <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem' }}>
-                            <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>결석일:</span>
-                            <input
-                              type="date"
-                              className="form-control"
-                              style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '140px' }}
-                              value={makeupForDates[`${student.id}-${cls.id}`] ?? record?.makeupForDate ?? ''}
-                              onChange={e => handleMakeupForDateChange(student.id, cls.id, e.target.value)}
-                              title="이 보강이 대체하는 원래 결석 날짜"
-                            />
-                          </div>
-                        )}
+                        {currentStatus === 'makeup' && (() => {
+                          const linkedDate = makeupForDates[`${student.id}-${cls.id}`] ?? record?.makeupForDate ?? '';
+                          // 연결한 결석일에 실제 결석 기록이 있는지 확인(고아 연결 방지).
+                          const hasAbsence = !!linkedDate && attendance.some(
+                            a => a.studentId === student.id && a.date === linkedDate && a.status === 'absent'
+                          );
+                          return (
+                            <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+                              <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>결석일:</span>
+                              <input
+                                type="date"
+                                className="form-control"
+                                style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '140px' }}
+                                value={linkedDate}
+                                onChange={e => handleMakeupForDateChange(student.id, cls.id, e.target.value)}
+                                title="이 보강이 대체하는 원래 결석 날짜"
+                              />
+                              {linkedDate && (
+                                <span style={{ fontSize: '0.7rem', color: hasAbsence ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                                  {hasAbsence ? '✓ 결석 기록과 연결됨' : '⚠ 해당 날짜 결석 기록 없음'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {currentStatus === 'absent' && (() => {
                           const linkedMakeup = attendance.find(
                             a => a.studentId === student.id && a.classId === cls.id &&

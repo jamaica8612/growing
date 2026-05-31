@@ -331,7 +331,9 @@ export function useAcademyData(userId: string) {
           studentId,
           classId: classIdMap.get(a.classId) ?? '',
           date: a.date,
-          status: a.status,
+          // 과거 백업의 지각(late)은 제거된 상태이므로 출석으로 정규화해 복원한다
+          // (DB 체크 제약이 late를 더 이상 허용하지 않음).
+          status: a.status === 'late' ? 'present' : a.status,
           memo: a.memo ?? '',
           homeworkStatus: a.homeworkStatus ?? '',
           checkInTime: a.checkInTime,

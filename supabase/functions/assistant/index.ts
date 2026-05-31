@@ -246,7 +246,7 @@ function compactLines(lines: (string | false | null | undefined)[]) {
 }
 
 const ATTENDANCE_KO: Record<string, string> = {
-  present: '출석', absent: '결석', late: '출석', makeup: '보강',
+  present: '출석', absent: '결석', makeup: '보강',
 };
 
 async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<Json> {
@@ -321,8 +321,7 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         if (targetIds && !targetIds.has(sid)) continue;
         if (!targetIds && !activeIds.has(sid)) continue;
         const row = (acc[sid] ??= { name: nameById.get(sid) ?? '(알수없음)', present: 0, absent: 0, makeup: 0, total: 0 });
-        const st = r.status as string;
-        const normalizedStatus = st === 'late' ? 'present' : st;
+        const normalizedStatus = r.status as string;
         if (normalizedStatus in row) (row[normalizedStatus] as number)++;
         row.total = (row.total as number) + 1;
       }
@@ -652,7 +651,16 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       if (filterColumn && filterValue) q = q.eq(filterColumn, filterValue);
       const { data, error } = await q;
       if (error) return { error: error.message };
-      return { table, count: (data ?? []).length, rows: data ?? [] };
+      let rows = (data ?? []) as Json[];
+      // student_id가 들어 있으면 학생 이름을 덧붙여 가독성을 높인다(알림/로그 등).
+      if (rows.some(r => 'student_id' in r && r.student_id)) {
+        const students = await fetchStudents(sb);
+        const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
+        rows = rows.map(r => ('student_id' in r && r.student_id)
+          ? { ...r, student_name: nameById.get(r.student_id as string) ?? null }
+          : r);
+      }
+      return { table, count: rows.length, rows };
     }
 
     default:
