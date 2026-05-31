@@ -381,7 +381,7 @@ body {
     bottom: 0;
     z-index: 95;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.15rem;
     padding: 0.45rem 0.65rem calc(0.45rem + env(safe-area-inset-bottom));
     background: rgba(255, 255, 255, 0.96);

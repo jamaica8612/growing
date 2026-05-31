@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Student, Class, ClassSchedule, DayOfWeek } from '../types';
 import { BookOpen, Plus, Clock, X, Users, Calendar } from 'lucide-react';
 import { deriveLegacyClassScheduleFields, getClassScheduleLabel, getClassSchedules, getSchedulesForDay } from '../lib/classSchedules';
+import { getTuitionOverrideCount } from '../lib/classTuition';
 
 interface ClassesProps {
   classes: Class[];
@@ -28,6 +29,7 @@ export const Classes: React.FC<ClassesProps> = ({
   const [formEndTime, setFormEndTime] = useState('15:30');
   const [formSchedules, setFormSchedules] = useState<ClassSchedule[]>([]);
   const [formTuitionFee, setFormTuitionFee] = useState(200000);
+  const [formTuitionOverrides, setFormTuitionOverrides] = useState<Record<string, number>>({});
   const [formStudentIds, setFormStudentIds] = useState<string[]>([]);
 
   // List of active students to choose from
@@ -83,9 +85,27 @@ export const Classes: React.FC<ClassesProps> = ({
   const handleStudentToggle = (studentId: string) => {
     if (formStudentIds.includes(studentId)) {
       setFormStudentIds(formStudentIds.filter(id => id !== studentId));
+      setFormTuitionOverrides(prev => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
     } else {
       setFormStudentIds([...formStudentIds, studentId]);
     }
+  };
+
+  const handleTuitionOverrideChange = (studentId: string, value: string) => {
+    const amount = Number(value);
+    setFormTuitionOverrides(prev => {
+      const next = { ...prev };
+      if (!value || !Number.isFinite(amount) || amount === Number(formTuitionFee)) {
+        delete next[studentId];
+      } else {
+        next[studentId] = Math.max(0, amount);
+      }
+      return next;
+    });
   };
 
   // Open form for adding
@@ -100,6 +120,7 @@ export const Classes: React.FC<ClassesProps> = ({
       { day: '수', startTime: '14:00', endTime: '15:30' },
     ]);
     setFormTuitionFee(200000);
+    setFormTuitionOverrides({});
     setFormStudentIds([]);
     setIsFormOpen(true);
   };
@@ -113,6 +134,7 @@ export const Classes: React.FC<ClassesProps> = ({
     setFormEndTime(cls.endTime);
     setFormSchedules(getClassSchedules(cls));
     setFormTuitionFee(cls.tuitionFee);
+    setFormTuitionOverrides(cls.tuitionOverrides ?? {});
     setFormStudentIds(cls.studentIds);
     setIsFormOpen(true);
   };
@@ -131,6 +153,10 @@ export const Classes: React.FC<ClassesProps> = ({
     }
 
     const legacyFields = deriveLegacyClassScheduleFields(formSchedules);
+    const tuitionOverrides = Object.fromEntries(
+      Object.entries(formTuitionOverrides)
+        .filter(([studentId, fee]) => formStudentIds.includes(studentId) && Number.isFinite(fee) && fee >= 0 && fee !== Number(formTuitionFee))
+    );
     const classData = {
       name: formName.trim(),
       days: legacyFields.days,
@@ -138,6 +164,7 @@ export const Classes: React.FC<ClassesProps> = ({
       endTime: legacyFields.endTime,
       schedules: formSchedules,
       tuitionFee: Number(formTuitionFee),
+      tuitionOverrides,
       studentIds: formStudentIds,
     };
 
@@ -278,7 +305,12 @@ export const Classes: React.FC<ClassesProps> = ({
                     🕒 <strong>시간표:</strong> {getClassScheduleLabel(cls)}
                   </div>
                   <div>
-                    💰 <strong>원비:</strong> {cls.tuitionFee.toLocaleString()}원
+                    💰 <strong>기본 원비:</strong> {cls.tuitionFee.toLocaleString()}원
+                    {getTuitionOverrideCount(cls) > 0 && (
+                      <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+                        개별 원비 {getTuitionOverrideCount(cls)}명
+                      </span>
+                    )}
                   </div>
                   <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Users size={16} className="text-primary" />
@@ -470,7 +502,7 @@ export const Classes: React.FC<ClassesProps> = ({
                       borderRadius: 'var(--radius-md)',
                       padding: '0.75rem',
                       display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
+                      gridTemplateColumns: '1fr',
                       gap: '0.5rem',
                       backgroundColor: '#fafbfc',
                     }}
@@ -483,27 +515,42 @@ export const Classes: React.FC<ClassesProps> = ({
                       activeStudents.map(student => {
                         const isChecked = formStudentIds.includes(student.id);
                         return (
-                          <label
+                          <div
                             key={student.id}
                             style={{
-                              display: 'flex',
+                              display: 'grid',
+                              gridTemplateColumns: isChecked ? 'minmax(0, 1fr) 130px' : '1fr',
+                              gap: '0.45rem',
                               alignItems: 'center',
-                              gap: '0.5rem',
                               fontSize: '0.85rem',
-                              cursor: 'pointer',
                               padding: '0.25rem',
                             }}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleStudentToggle(student.id)}
-                              style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
-                            />
-                            <span>
-                              {student.name} ({student.grade.split(' ')[1] || student.grade})
-                            </span>
-                          </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', minWidth: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleStudentToggle(student.id)}
+                                style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
+                              />
+                              <span style={{ minWidth: 0 }}>
+                                {student.name} ({student.grade.split(' ')[1] || student.grade})
+                              </span>
+                            </label>
+                            {isChecked && (
+                              <input
+                                type="number"
+                                className="form-control"
+                                value={formTuitionOverrides[student.id] ?? formTuitionFee}
+                                min={0}
+                                step={10000}
+                                aria-label={`${student.name} 개별 원비`}
+                                title="기본 원비와 다를 때만 개별 원비로 저장됩니다"
+                                onChange={e => handleTuitionOverrideChange(student.id, e.target.value)}
+                                style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                              />
+                            )}
+                          </div>
                         );
                       })
                     )}

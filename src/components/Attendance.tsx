@@ -116,6 +116,24 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
     });
   };
 
+  const handleTimeChange = (
+    studentId: string,
+    classId: string,
+    field: 'checkInTime' | 'checkOutTime',
+    value: string
+  ) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: record?.status ?? 'present',
+      memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '',
+      checkInTime: field === 'checkInTime' ? value : record?.checkInTime,
+      checkOutTime: field === 'checkOutTime' ? value : record?.checkOutTime,
+    });
+  };
+
   // Handle status update
   const handleStatusChange = (studentId: string, classId: string, status: EditableAttendanceStatus) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
@@ -333,6 +351,24 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             <LogOut size={12} /> 하원{record?.checkOutTime ? ` ${record.checkOutTime}` : ''}
                           </button>
                         </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                          <input
+                            type="time"
+                            className="form-control"
+                            value={record?.checkInTime ?? ''}
+                            aria-label={`${student.name} 등원 시간 수정`}
+                            onChange={e => handleTimeChange(student.id, cls.id, 'checkInTime', e.target.value)}
+                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.45rem' }}
+                          />
+                          <input
+                            type="time"
+                            className="form-control"
+                            value={record?.checkOutTime ?? ''}
+                            aria-label={`${student.name} 하원 시간 수정`}
+                            onChange={e => handleTimeChange(student.id, cls.id, 'checkOutTime', e.target.value)}
+                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.45rem' }}
+                          />
+                        </div>
                         <div className="quick-att-buttons">
                           <button
                             className={`btn-att-select ${currentStatus === 'present' ? 'active-present' : ''}`}
@@ -499,6 +535,22 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                       >
                         <LogOut size={12} /> 하원{record?.checkOutTime ? ` ${record.checkOutTime}` : ''}
                       </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', marginTop: '0.5rem' }}>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={record?.checkInTime ?? ''}
+                        aria-label={`${student.name} 등원 시간 수정`}
+                        onChange={e => handleTimeChange(student.id, cls.id, 'checkInTime', e.target.value)}
+                      />
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={record?.checkOutTime ?? ''}
+                        aria-label={`${student.name} 하원 시간 수정`}
+                        onChange={e => handleTimeChange(student.id, cls.id, 'checkOutTime', e.target.value)}
+                      />
                     </div>
                   </div>
 

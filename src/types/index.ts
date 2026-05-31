@@ -22,6 +22,7 @@ export interface Class {
   endTime: string; // e.g. "15:30"
   schedules: ClassSchedule[];
   tuitionFee: number;
+  tuitionOverrides: Record<string, number>;
   studentIds: string[]; // List of Student IDs in this class
 }
 

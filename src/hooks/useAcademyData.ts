@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, HomeworkAlert, HomeworkStatus, PaymentMethod } from '../types';
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
+import { getStudentClassTuition } from '../lib/classTuition';
 
 // Centralises all academy data: loads it from Supabase for the signed-in owner
 // and exposes the same handler surface the UI used with localStorage, so the
@@ -80,9 +81,17 @@ export function useAcademyData(userId: string) {
       const updatedStudent = await api.updateStudent({ ...student, status: 'inactive' });
       const affectedClasses = classes.filter(c => c.studentIds.includes(id));
       await Promise.all(
-        affectedClasses.map(c => api.updateClass({ ...c, studentIds: c.studentIds.filter(sid => sid !== id) }))
+        affectedClasses.map(c => {
+          const tuitionOverrides = { ...(c.tuitionOverrides ?? {}) };
+          delete tuitionOverrides[id];
+          return api.updateClass({ ...c, studentIds: c.studentIds.filter(sid => sid !== id), tuitionOverrides });
+        })
       );
-      setClasses(prev => prev.map(c => ({ ...c, studentIds: c.studentIds.filter(sid => sid !== id) })));
+      setClasses(prev => prev.map(c => {
+        const tuitionOverrides = { ...(c.tuitionOverrides ?? {}) };
+        delete tuitionOverrides[id];
+        return { ...c, studentIds: c.studentIds.filter(sid => sid !== id), tuitionOverrides };
+      }));
       setStudents(prev => prev.map(p => (p.id === id ? updatedStudent : p)));
     });
 
@@ -146,7 +155,7 @@ export function useAcademyData(userId: string) {
         .forEach(student => {
           const studentClasses = classes.filter(c => c.studentIds.includes(student.id));
           if (studentClasses.length === 0) return;
-          const totalTuition = studentClasses.reduce((sum, c) => sum + c.tuitionFee, 0);
+          const totalTuition = studentClasses.reduce((sum, c) => sum + getStudentClassTuition(c, student.id), 0);
           const billExists = payments.some(p => p.studentId === student.id && p.billingMonth === month);
           if (!billExists && totalTuition > 0) {
             newBills.push({ studentId: student.id, billingMonth: month, amount: totalTuition, status: 'unpaid' });
@@ -280,9 +289,16 @@ export function useAcademyData(userId: string) {
       }
       const classIdMap = new Map<string, string>();
       for (const c of data.classes) {
+        const studentIds = c.studentIds.map(id => studentIdMap.get(id)).filter((v): v is string => Boolean(v));
+        const tuitionOverrides = Object.fromEntries(
+          Object.entries(c.tuitionOverrides ?? {})
+            .map(([oldId, fee]) => [studentIdMap.get(oldId), fee] as const)
+            .filter((entry): entry is [string, number] => Boolean(entry[0]) && Number.isFinite(entry[1]))
+        );
         const created = await api.addClass({
           ...c,
-          studentIds: c.studentIds.map(id => studentIdMap.get(id)).filter((v): v is string => Boolean(v)),
+          tuitionOverrides,
+          studentIds,
         });
         classIdMap.set(c.id, created.id);
       }

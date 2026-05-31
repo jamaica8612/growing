@@ -264,6 +264,7 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
           name: c.name, days: c.days, startTime: c.start_time, endTime: c.end_time,
           schedules: c.schedules ?? [],
           tuitionFee: c.tuition_fee,
+          tuitionOverrides: c.tuition_overrides ?? {},
           students: ((c.student_ids as string[]) ?? []).map(id => nameById.get(id)).filter(Boolean),
         })),
       };

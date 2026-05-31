@@ -38,7 +38,7 @@ import {
 
 // Navigation grouped by usage flow so the most-frequent daily tasks sit at the
 // top. Rendered by both the desktop sidebar and the mobile drawer. The 'kiosk'
-// item launches full-screen mode via a confirm; 'backup' lives in the footer.
+// item launches full-screen mode via a confirm; settings live in the footer.
 type NavItem = { id: string; label: string; icon: LucideIcon; kind?: 'kiosk' };
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
@@ -85,7 +85,7 @@ const TAB_TITLES: Record<string, string> = {
   counsel: '상담 및 학습/성적 일지',
   messaging: '알림장 발송 도우미',
   kiosk: '자율 등하원 키오스크',
-  backup: '데이터 백업 및 복원',
+  backup: 'AI·알림·백업 설정',
 };
 
 const NAV_ITEM_STYLE: React.CSSProperties = {
@@ -226,6 +226,7 @@ function AcademyApp({ session }: { session: Session }) {
     { id: 'attendance', label: '출결', icon: CalendarCheck },
     { id: 'messaging', label: '알림장', icon: Smartphone },
     { id: 'students', label: '학생', icon: Users },
+    { id: 'backup', label: '설정', icon: ShieldCheck },
   ];
 
   // Render Page Content based on tab Selection
@@ -393,7 +394,7 @@ function AcademyApp({ session }: { session: Session }) {
           <NavItemButton
             active={activeTab === 'backup'}
             icon={ShieldCheck}
-            label="안전 백업 설정"
+            label="AI·알림·백업 설정"
             onClick={() => go('backup')}
           />
         </div>

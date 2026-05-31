@@ -252,10 +252,11 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       
       {/* Introduction Card */}
       <div className="card" style={{ borderLeft: '5px solid var(--color-primary)' }}>
-        <h3 className="card-title">🌱 클라우드 데이터 백업 안내</h3>
+        <h3 className="card-title">🌱 AI·알림·백업 설정 안내</h3>
         <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7' }}>
           그로잉영어 관리 시스템은 학생 정보와 수납 내역을 <strong>Supabase 클라우드 데이터베이스</strong>에 안전하게 저장합니다.
           본인 계정으로 로그인한 기기 어디서나 동일한 데이터를 보고 관리할 수 있으며, 행 수준 보안(RLS)으로 다른 사용자와 완전히 분리됩니다.
+          로그인한 원장/관리자 계정에서는 아이비 AI 기억, 알림장 문구, 키오스크 PIN, 백업/복원을 모두 이 화면에서 관리합니다.
         </p>
         <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7', marginTop: '0.75rem' }}>
           평소에는 자동으로 클라우드에 저장되므로 안전하지만, <strong>중요한 시점마다 데이터를 파일(.json)로 한 번씩 내려받아 두시면</strong> 실수로 인한 삭제에도 대비할 수 있습니다.

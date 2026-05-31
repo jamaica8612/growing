@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Sprout, LogIn, UserPlus } from 'lucide-react';
 
-// Email/password gate. A single admin account (the academy owner) signs up
-// once; RLS then scopes all data to that account.
+// Email/password gate. Each academy owner/admin signs in with their own
+// account; RLS scopes academy data to that signed-in account.
 export const Login: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');

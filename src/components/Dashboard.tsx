@@ -99,6 +99,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onSaveAttendance({ studentId, classId, date: selectedDate, status: 'present', checkOutTime: getCurrentTimeStr() });
   };
 
+  const handleTimeChange = (
+    studentId: string,
+    classId: string,
+    field: 'checkInTime' | 'checkOutTime',
+    value: string
+  ) => {
+    const record = getRecordForSelectedDate(studentId, classId);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: record?.status ?? 'present',
+      memo: record?.memo ?? '',
+      homeworkStatus: record?.homeworkStatus ?? '',
+      checkInTime: field === 'checkInTime' ? value : record?.checkInTime,
+      checkOutTime: field === 'checkOutTime' ? value : record?.checkOutTime,
+    });
+  };
+
   const handleHomework = (studentId: string, classId: string, homeworkStatus: HomeworkStatus) => {
     const record = getRecordForSelectedDate(studentId, classId);
     onSaveAttendance({
@@ -247,6 +266,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               >
                                 🏡 하원{departureTime ? ` ${departureTime}` : ''}
                               </button>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', marginTop: '0.45rem' }}>
+                              <input
+                                type="time"
+                                className="form-control"
+                                value={arrivalTime ?? ''}
+                                aria-label={`${student.name} 등원 시간 수정`}
+                                onChange={e => handleTimeChange(student.id, cls.id, 'checkInTime', e.target.value)}
+                                style={{ fontSize: '0.78rem', padding: '0.35rem 0.45rem' }}
+                              />
+                              <input
+                                type="time"
+                                className="form-control"
+                                value={departureTime ?? ''}
+                                aria-label={`${student.name} 하원 시간 수정`}
+                                onChange={e => handleTimeChange(student.id, cls.id, 'checkOutTime', e.target.value)}
+                                style={{ fontSize: '0.78rem', padding: '0.35rem 0.45rem' }}
+                              />
                             </div>
                             <div className="quick-att-buttons" style={{ marginTop: '0.45rem' }}>
                               <button

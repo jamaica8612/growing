@@ -3,6 +3,7 @@ import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } f
 import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone, UserX } from 'lucide-react';
 import { isAttendedStatus, normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
+import { getStudentClassTuition } from '../lib/classTuition';
 
 interface StudentsProps {
   students: Student[];
@@ -699,7 +700,7 @@ export const Students: React.FC<StudentsProps> = ({
                             </div>
                           </div>
                           <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
-                            월 {cls.tuitionFee.toLocaleString()}원
+                            월 {getStudentClassTuition(cls, activeDetailStudent.id).toLocaleString()}원
                           </span>
                         </div>
                       ))}

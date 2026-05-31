@@ -45,6 +45,14 @@ const toSchedules = (r: Row): ClassSchedule[] => {
   return days.map(day => ({ day, startTime, endTime }));
 };
 
+const toTuitionOverrides = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, fee]) => typeof fee === 'number' && Number.isFinite(fee) && fee >= 0)
+  ) as Record<string, number>;
+};
+
 // ---- DB row -> app type mappers ----
 const toStudent = (r: Row): Student => ({
   id: r.id as string,
@@ -66,6 +74,7 @@ const toClass = (r: Row): Class => ({
   endTime: s(r.end_time),
   schedules: toSchedules(r),
   tuitionFee: (r.tuition_fee as number) ?? 0,
+  tuitionOverrides: toTuitionOverrides(r.tuition_overrides),
   studentIds: (r.student_ids as string[]) ?? [],
 });
 
@@ -219,6 +228,7 @@ export const api = {
         end_time: legacy.endTime,
         schedules,
         tuition_fee: data.tuitionFee,
+        tuition_overrides: data.tuitionOverrides ?? {},
         student_ids: data.studentIds,
       })
       .select()
@@ -239,6 +249,7 @@ export const api = {
         end_time: legacy.endTime,
         schedules,
         tuition_fee: cls.tuitionFee,
+        tuition_overrides: cls.tuitionOverrides ?? {},
         student_ids: cls.studentIds,
       })
       .eq('id', cls.id)
