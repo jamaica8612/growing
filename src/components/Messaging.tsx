@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { Student, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
 import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles, Filter, CheckSquare, Square } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
+import { sendAlimtalk, type AlimtalkAlertType } from '../lib/alimtalk';
 
 interface MessagingProps {
   students: Student[];
@@ -29,6 +30,8 @@ interface PendingAlertRow {
   type: PendingAlertType;
   label: string;
   badgeClass: string;
+  alertType: AlimtalkAlertType;
+  studentId: string;
   name: string;
   contact: string;
   date: string;
@@ -96,6 +99,7 @@ export const Messaging: React.FC<MessagingProps> = ({
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('all');
   const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>([]);
   const [bulkCopied, setBulkCopied] = useState(false);
+  const [sendingAlimtalkId, setSendingAlimtalkId] = useState<string | null>(null);
   
   // Dynamic parameters for templates (defaults computed once on mount)
   const [paramTime, setParamTime] = useState(() =>
@@ -180,6 +184,8 @@ export const Messaging: React.FC<MessagingProps> = ({
         type: alert.kind,
         label: alert.kind === 'in' ? '등원' : '하원',
         badgeClass: alert.kind === 'in' ? 'badge-present' : 'badge-makeup',
+        alertType: alert.kind === 'in' ? 'check_in' : 'check_out',
+        studentId: alert.studentId,
         name,
         contact,
         date: alert.date,
@@ -200,6 +206,8 @@ export const Messaging: React.FC<MessagingProps> = ({
         type: 'homework',
         label: `숙제 ${HOMEWORK_LABEL[alert.homeworkStatus]}`,
         badgeClass: alert.homeworkStatus === 'done' ? 'badge-present' : alert.homeworkStatus === 'incomplete' ? 'badge-late' : 'badge-absent',
+        alertType: `homework_${alert.homeworkStatus}` as AlimtalkAlertType,
+        studentId: alert.studentId,
         name,
         contact,
         date: alert.date,
@@ -264,6 +272,32 @@ export const Messaging: React.FC<MessagingProps> = ({
     setSelectedAlertIds([]);
   };
 
+  const handleSendAlimtalk = async (row: PendingAlertRow) => {
+    if (!row.contact) {
+      alert('학부모 연락처가 없어 알림톡을 보낼 수 없습니다.');
+      return;
+    }
+    setSendingAlimtalkId(row.id);
+    try {
+      await sendAlimtalk({
+        studentId: row.studentId,
+        alertType: row.alertType,
+        recipientPhone: row.contact,
+        recipientName: row.name,
+        subject: `그로잉영어 ${row.label} 안내`,
+        message: row.message,
+        fallbackMessage: row.message,
+      });
+      dismissPendingRow(row);
+      alert('알림톡 발송을 요청했습니다.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '알림톡 발송에 실패했습니다.';
+      alert(message);
+    } finally {
+      setSendingAlimtalkId(null);
+    }
+  };
+
   const currentStudent = students.find(s => s.id === selectedStudentId);
   const draftMatchedStudent = assistantDraft?.content ? students.find(s => s.id === findDraftStudentId(students, assistantDraft.content)) : null;
 
@@ -302,7 +336,7 @@ export const Messaging: React.FC<MessagingProps> = ({
             </div>
           </div>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-            키오스크 등·하원 알림과 출결 관리의 숙제 알림을 한곳에 모았습니다. 필요한 항목만 필터링해서 복사하거나 문자 발송 후 완료 처리하세요.
+            키오스크 등·하원 알림과 출결 관리의 숙제 알림을 한곳에 모았습니다. 알리고 설정이 끝나면 알림톡으로 바로 발송할 수 있습니다.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
             <Filter size={15} className="text-secondary" />
@@ -385,12 +419,23 @@ export const Messaging: React.FC<MessagingProps> = ({
                       {copiedAlertId === row.id ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
                     </button>
                     {row.contact && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
+                        onClick={() => void handleSendAlimtalk(row)}
+                        disabled={sendingAlimtalkId === row.id}
+                      >
+                        <Send size={13} /> {sendingAlimtalkId === row.id ? '발송중' : '알림톡'}
+                      </button>
+                    )}
+                    {row.contact && (
                       <a
                         href={buildSMSLink(row.contact, row.message)}
-                        className="btn btn-primary"
+                        className="btn btn-secondary"
                         style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem', textDecoration: 'none' }}
                       >
-                        <Send size={13} /> 문자
+                        문자
                       </a>
                     )}
                     <button
