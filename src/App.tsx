@@ -230,7 +230,6 @@ function AcademyApp({ session }: { session: Session }) {
   const mobileQuickNavItems: NavItem[] = [
     { id: 'dashboard', label: '홈', icon: LayoutDashboard },
     { id: 'attendance', label: '출결', icon: CalendarCheck },
-    { id: 'makeup', label: '\uBCF4\uAC15', icon: CalendarCheck },
     { id: 'messaging', label: '알림장', icon: Smartphone },
     { id: 'students', label: '학생', icon: Users },
     { id: 'backup', label: '설정', icon: ShieldCheck },
