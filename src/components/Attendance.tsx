@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Student, Class, Attendance, AttendanceStatus, HomeworkStatus } from '../types';
-import { Calendar, Clock, Save, MessageSquare, Send, Check } from 'lucide-react';
+import { Calendar, Clock, Save, MessageSquare, Send, Check, LogIn, LogOut } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 import { AttendanceCalendar } from './AttendanceCalendar';
 
@@ -10,6 +10,7 @@ interface AttendanceProps {
   classes: Class[];
   messageTemplates: MessageTemplates;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
+  onSendDraftToMessaging?: (content: string) => void;
 }
 
 // 숙제 상태 → 템플릿 키 매핑. 상태가 없으면 메시지도 없음.
@@ -26,6 +27,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   classes,
   messageTemplates,
   onSaveAttendance,
+  onSendDraftToMessaging,
 }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
@@ -89,6 +91,30 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const getCurrentTimeStr = (): string =>
     new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+  const handleArrival = (studentId: string, classId: string) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: 'present',
+      memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '',
+      checkInTime: getCurrentTimeStr(),
+    });
+  };
+
+  const handleDeparture = (studentId: string, classId: string) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: record?.status ?? 'present',
+      memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '',
+      checkOutTime: getCurrentTimeStr(),
+    });
+  };
+
   // Handle status update
   const handleStatusChange = (studentId: string, classId: string, status: AttendanceStatus) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
@@ -106,6 +132,12 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       memo: currentMemo,
       ...(shouldStampCheckIn ? { checkInTime: getCurrentTimeStr() } : {}),
     });
+  };
+
+  const handleSendHomeworkToMessaging = (studentName: string, status: HomeworkStatus) => {
+    const msg = getHomeworkMessage(studentName, status);
+    if (!msg) return;
+    onSendDraftToMessaging?.(msg);
   };
 
   // Handle memo input change
@@ -250,7 +282,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
               <tr>
                 <th style={{ width: '90px' }}>이름</th>
                 <th style={{ width: '150px' }}>반 / 학교 / 학년</th>
-                <th style={{ width: '220px' }}>출결 체크</th>
+                <th style={{ width: '290px' }}>출결 체크</th>
                 <th style={{ width: '180px' }}>숙제 체크</th>
                 <th style={{ width: '120px', textAlign: 'center' }}>학부모 알림</th>
                 <th>비고 (메모 입력)</th>
@@ -287,6 +319,22 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             {record?.checkOutTime && <span>🏡 하원 {record.checkOutTime}</span>}
                           </div>
                         )}
+                        <div className="quick-att-buttons" style={{ marginBottom: '0.4rem' }}>
+                          <button
+                            className={`btn-att-select ${record?.checkInTime ? 'active-present' : ''}`}
+                            onClick={() => handleArrival(student.id, cls.id)}
+                            title="현재 시각으로 등원 시간을 기록합니다"
+                          >
+                            <LogIn size={12} /> 등원{record?.checkInTime ? ` ${record.checkInTime}` : ''}
+                          </button>
+                          <button
+                            className={`btn-att-select ${record?.checkOutTime ? 'active-makeup' : ''}`}
+                            onClick={() => handleDeparture(student.id, cls.id)}
+                            title="현재 시각으로 하원 시간을 기록합니다"
+                          >
+                            <LogOut size={12} /> 하원{record?.checkOutTime ? ` ${record.checkOutTime}` : ''}
+                          </button>
+                        </div>
                         <div className="quick-att-buttons">
                           <button
                             className={`btn-att-select ${currentStatus === 'present' ? 'active-present' : ''}`}
@@ -352,6 +400,17 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               )}
                               카톡
                             </button>
+                            {onSendDraftToMessaging && (
+                              <button
+                                className="btn btn-secondary"
+                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', gap: '0.2rem', minWidth: 'auto', margin: 0, display: 'inline-flex', alignItems: 'center' }}
+                                onClick={() => handleSendHomeworkToMessaging(student.name, currentHomework)}
+                                title="숙제 안내문을 알림장 조립기로 보내기"
+                              >
+                                <MessageSquare size={12} className="text-secondary" />
+                                알림장
+                              </button>
+                            )}
                             {student.parentContact ? (
                               <a
                                 href={getSMSLink(student.parentContact, student.name, currentHomework)}

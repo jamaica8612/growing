@@ -261,6 +261,7 @@ function AcademyApp({ session }: { session: Session }) {
             classes={classes}
             messageTemplates={messageTemplates}
             onSaveAttendance={data.handleSaveAttendance}
+            onSendDraftToMessaging={handleAssistantDraftToMessaging}
           />
         );
       case 'stats':
