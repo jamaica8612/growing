@@ -590,7 +590,7 @@ export const Messaging: React.FC<MessagingProps> = ({
 
         <div className="form-group">
           <label>템플릿 유형 선택</label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.35rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem', marginTop: '0.35rem' }}>
             <button
               className={`btn ${selectedTemplate === 'in' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ fontSize: '0.85rem', padding: '0.5rem' }}
