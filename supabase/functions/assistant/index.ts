@@ -205,6 +205,25 @@ const TOOL_DECLARATIONS = [
       required: ['studentName'],
     },
   },
+  {
+    name: 'list_data_sources',
+    description: '아이비가 읽을 수 있는 모든 데이터 테이블(growing_*) 목록을 조회한다. 전용 도구로 다루지 않는 데이터(키오스크/숙제 알림, 발송 로그, 설정, 향후 추가되는 기능 등)를 query_table로 읽기 전에 먼저 사용한다.',
+    parameters: { type: 'OBJECT', properties: {} },
+  },
+  {
+    name: 'query_table',
+    description: "지정한 growing_* 테이블의 데이터를 직접 조회한다. 전용 도구(list_students, get_payments 등)가 있으면 그것을 우선 쓰고, 전용 도구가 없는 데이터(알림 대기열·발송 로그·설정 등)에만 이 도구를 사용한다. 학생 식별은 student_id(UUID)로 들어 있을 수 있으니 필요하면 list_students로 이름을 대조한다.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        table: { type: 'STRING', description: "조회할 테이블명. 반드시 'growing_'로 시작. list_data_sources로 확인 가능." },
+        limit: { type: 'NUMBER', description: '최대 행 수(기본 50, 최대 200)' },
+        filterColumn: { type: 'STRING', description: '동등 조건으로 거를 컬럼명(선택)' },
+        filterValue: { type: 'STRING', description: 'filterColumn의 값(선택). filterColumn과 함께 써야 적용된다.' },
+      },
+      required: ['table'],
+    },
+  },
 ];
 
 // =====================================================================
@@ -613,6 +632,29 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    case 'list_data_sources': {
+      const { data, error } = await sb.rpc('growing_list_tables');
+      if (error) throw error;
+      return { tables: data ?? [] };
+    }
+
+    case 'query_table': {
+      const table = (args.table as string) ?? '';
+      // growing_ 접두사만 허용 — 다른 앱 테이블/시스템 카탈로그 접근 차단.
+      // 데이터 격리는 각 테이블의 RLS(로그인 원장 본인 데이터)로 추가 보장된다.
+      if (!table.startsWith('growing_')) {
+        return { error: "growing_ 로 시작하는 학원 테이블만 조회할 수 있습니다." };
+      }
+      const limit = Math.min(Math.max(Number(args.limit) || 50, 1), 200);
+      const filterColumn = (args.filterColumn as string) ?? '';
+      const filterValue = (args.filterValue as string) ?? '';
+      let q = sb.from(table).select('*').limit(limit);
+      if (filterColumn && filterValue) q = q.eq(filterColumn, filterValue);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      return { table, count: (data ?? []).length, rows: data ?? [] };
+    }
+
     default:
       return { error: `알 수 없는 도구: ${name}` };
   }
@@ -688,7 +730,8 @@ function systemPrompt(memory: string): string {
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.
 - 대화에서 운영에 반복적으로 유용할 안정적 사실·선호를 알게 되면 remember_note로 간결히 저장합니다. 추측·일시적 정보·민감정보는 저장하지 않습니다.
-- 학생 관련 질문에 답하기 전 과거 메모가 필요하다고 판단되면 recall_notes로 먼저 확인합니다.${memorySection}`;
+- 학생 관련 질문에 답하기 전 과거 메모가 필요하다고 판단되면 recall_notes로 먼저 확인합니다.
+- 전용 도구로 다루지 않는 데이터(키오스크 등하원 알림, 숙제 알림, 발송 로그, 설정, 이후 추가되는 기능 등)는 list_data_sources로 사용할 수 있는 테이블을 확인한 뒤 query_table로 직접 조회합니다.${memorySection}`;
 }
 
 // =====================================================================
