@@ -27,6 +27,58 @@ const LOG_TYPE_KO: Record<string, string> = {
   counsel: '상담', progress: '진도', test: '시험',
 };
 
+const ASSISTANT_CAPABILITIES = [
+  { label: '조회', detail: '학생·반·출결·수납·상담 기록 확인' },
+  { label: '브리핑', detail: '오늘 수업, 미체크, 미납, 관리 대상 요약' },
+  { label: '초안', detail: '학부모 안내문·출결/수납 follow-up 문구 작성' },
+  { label: '승인 후 변경', detail: '출결 수정, 수납 완납, 일지/학생 메모 저장' },
+];
+
+const SUGGESTION_GROUPS = [
+  {
+    title: '오늘 업무',
+    prompts: [
+      '오늘 브리핑 해줘',
+      '오늘 출석 현황과 미체크 학생 알려줘',
+      '이번 달 우선 관리 대상 학생 정리해줘',
+    ],
+  },
+  {
+    title: '학생·반 조회',
+    prompts: [
+      '재원생 명단을 학교별로 정리해줘',
+      '휴원생 목록과 반 배정 상태 알려줘',
+      '중등 문법반 학생과 수업 시간표 알려줘',
+    ],
+  },
+  {
+    title: '출결·수납',
+    prompts: [
+      '이번 달 출석률 낮은 학생 순서대로 보여줘',
+      '이번 달 미납 학생과 총액 알려줘',
+      '홍길동 오늘 결석을 출석으로 바꿔줘',
+      '홍길동 2026-06 수납 완납 처리해줘',
+    ],
+  },
+  {
+    title: '상담·안내문',
+    prompts: [
+      '홍길동 최근 상담/진도 기록 요약해줘',
+      '홍길동 학부모님께 보낼 출결 안내문 써줘',
+      '홍길동 단어 테스트 80점, 숙제 미흡으로 상담일지 작성해줘',
+      '홍길동 메모에 "어휘 복습을 자주 확인" 추가해줘',
+    ],
+  },
+  {
+    title: '기억·자료',
+    prompts: [
+      '앞으로 안내문은 짧고 따뜻한 톤으로 써줘',
+      '아이비가 읽을 수 있는 데이터 목록 보여줘',
+      '최근 알림장 발송 기록이 있으면 보여줘',
+    ],
+  },
+];
+
 // 긴 메모를 카드에서 보기 좋게 줄임
 function truncate(text: string, max = 80) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
@@ -267,12 +319,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
     setOpen(false);
   };
 
-  const suggestions = [
-    '🌅 오늘 브리핑 해줘',
-    '오늘 출석 현황 알려줘',
-    '이번 달 미납 학부모에게 보낼 안내 문구 만들어줘',
-    '홍길동 오늘 결석 → 출석으로 바꿔줘',
-  ];
+  const suggestionCount = SUGGESTION_GROUPS.reduce((sum, group) => sum + group.prompts.length, 0);
 
   return (
     <>
@@ -369,21 +416,65 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
             }}
           >
             {messages.length === 0 && !loading && (
-              <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--color-text-muted)', width: '100%' }}>
+              <div style={{ color: 'var(--color-text-muted)', width: '100%' }}>
                 <Sparkles size={28} className="text-primary" style={{ marginBottom: '0.6rem' }} />
-                <p style={{ fontSize: '0.88rem', marginBottom: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                  안녕하세요, 아이비예요. <br />무엇을 도와드릴까요?
+                <p style={{ fontSize: '0.9rem', marginBottom: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
+                  안녕하세요, 아이비예요. 학생·출결·수납·상담 데이터를 실제로 확인해서 답하고, 변경 작업은 승인 카드로 먼저 확인받아요.
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-                  {suggestions.map(s => (
-                    <button
-                      key={s}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.78rem', justifyContent: 'flex-start', textAlign: 'left', padding: '0.5rem 0.7rem' }}
-                      onClick={() => setInput(s)}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.45rem', marginBottom: '0.95rem' }}>
+                  {ASSISTANT_CAPABILITIES.map(item => (
+                    <div
+                      key={item.label}
+                      style={{
+                        padding: '0.55rem 0.6rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: '#fff',
+                        textAlign: 'left',
+                      }}
                     >
-                      {s}
-                    </button>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '0.2rem' }}>
+                        {item.label}
+                      </div>
+                      <div style={{ fontSize: '0.69rem', lineHeight: 1.35, color: 'var(--color-text-secondary)' }}>
+                        {item.detail}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <strong style={{ fontSize: '0.78rem', color: 'var(--color-primary-dark)' }}>바로 써볼 질문 예시</strong>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{suggestionCount}개</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {SUGGESTION_GROUPS.map(group => (
+                    <div key={group.title}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--color-text-secondary)', marginBottom: '0.35rem' }}>
+                        {group.title}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        {group.prompts.map(prompt => (
+                          <button
+                            key={prompt}
+                            className="btn btn-secondary"
+                            style={{
+                              fontSize: '0.76rem',
+                              justifyContent: 'flex-start',
+                              textAlign: 'left',
+                              padding: '0.48rem 0.65rem',
+                              lineHeight: 1.35,
+                              minHeight: 'auto',
+                            }}
+                            onClick={() => setInput(prompt)}
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
