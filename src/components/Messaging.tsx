@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import type { Student, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
+import type { Student, Class, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
 import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles, Filter, CheckSquare, Square } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 import { sendAlimtalk, type AlimtalkAlertType } from '../lib/alimtalk';
 
 interface MessagingProps {
   students: Student[];
+  classes: Class[];
   kioskAlerts: KioskAlert[];
   homeworkAlerts: HomeworkAlert[];
   onDismissAlert: (id: string) => void;
@@ -83,6 +84,7 @@ const findDraftStudentId = (students: Student[], draft?: string): string => {
 
 export const Messaging: React.FC<MessagingProps> = ({
   students,
+  classes,
   kioskAlerts,
   homeworkAlerts,
   onDismissAlert,
@@ -119,6 +121,19 @@ export const Messaging: React.FC<MessagingProps> = ({
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+  // Group active students by class
+  const studentsByClass = useMemo(() => {
+    const groups: Array<{ classId: string; className: string; students: Student[] }> = [];
+    for (const cls of classes) {
+      const members = activeStudents.filter(s => cls.studentIds.includes(s.id));
+      if (members.length > 0) groups.push({ classId: cls.id, className: cls.name, students: members });
+    }
+    const assignedIds = new Set(classes.flatMap(c => c.studentIds));
+    const unassigned = activeStudents.filter(s => !assignedIds.has(s.id));
+    if (unassigned.length > 0) groups.push({ classId: '__none__', className: '미배정', students: unassigned });
+    return groups;
+  }, [classes, activeStudents]);
 
   // Compiled message is derived directly from the current selections/parameters.
   const compiledMessage = useMemo(() => {
@@ -468,10 +483,14 @@ export const Messaging: React.FC<MessagingProps> = ({
             onChange={e => setSelectedStudentId(e.target.value)}
           >
             <option value="">학생을 선택하세요</option>
-            {activeStudents.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.school} | {s.grade.split(' ')[1] || s.grade})
-              </option>
+            {studentsByClass.map(group => (
+              <optgroup key={group.classId} label={`── ${group.className}`}>
+                {group.students.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.grade.split(' ')[1] || s.grade})
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
