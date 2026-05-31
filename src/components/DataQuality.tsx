@@ -32,15 +32,15 @@ export function DataQuality({ students, classes, attendance, payments, counselLo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <div className="grid-container cols-3" style={{ gap: '1rem' }}>
-        <div className="metric-card danger">
+        <div className="card metric-card danger">
           <div className="metric-label">전체 점검 항목</div>
           <div className="metric-value">{totalIssues}건</div>
         </div>
-        <div className="metric-card warning">
+        <div className="card metric-card warning">
           <div className="metric-label">확인 필요 카드</div>
           <div className="metric-value">{activeSections.length}개</div>
         </div>
-        <div className="metric-card accent-mint">
+        <div className="card metric-card accent-mint">
           <div className="metric-label">자동 수정</div>
           <div className="metric-value" style={{ fontSize: '1.1rem' }}>없음</div>
         </div>

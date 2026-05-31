@@ -251,21 +251,15 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
       {/* Introduction Card */}
-      <div className="card" style={{ borderLeft: '5px solid var(--color-primary)' }}>
+      <div className="card" style={{ borderLeft: '5px solid var(--color-primary)', order: 50 }}>
         <h3 className="card-title">🌱 AI·알림·백업 설정 안내</h3>
         <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7' }}>
-          그로잉영어 관리 시스템은 학생 정보와 수납 내역을 <strong>Supabase 클라우드 데이터베이스</strong>에 안전하게 저장합니다.
-          본인 계정으로 로그인한 기기 어디서나 동일한 데이터를 보고 관리할 수 있으며, 행 수준 보안(RLS)으로 다른 사용자와 완전히 분리됩니다.
-          로그인한 원장/관리자 계정에서는 아이비 AI 기억, 알림장 문구, 키오스크 PIN, 백업/복원을 모두 이 화면에서 관리합니다.
-        </p>
-        <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7', marginTop: '0.75rem' }}>
-          평소에는 자동으로 클라우드에 저장되므로 안전하지만, <strong>중요한 시점마다 데이터를 파일(.json)로 한 번씩 내려받아 두시면</strong> 실수로 인한 삭제에도 대비할 수 있습니다.
-          내려받은 백업 파일은 [복원하기]로 언제든 다시 불러올 수 있습니다.
+          데이터는 로그인 계정 기준으로 클라우드에 저장됩니다. 중요한 변경 전에는 백업 파일을 받아두세요.
         </p>
       </div>
 
       {/* Main Operations Grid */}
-      <div className="grid-container cols-2">
+      <div className="grid-container cols-2" style={{ order: 51 }}>
         
         {/* Export Data */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1.5rem' }}>
@@ -274,7 +268,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
               <Download size={18} /> 데이터 백업하기 (내보내기)
             </h4>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              현재 교습소의 학생 명부, 시간표 요일, 출석 이력, 상담일지, 완납/미납 장부 데이터를 하나의 파일로 생성하여 사용자 PC에 다운로드합니다.
+              학생, 반, 출결, 수납, 상담 데이터를 파일로 저장합니다.
             </p>
           </div>
           <button className="btn btn-primary" onClick={handleExport} style={{ width: '100%' }}>
@@ -289,8 +283,8 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
               <Upload size={18} /> 데이터 복원하기 (가져오기)
             </h4>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              컴퓨터에 저장해 둔 그로잉영어 백업 파일(.json)을 업로드하여 데이터를 원래대로 복원합니다. 
-              <strong>주의: 클라우드에 등록된 기존 내용이 백업 데이터로 대체됩니다.</strong>
+              백업 파일(.json)로 데이터를 복원합니다.
+              <strong> 기존 클라우드 데이터가 대체됩니다.</strong>
             </p>
           </div>
           <input
@@ -517,7 +511,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       </div>
 
       {/* Danger Zone Reset Data */}
-      <div className="card" style={{ border: '1px solid #fca5a5', backgroundColor: '#fffbfb' }}>
+      <div className="card" style={{ border: '1px solid #fca5a5', backgroundColor: '#fffbfb', order: 40 }}>
         <h4 style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: '1.05rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <AlertTriangle size={18} /> 위험 영역 (초기화)
         </h4>

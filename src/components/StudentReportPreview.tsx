@@ -76,44 +76,43 @@ export function StudentReportPreview({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+    <div className="student-report-preview">
+      <div className="student-report-toolbar">
         <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
           월간 학습 리포트
         </h4>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="student-report-actions">
           <input
             type="month"
             className="form-control"
             value={month}
             onChange={event => setMonth(event.target.value)}
-            style={{ width: 135, height: 'auto', margin: 0, padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
           />
-          <button type="button" className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => setComment(summary.draft)}>
+          <button type="button" className="btn btn-secondary" onClick={() => setComment(summary.draft)}>
             <Wand2 size={15} /> 초안 자동 작성
           </button>
-          <button type="button" className="btn btn-primary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={handleSave}>
+          <button type="button" className="btn btn-primary" onClick={handleSave}>
             <Save size={15} /> 저장
           </button>
-          <button type="button" className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={handleCopy}>
+          <button type="button" className="btn btn-secondary" onClick={handleCopy}>
             <Clipboard size={15} /> 복사
           </button>
-          <button type="button" className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => window.print()}>
+          <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
             <Printer size={15} /> 인쇄/PDF
           </button>
         </div>
       </div>
 
-      <div className="grid-container cols-3" style={{ gap: '0.75rem' }}>
-        <div className="metric-card accent-mint" style={{ padding: '0.9rem' }}>
+      <div className="student-report-metrics">
+        <div className="card metric-card accent-mint">
           <div className="metric-label">출석률</div>
           <div className="metric-value">{summary.attendance.rate}%</div>
         </div>
-        <div className="metric-card warning" style={{ padding: '0.9rem' }}>
+        <div className="card metric-card warning">
           <div className="metric-label">숙제 미흡/미완료</div>
           <div className="metric-value">{summary.homework.incomplete + summary.homework.undone}회</div>
         </div>
-        <div className="metric-card danger" style={{ padding: '0.9rem' }}>
+        <div className="card metric-card danger">
           <div className="metric-label">수납 상태</div>
           <div className="metric-value" style={{ fontSize: '1.05rem' }}>
             {summary.payment ? (summary.payment.status === 'paid' ? '완료' : '미납') : '없음'}
@@ -134,8 +133,8 @@ export function StudentReportPreview({
         />
       </div>
 
-      <div className="print-report-card" style={{ backgroundColor: '#fff', border: '1px solid var(--color-border)', borderRadius: 8, padding: '1.5rem', color: '#333' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', borderBottom: '2px solid var(--color-primary)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+      <div className="print-report-card">
+        <div className="print-report-header">
           <div>
             <div style={{ color: 'var(--color-primary)', fontWeight: 900, fontSize: '0.78rem' }}>GROWING ENGLISH</div>
             <h2 style={{ margin: '0.2rem 0 0', color: 'var(--color-primary-dark)' }}>월간 학습 리포트</h2>
@@ -143,13 +142,13 @@ export function StudentReportPreview({
           <FileText size={30} color="var(--color-primary)" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem', fontSize: '0.88rem', marginBottom: '1rem' }}>
+        <div className="print-report-info">
           <div><strong>학생</strong> {student.name} ({student.school || '-'} / {student.grade})</div>
           <div><strong>대상월</strong> {month}</div>
           <div style={{ gridColumn: '1 / -1' }}><strong>수강반</strong> {summary.classNames}</div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="print-report-stats">
           <div><strong>출석</strong><br />{summary.attendance.present}회</div>
           <div><strong>결석</strong><br />{summary.attendance.absent}회</div>
           <div><strong>보강</strong><br />{summary.attendance.makeup}회</div>

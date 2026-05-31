@@ -133,22 +133,39 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div className="grid-container cols-3" style={{ gap: '1rem' }}>
-        <div className="metric-card danger">
-          <div className="metric-label">보강 필요</div>
-          <div className="metric-value">{summary.needed.length}건</div>
+      <div
+        className="card makeup-summary-card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          padding: '1rem',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <div>
+          <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>
+            보강 현황
+          </h3>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.84rem' }}>
+            결석 기록과 연결된 보강만 관리합니다.
+          </p>
         </div>
-        <div className="metric-card accent-mint">
-          <div className="metric-label">보강 완료</div>
-          <div className="metric-value">{summary.completed.length}건</div>
-        </div>
-        <div className="metric-card warning">
-          <div className="metric-label">처리 방식</div>
-          <div className="metric-value" style={{ fontSize: '1.05rem' }}>출결 저장</div>
+        <div className="makeup-summary-badges" style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <span className="badge badge-absent" style={{ fontSize: '0.78rem' }}>
+            필요 {summary.needed.length}건
+          </span>
+          <span className="badge badge-makeup" style={{ fontSize: '0.78rem' }}>
+            완료 {summary.completed.length}건
+          </span>
+          <span className="badge badge-active" style={{ fontSize: '0.78rem' }}>
+            출결 저장
+          </span>
         </div>
       </div>
 
-      <div className="filter-bar">
+      <div className="makeup-filter-card">
         <div className="search-input-wrapper">
           <Search size={18} className="search-icon" />
           <input
@@ -158,21 +175,21 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             placeholder="학생명 또는 반 이름 검색"
           />
         </div>
-        <div className="filter-options">
+        <div className="makeup-filter-tabs" role="group" aria-label="보강 상태 필터">
           {(['all', 'needed', 'completed'] as Filter[]).map(item => (
             <button
               key={item}
               type="button"
-              className={`btn ${filter === item ? 'btn-primary' : 'btn-secondary'}`}
+              className={filter === item ? 'active' : ''}
               onClick={() => setFilter(item)}
             >
               {item === 'all' ? '전체' : item === 'needed' ? '보강 필요' : '보강 완료'}
             </button>
           ))}
-          <button type="button" className={`btn ${activeOnly ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveOnly(value => !value)}>
-            재원생만 {activeOnly ? 'ON' : 'OFF'}
-          </button>
         </div>
+        <button type="button" className={`makeup-active-toggle ${activeOnly ? 'active' : ''}`} onClick={() => setActiveOnly(value => !value)}>
+          재원생만 {activeOnly ? 'ON' : 'OFF'}
+        </button>
       </div>
 
       {(filter === 'all' || filter === 'needed') && renderNeeded()}
