@@ -84,18 +84,27 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
     );
   };
 
+  const todayDateStr = new Date().toISOString().split('T')[0];
+
+  const getCurrentTimeStr = (): string =>
+    new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
   // Handle status update
   const handleStatusChange = (studentId: string, classId: string, status: AttendanceStatus) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
     const currentMemo =
       attendanceMemos[`${studentId}-${classId}`] ??
-      getAttendanceRecord(studentId, classId, selectedDate)?.memo ??
+      record?.memo ??
       '';
+    const shouldStampCheckIn =
+      selectedDate === todayDateStr && (status === 'present' || status === 'late') && !record?.checkInTime;
     onSaveAttendance({
       studentId,
       classId,
       date: selectedDate,
       status,
       memo: currentMemo,
+      ...(shouldStampCheckIn ? { checkInTime: getCurrentTimeStr() } : {}),
     });
   };
 

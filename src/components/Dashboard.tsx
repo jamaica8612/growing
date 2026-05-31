@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { Student, Class, Attendance, Payment, DayOfWeek } from '../types';
-import { Users, BookOpen, CreditCard, AlertCircle, Copy, Check, Clock, Calendar } from 'lucide-react';
+import type { Student, Class, Attendance, Payment, DayOfWeek, HomeworkStatus } from '../types';
+import { Users, BookOpen, CreditCard, AlertCircle, Copy, Check, Clock, Calendar, ClipboardCheck } from 'lucide-react';
 
 interface DashboardProps {
   students: Student[];
@@ -97,6 +97,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onSaveAttendance({ studentId, classId, date: todayDateStr, status: 'present', checkOutTime: getCurrentTimeStr() });
   };
 
+  const handleHomework = (studentId: string, classId: string, homeworkStatus: HomeworkStatus) => {
+    const record = getRecordForToday(studentId, classId);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: todayDateStr,
+      status: record?.status ?? 'present',
+      memo: record?.memo ?? '',
+      homeworkStatus,
+    });
+  };
+
   return (
     <div>
       {/* Metrics Row */}
@@ -153,7 +165,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Left: Today's Classes & Attendance Check */}
         <div className="card">
           <h3 className="card-title">
-            <Clock size={20} className="text-primary" /> 오늘 수업 출결 체크 ({todayDateStr})
+            <Clock size={20} className="text-primary" /> 오늘 수업 출결/숙제 체크 ({todayDateStr})
           </h3>
 
           {todayClasses.length === 0 ? (
@@ -190,6 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         const record = getRecordForToday(student.id, cls.id);
                         const arrivalTime = record?.checkInTime ?? null;
                         const departureTime = record?.checkOutTime ?? null;
+                        const homeworkStatus = record?.homeworkStatus ?? '';
 
                         return (
                           <div key={student.id} className="quick-att-card">
@@ -211,6 +224,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 onClick={() => handleDeparture(student.id, cls.id)}
                               >
                                 🏡 하원{departureTime ? ` ${departureTime}` : ''}
+                              </button>
+                            </div>
+                            <div className="quick-att-buttons" style={{ marginTop: '0.45rem' }}>
+                              <button
+                                className={`btn-att-select ${homeworkStatus === 'done' ? 'active-present' : ''}`}
+                                onClick={() => handleHomework(student.id, cls.id, 'done')}
+                                title="숙제 완료로 체크"
+                              >
+                                <ClipboardCheck size={12} /> 완료
+                              </button>
+                              <button
+                                className={`btn-att-select ${homeworkStatus === 'incomplete' ? 'active-late' : ''}`}
+                                onClick={() => handleHomework(student.id, cls.id, 'incomplete')}
+                                title="숙제 미흡으로 체크"
+                              >
+                                미흡
+                              </button>
+                              <button
+                                className={`btn-att-select ${homeworkStatus === 'undone' ? 'active-absent' : ''}`}
+                                onClick={() => handleHomework(student.id, cls.id, 'undone')}
+                                title="숙제 안함으로 체크"
+                              >
+                                안함
                               </button>
                             </div>
                           </div>
