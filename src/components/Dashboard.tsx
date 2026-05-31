@@ -225,8 +225,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid-container cols-2-1">
         {/* Left: Selected Date Classes & Attendance Check */}
         <div className="card">
-          <h3 className="card-title">
-            <Clock size={20} className="text-primary" /> 선택일 수업 출결/숙제 체크 ({selectedDate})
+          <h3 className="card-title dashboard-attendance-title">
+            <Clock size={20} className="text-primary" />
+            <span className="dashboard-title-desktop">선택일 수업 출결/숙제 체크</span>
+            <span className="dashboard-title-mobile">출결/숙제 체크</span>
+            <span className="dashboard-title-date">{selectedDate}</span>
           </h3>
 
           {selectedClasses.length === 0 ? (
@@ -242,16 +245,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 ).length;
                 return (
                 <div key={`${cls.id}-${schedule.day}-${schedule.startTime}-${schedule.endTime}`} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <div>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>
-                        {cls.name}
-                      </span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginLeft: '0.5rem' }}>
-                        🕒 {schedule.startTime} - {schedule.endTime}
-                      </span>
+                  <div className="dashboard-class-header">
+                    <div className="dashboard-class-info">
+                      <span className="dashboard-class-name">{cls.name}</span>
+                      <span className="dashboard-class-time">🕒 {schedule.startTime} - {schedule.endTime}</span>
                     </div>
-                    <span className="badge badge-present" style={{ fontSize: '0.7rem' }}>
+                    <span className="badge badge-present dashboard-member-badge">
                       재원생 {activeMemberIds.length}명
                       {pausedMemberCount > 0 && ` · 휴원 ${pausedMemberCount}`}
                     </span>

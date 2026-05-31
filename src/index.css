@@ -64,6 +64,10 @@ body {
   color: var(--color-text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   overflow-x: hidden;
 }
 
@@ -858,6 +862,7 @@ body {
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: var(--radius-full);
+  white-space: nowrap;
 }
 
 .badge-present {
@@ -1095,6 +1100,57 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
+}
+
+.dashboard-attendance-title {
+  flex-wrap: wrap;
+  line-height: 1.25;
+  word-break: keep-all;
+}
+
+.dashboard-title-mobile {
+  display: none;
+}
+
+.dashboard-title-date {
+  white-space: nowrap;
+}
+
+.dashboard-class-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-class-info {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-class-name {
+  min-width: 0;
+  color: var(--color-primary-dark);
+  font-size: 1.05rem;
+  font-weight: 800;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-class-time {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.dashboard-member-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 .quick-att-card {
@@ -1575,6 +1631,56 @@ body {
     min-width: 750px !important;
   }
 
+  .dashboard-attendance-title {
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 1.08rem;
+  }
+
+  .dashboard-title-desktop {
+    display: none;
+  }
+
+  .dashboard-title-mobile {
+    display: inline;
+    white-space: nowrap;
+  }
+
+  .dashboard-title-date {
+    padding: 0.12rem 0.45rem;
+    border-radius: var(--radius-full);
+    background: #eaf6f0;
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .dashboard-class-header {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+
+  .dashboard-class-info {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .dashboard-class-name {
+    font-size: 1rem;
+  }
+
+  .dashboard-class-time {
+    font-size: 0.78rem;
+  }
+
+  .dashboard-member-badge {
+    justify-self: start;
+    font-size: 0.72rem;
+  }
+
   .section-title-row {
     flex-direction: column;
     align-items: stretch;
@@ -1792,7 +1898,8 @@ body {
 
   .quick-att-card-header > span:last-child {
     text-align: right;
-    overflow-wrap: anywhere;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 }
 
