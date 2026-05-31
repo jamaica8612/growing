@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
 import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone, UserX } from 'lucide-react';
 import { isAttendedStatus, normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
 import { getStudentClassTuition } from '../lib/classTuition';
+import { getStudentTagMap, type StudentTagKey } from '../lib/studentTags';
+import { StudentReportPreview } from './StudentReportPreview';
+import { StudentTagBadges } from './StudentTagBadges';
+import { StudentTimeline } from './StudentTimeline';
 
 interface StudentsProps {
   students: Student[];
@@ -38,6 +42,7 @@ export const Students: React.FC<StudentsProps> = ({
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState<StudentTagKey | 'all' | 'has-tags'>('all');
   const [unpaidOnly, setUnpaidOnly] = useState(false);
 
   // Modal States
@@ -46,7 +51,7 @@ export const Students: React.FC<StudentsProps> = ({
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeDetailStudent, setActiveDetailStudent] = useState<Student | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'classes' | 'attendance' | 'payments' | 'counsel' | 'analysis' | 'report'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'classes' | 'attendance' | 'payments' | 'counsel' | 'timeline' | 'analysis' | 'report' | 'report-old'>('info');
 
   // Form Fields
   const [formName, setFormName] = useState('');
@@ -253,6 +258,21 @@ export const Students: React.FC<StudentsProps> = ({
   const unpaidStudentIds = new Set(
     payments.filter(p => p.billingMonth === currentBillingMonth && p.status === 'unpaid').map(p => p.studentId)
   );
+  const studentTagMap = useMemo(
+    () => getStudentTagMap(students, classes, attendance, payments, counselLogs),
+    [students, classes, attendance, payments, counselLogs]
+  );
+  const tagFilterOptions: { value: StudentTagKey | 'all' | 'has-tags'; label: string }[] = [
+    { value: 'all', label: '전체 태그' },
+    { value: 'has-tags', label: '주의 태그 있음' },
+    { value: 'unpaid', label: '미납' },
+    { value: 'missing-parent-contact', label: '연락처 없음' },
+    { value: 'no-class', label: '반 미배정' },
+    { value: 'frequent-absence', label: '결석 잦음' },
+    { value: 'homework-followup', label: '숙제 미흡' },
+    { value: 'needs-counsel', label: '상담 필요' },
+    { value: 'report-missing', label: '리포트 미작성' },
+  ];
 
   // Filter students
   const filteredStudents = students.filter(student => {
@@ -267,8 +287,13 @@ export const Students: React.FC<StudentsProps> = ({
     const matchesGrade = gradeFilter === 'all' || student.grade === gradeFilter;
     const matchesClass = !filterClassMemberIds || filterClassMemberIds.has(student.id);
     const matchesUnpaid = !unpaidOnly || unpaidStudentIds.has(student.id);
+    const tags = studentTagMap.get(student.id) ?? [];
+    const matchesTags =
+      tagFilter === 'all' ||
+      (tagFilter === 'has-tags' && tags.length > 0) ||
+      tags.some(tag => tag.key === tagFilter);
 
-    return matchesSearch && matchesStatus && matchesGrade && matchesClass && matchesUnpaid;
+    return matchesSearch && matchesStatus && matchesGrade && matchesClass && matchesUnpaid && matchesTags;
   });
 
   // Calculations for Student Details
@@ -347,6 +372,17 @@ export const Students: React.FC<StudentsProps> = ({
             ))}
           </select>
 
+          <select
+            className="form-control"
+            style={{ width: '150px' }}
+            value={tagFilter}
+            onChange={e => setTagFilter(e.target.value as StudentTagKey | 'all' | 'has-tags')}
+          >
+            {tagFilterOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+
           <button
             className={`btn ${unpaidOnly ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setUnpaidOnly(v => !v)}
@@ -385,6 +421,7 @@ export const Students: React.FC<StudentsProps> = ({
             ) : (
               filteredStudents.map(student => {
                 const attRate = calculateAttendanceRate(student.id);
+                const tags = studentTagMap.get(student.id) ?? [];
                 return (
                   <tr
                     key={student.id}
@@ -393,6 +430,9 @@ export const Students: React.FC<StudentsProps> = ({
                   >
                     <td style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>
                       {student.name}
+                      <div style={{ marginTop: '0.35rem' }}>
+                        <StudentTagBadges tags={tags} maxVisible={3} />
+                      </div>
                     </td>
                     <td>
                       {student.school || '-'} ({student.grade})
@@ -474,6 +514,7 @@ export const Students: React.FC<StudentsProps> = ({
         ) : (
           filteredStudents.map(student => {
             const attRate = calculateAttendanceRate(student.id);
+            const tags = studentTagMap.get(student.id) ?? [];
             return (
               <div key={`${student.id}-mobile`} className="mobile-data-card" onClick={() => handleOpenDetail(student)}>
                 <div className="mobile-data-card-header">
@@ -504,6 +545,8 @@ export const Students: React.FC<StudentsProps> = ({
                 <div className="mobile-progress">
                   <div style={{ width: `${attRate}%`, backgroundColor: attRate > 80 ? 'var(--color-success)' : attRate > 50 ? 'var(--color-warning)' : 'var(--color-danger)' }} />
                 </div>
+
+                <StudentTagBadges tags={tags} maxVisible={3} />
 
                 <div className="mobile-card-actions" onClick={e => e.stopPropagation()}>
                   <button className="btn btn-secondary" onClick={() => handleOpenDetail(student)}>
@@ -662,6 +705,9 @@ export const Students: React.FC<StudentsProps> = ({
                   <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '0.15rem' }}>
                     {activeDetailStudent.school} • {activeDetailStudent.grade}
                   </div>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <StudentTagBadges tags={studentTagMap.get(activeDetailStudent.id) ?? []} showReasons />
+                  </div>
                 </div>
               </div>
               <button className="btn-icon-only" onClick={() => setIsDetailOpen(false)}>
@@ -686,6 +732,9 @@ export const Students: React.FC<StudentsProps> = ({
                 </button>
                 <button className={`tab-btn ${detailTab === 'counsel' ? 'active' : ''}`} onClick={() => setDetailTab('counsel')}>
                   상담/성적 일지
+                </button>
+                <button className={`tab-btn ${detailTab === 'timeline' ? 'active' : ''}`} onClick={() => setDetailTab('timeline')}>
+                  타임라인
                 </button>
                 <button className={`tab-btn ${detailTab === 'analysis' ? 'active' : ''}`} onClick={() => setDetailTab('analysis')}>
                   성적 분석
@@ -1175,7 +1224,29 @@ export const Students: React.FC<StudentsProps> = ({
               )}
 
               {/* Tab 7: Monthly Progress Report */}
+              {detailTab === 'timeline' && (
+                <StudentTimeline
+                  student={activeDetailStudent}
+                  classes={classes}
+                  attendance={attendance}
+                  payments={payments}
+                  counselLogs={counselLogs}
+                />
+              )}
+
               {detailTab === 'report' && (
+                <StudentReportPreview
+                  student={activeDetailStudent}
+                  classes={classes}
+                  attendance={attendance}
+                  payments={payments}
+                  counselLogs={counselLogs}
+                  onAddCounselLog={onAddCounselLog}
+                  onUpdateCounselLog={onUpdateCounselLog}
+                />
+              )}
+
+              {detailTab === 'report-old' && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-primary-dark)', margin: 0 }}>
