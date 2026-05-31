@@ -27,13 +27,6 @@ const LOG_TYPE_KO: Record<string, string> = {
   counsel: '상담', progress: '진도', test: '시험',
 };
 
-const ASSISTANT_CAPABILITIES = [
-  { label: '조회', detail: '학생·반·출결·수납·상담 기록 확인' },
-  { label: '브리핑', detail: '오늘 수업, 미체크, 미납, 관리 대상 요약' },
-  { label: '초안', detail: '학부모 안내문·출결/수납 follow-up 문구 작성' },
-  { label: '승인 후 변경', detail: '출결 수정, 수납 완납, 일지/학생 메모 저장' },
-];
-
 const SUGGESTION_GROUPS = [
   {
     title: '오늘 업무',
@@ -320,7 +313,6 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
     setOpen(false);
   };
 
-  const suggestionCount = SUGGESTION_GROUPS.reduce((sum, group) => sum + group.prompts.length, 0);
   const activeSuggestions = SUGGESTION_GROUPS.find(group => group.title === activeSuggestionGroup) ?? SUGGESTION_GROUPS[0];
 
   return (
@@ -419,56 +411,61 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
           >
             {messages.length === 0 && !loading && (
               <div style={{ color: 'var(--color-text-muted)', width: '100%' }}>
-                <Sparkles size={28} className="text-primary" style={{ marginBottom: '0.6rem' }} />
-                <p style={{ fontSize: '0.9rem', marginBottom: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-                  안녕하세요, 아이비예요. 학생·출결·수납·상담 데이터를 실제로 확인해서 답하고, 변경 작업은 승인 카드로 먼저 확인받아요.
-                </p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.45rem', marginBottom: '0.95rem' }}>
-                  {ASSISTANT_CAPABILITIES.map(item => (
-                    <div
-                      key={item.label}
-                      style={{
-                        padding: '0.55rem 0.6rem',
-                        borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--color-border)',
-                        backgroundColor: '#fff',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '0.2rem' }}>
-                        {item.label}
-                      </div>
-                      <div style={{ fontSize: '0.69rem', lineHeight: 1.35, color: 'var(--color-text-secondary)' }}>
-                        {item.detail}
-                      </div>
+                <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', marginBottom: '0.85rem' }}>
+                  <div
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark, #0c2e20))',
+                    }}
+                  >
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.96rem', fontWeight: 850, color: 'var(--color-primary-dark)', marginBottom: '0.2rem' }}>
+                      아이비에게 바로 물어보세요
                     </div>
-                  ))}
+                    <p style={{ fontSize: '0.78rem', margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
+                      조회·브리핑·안내문 초안을 도와드리고, 저장/변경은 승인 후 처리해요.
+                    </p>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <strong style={{ fontSize: '0.78rem', color: 'var(--color-primary-dark)' }}>바로 써볼 질문 예시</strong>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{suggestionCount}개</span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.25rem', marginBottom: '0.6rem' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    gap: '0.35rem',
+                    marginBottom: '0.65rem',
+                  }}
+                >
                   {SUGGESTION_GROUPS.map(group => (
                     <button
                       key={group.title}
                       type="button"
                       onClick={() => setActiveSuggestionGroup(group.title)}
                       style={{
-                        flex: '0 0 auto',
-                        padding: '0.35rem 0.55rem',
-                        borderRadius: 'var(--radius-full)',
-                        border: activeSuggestionGroup === group.title ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                        minWidth: 0,
+                        gridColumn: group.title === '기억·자료' ? '1 / -1' : undefined,
+                        minHeight: '34px',
+                        padding: '0.34rem 0.45rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: activeSuggestionGroup === group.title ? '1px solid var(--color-primary)' : '1px solid transparent',
                         backgroundColor: activeSuggestionGroup === group.title ? 'var(--color-accent-mint-light, #d1fae5)' : '#fff',
                         color: activeSuggestionGroup === group.title ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)',
                         font: 'inherit',
-                        fontSize: '0.72rem',
+                        fontSize: '0.71rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap',
+                        whiteSpace: 'normal',
+                        lineHeight: 1.2,
+                        boxShadow: activeSuggestionGroup === group.title ? 'inset 0 0 0 1px rgba(47, 125, 87, 0.08)' : 'none',
                       }}
                     >
                       {group.title}
@@ -476,24 +473,39 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   {activeSuggestions.prompts.map(prompt => (
                     <button
                       key={prompt}
-                      className="btn btn-secondary"
                       style={{
-                        fontSize: '0.76rem',
-                        justifyContent: 'flex-start',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.6rem',
+                        width: '100%',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: '#fff',
+                        color: 'var(--color-text-primary)',
+                        font: 'inherit',
+                        fontSize: '0.77rem',
+                        fontWeight: 650,
                         textAlign: 'left',
-                        padding: '0.48rem 0.65rem',
+                        padding: '0.62rem 0.7rem',
                         lineHeight: 1.35,
                         minHeight: 'auto',
+                        cursor: 'pointer',
                       }}
                       onClick={() => setInput(prompt)}
                     >
-                      {prompt}
+                      <span>{prompt}</span>
+                      <span style={{ color: 'var(--color-primary)', fontSize: '0.9rem', flexShrink: 0 }}>↗</span>
                     </button>
                   ))}
+                </div>
+
+                <div style={{ marginTop: '0.75rem', fontSize: '0.7rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                  출결·수납·일지·메모 변경은 확인 카드에서 승인해야 저장됩니다.
                 </div>
               </div>
             )}
