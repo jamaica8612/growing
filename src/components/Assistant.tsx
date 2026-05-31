@@ -227,6 +227,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [activeSuggestionGroup, setActiveSuggestionGroup] = useState(SUGGESTION_GROUPS[0].title);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -320,6 +321,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   };
 
   const suggestionCount = SUGGESTION_GROUPS.reduce((sum, group) => sum + group.prompts.length, 0);
+  const activeSuggestions = SUGGESTION_GROUPS.find(group => group.title === activeSuggestionGroup) ?? SUGGESTION_GROUPS[0];
 
   return (
     <>
@@ -449,32 +451,48 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
                   <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{suggestionCount}개</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.25rem', marginBottom: '0.6rem' }}>
                   {SUGGESTION_GROUPS.map(group => (
-                    <div key={group.title}>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--color-text-secondary)', marginBottom: '0.35rem' }}>
-                        {group.title}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                        {group.prompts.map(prompt => (
-                          <button
-                            key={prompt}
-                            className="btn btn-secondary"
-                            style={{
-                              fontSize: '0.76rem',
-                              justifyContent: 'flex-start',
-                              textAlign: 'left',
-                              padding: '0.48rem 0.65rem',
-                              lineHeight: 1.35,
-                              minHeight: 'auto',
-                            }}
-                            onClick={() => setInput(prompt)}
-                          >
-                            {prompt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <button
+                      key={group.title}
+                      type="button"
+                      onClick={() => setActiveSuggestionGroup(group.title)}
+                      style={{
+                        flex: '0 0 auto',
+                        padding: '0.35rem 0.55rem',
+                        borderRadius: 'var(--radius-full)',
+                        border: activeSuggestionGroup === group.title ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                        backgroundColor: activeSuggestionGroup === group.title ? 'var(--color-accent-mint-light, #d1fae5)' : '#fff',
+                        color: activeSuggestionGroup === group.title ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)',
+                        font: 'inherit',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {group.title}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {activeSuggestions.prompts.map(prompt => (
+                    <button
+                      key={prompt}
+                      className="btn btn-secondary"
+                      style={{
+                        fontSize: '0.76rem',
+                        justifyContent: 'flex-start',
+                        textAlign: 'left',
+                        padding: '0.48rem 0.65rem',
+                        lineHeight: 1.35,
+                        minHeight: 'auto',
+                      }}
+                      onClick={() => setInput(prompt)}
+                    >
+                      {prompt}
+                    </button>
                   ))}
                 </div>
               </div>
