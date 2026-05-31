@@ -78,11 +78,11 @@ type PendingAction = UpdateAttendanceAction | CreateAttendanceAction | UpdatePay
 const TOOL_DECLARATIONS = [
   {
     name: 'list_students',
-    description: '학원 학생 목록을 조회한다. 이름/학교로 검색하거나 재원/퇴원 상태로 필터할 수 있다.',
+    description: '학원 학생 목록을 조회한다. 이름/학교로 검색하거나 재원/휴원/퇴원 상태로 필터할 수 있다.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        status: { type: 'STRING', enum: ['active', 'inactive', 'all'], description: '재원(active)/퇴원(inactive)/전체(all). 기본 active' },
+        status: { type: 'STRING', enum: ['active', 'paused', 'inactive', 'all'], description: '재원(active)/휴원(paused)/퇴원(inactive)/전체(all). 기본 active' },
         query: { type: 'STRING', description: '이름 또는 학교명 부분 검색어(선택)' },
       },
     },
@@ -293,10 +293,14 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       }
 
       const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
+      // 이름/반을 콕 집어 물으면 휴원생도 답하되, 일반 집계 요약은 재원생만 센다
+      // (앱의 출결 통계 정책과 일치).
+      const activeIds = new Set(students.filter((s: Json) => s.status === 'active').map((s: Json) => s.id as string));
       const acc: Record<string, Json> = {};
       for (const r of attRes.data ?? []) {
         const sid = r.student_id as string;
         if (targetIds && !targetIds.has(sid)) continue;
+        if (!targetIds && !activeIds.has(sid)) continue;
         const row = (acc[sid] ??= { name: nameById.get(sid) ?? '(알수없음)', present: 0, absent: 0, makeup: 0, total: 0 });
         const st = r.status as string;
         const normalizedStatus = st === 'late' ? 'present' : st;
@@ -377,10 +381,12 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       if (attRes.error) throw attRes.error;
       if (payRes.error) throw payRes.error;
       const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
+      // 출결 대상은 재원생만(휴원/퇴원생은 오늘 명단에서 제외).
+      const activeIds = new Set(students.filter((s: Json) => s.status === 'active').map((s: Json) => s.id as string));
       const todayClasses = (classesRes.data ?? []).filter((c: Json) => ((c.days as string[]) ?? []).includes(day));
       const att = attRes.data ?? [];
       const classes = todayClasses.map((c: Json) => {
-        const ids = (c.student_ids as string[]) ?? [];
+        const ids = ((c.student_ids as string[]) ?? []).filter(id => activeIds.has(id));
         const recs = att.filter((a: Json) => ids.includes(a.student_id as string));
         return {
           name: c.name, time: `${c.start_time}~${c.end_time}`,

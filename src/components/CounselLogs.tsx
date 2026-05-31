@@ -30,11 +30,12 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
   const [formType, setFormType] = useState<CounselLogType>('counsel');
   const [formScore, setFormScore] = useState('');
 
-  // active students for dropdown
-  const activeStudents = students.filter(s => s.status === 'active');
+  // 신규 일지 작성 대상: 재원생 + 휴원생(퇴원생만 제외). 휴원 중인 학생의
+  // 복귀 상담·특이사항도 기록할 수 있어야 한다.
+  const enrolledStudents = students.filter(s => s.status !== 'inactive');
 
   const handleOpenAdd = () => {
-    setFormStudentId(activeStudents[0]?.id || '');
+    setFormStudentId(enrolledStudents[0]?.id || '');
     setFormTitle('');
     setFormContent('');
     setFormType('counsel');
@@ -112,7 +113,7 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
 
   const recentShareCandidates = [...counselLogs]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .filter(log => students.find(s => s.id === log.studentId)?.status === 'active')
+    .filter(log => students.find(s => s.id === log.studentId)?.status !== 'inactive')
     .slice(0, 6);
 
   return (
@@ -372,9 +373,9 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
                       required
                     >
                       <option value="">학생을 선택하세요</option>
-                      {activeStudents.map(s => (
+                      {enrolledStudents.map(s => (
                         <option key={s.id} value={s.id}>
-                          {s.name} ({s.school} | {s.grade.split(' ')[1] || s.grade})
+                          {s.name}{s.status === 'paused' ? ' (휴원)' : ''} ({s.school} | {s.grade.split(' ')[1] || s.grade})
                         </option>
                       ))}
                     </select>

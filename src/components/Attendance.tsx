@@ -229,9 +229,11 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const getMonthlyReportData = () => {
     const reportData: {
       [studentId: string]: {
+        id: string;
         name: string;
         school: string;
         grade: string;
+        isPaused: boolean;
         present: number;
         absent: number;
         makeup: number;
@@ -239,12 +241,15 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       };
     } = {};
 
-    // Initialize active students
-    students.filter(s => s.status === 'active').forEach(s => {
+    // 재원생 + 휴원생을 포함한다(퇴원생만 제외). 같은 달 중간에 휴원으로 바뀐
+    // 학생의 그달 출결 기록이 리포트에서 사라지지 않도록 보존한다.
+    students.filter(s => s.status !== 'inactive').forEach(s => {
       reportData[s.id] = {
+        id: s.id,
         name: s.name,
         school: s.school,
         grade: s.grade,
+        isPaused: s.status === 'paused',
         present: 0,
         absent: 0,
         makeup: 0,
@@ -734,8 +739,13 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                   const attended = row.present + row.makeup;
                   const rate = row.total > 0 ? Math.round((attended / row.total) * 100) : 100;
                   return (
-                    <tr key={row.name}>
-                      <td style={{ fontWeight: 700 }}>{row.name}</td>
+                    <tr key={row.id}>
+                      <td style={{ fontWeight: 700 }}>
+                        {row.name}
+                        {row.isPaused && (
+                          <span style={{ marginLeft: '0.35rem', fontSize: '0.7rem', color: '#92400e', fontWeight: 700 }}>휴원</span>
+                        )}
+                      </td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{row.school} {row.grade.split(' ')[1] || row.grade}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-success)' }}>{row.present}회</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-danger)' }}>{row.absent}회</td>

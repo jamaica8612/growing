@@ -492,9 +492,11 @@ export const Payments: React.FC<PaymentsProps> = ({
                     required
                   >
                     <option value="">학생을 선택하세요</option>
-                    {students.filter(s => s.status === 'active').map(s => (
+                    {/* 재원생 + 휴원생(퇴원 제외). 휴원생은 자동 일괄청구에서는 빠지지만
+                        교재비 등 예외적 수동 청구는 가능해야 한다. */}
+                    {students.filter(s => s.status !== 'inactive').map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({s.school} | {s.grade.split(' ')[1] || s.grade})
+                        {s.name}{s.status === 'paused' ? ' (휴원)' : ''} ({s.school} | {s.grade.split(' ')[1] || s.grade})
                       </option>
                     ))}
                   </select>
