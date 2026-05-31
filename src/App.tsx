@@ -511,12 +511,6 @@ function AcademyApp({ session }: { session: Session }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#eaf6f0', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-accent-mint-light)' }}>
-              <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--color-success)', borderRadius: '50%', display: 'inline-block' }}></span>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary)' }} title={session.user.email ?? ''}>
-                클라우드 동기화 중
-              </span>
-            </div>
             <button className="btn btn-secondary" style={{ gap: '0.4rem' }} onClick={handleLogout} title={session.user.email ?? ''}>
               <LogOut size={15} /> 로그아웃
             </button>
