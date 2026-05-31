@@ -14,6 +14,8 @@ interface StudentsProps {
   onAddStudent: (student: Omit<Student, 'id'>) => void;
   onUpdateStudent: (student: Student) => void;
   onWithdrawStudent: (id: string) => void;
+  onPauseStudent: (id: string) => void;
+  onRestoreStudent: (id: string) => void;
   onAddCounselLog: (log: Omit<CounselLog, 'id'>) => void;
   onUpdateCounselLog: (log: CounselLog) => void;
 }
@@ -27,6 +29,8 @@ export const Students: React.FC<StudentsProps> = ({
   onAddStudent,
   onUpdateStudent,
   onWithdrawStudent,
+  onPauseStudent,
+  onRestoreStudent,
   onAddCounselLog,
   onUpdateCounselLog,
 }) => {
@@ -218,6 +222,26 @@ export const Students: React.FC<StudentsProps> = ({
     }
   };
 
+  const handlePauseClick = (student: Student, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (student.status !== 'active') return;
+    if (window.confirm(`${student.name} 학생을 휴원 처리하시겠습니까?\n반 배정은 유지되고, 휴원 기간 동안 수강료 청구만 중단됩니다.`)) {
+      onPauseStudent(student.id);
+      if (activeDetailStudent?.id === student.id)
+        setActiveDetailStudent({ ...activeDetailStudent, status: 'paused' });
+    }
+  };
+
+  const handleRestoreClick = (student: Student, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (student.status !== 'paused') return;
+    if (window.confirm(`${student.name} 학생을 복귀 처리하시겠습니까?\n다시 재원생으로 전환하고 다음 달부터 수강료가 청구됩니다.`)) {
+      onRestoreStudent(student.id);
+      if (activeDetailStudent?.id === student.id)
+        setActiveDetailStudent({ ...activeDetailStudent, status: 'active' });
+    }
+  };
+
   // Students belonging to the selected class (when a class filter is active).
   const filterClassMemberIds =
     classFilter === 'all'
@@ -294,6 +318,7 @@ export const Students: React.FC<StudentsProps> = ({
             onChange={e => setStatusFilter(e.target.value as StudentStatus | 'all')}
           >
             <option value="active">재원생</option>
+            <option value="paused">휴원생</option>
             <option value="inactive">퇴원생</option>
             <option value="all">전체 상태</option>
           </select>
@@ -383,8 +408,8 @@ export const Students: React.FC<StudentsProps> = ({
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${student.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
-                        {student.status === 'active' ? '재원' : '퇴원'}
+                      <span className={`badge ${student.status === 'active' ? 'badge-active' : student.status === 'paused' ? 'badge-warning' : 'badge-inactive'}`}>
+                        {student.status === 'active' ? '재원' : student.status === 'paused' ? '휴원' : '퇴원'}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
@@ -403,6 +428,26 @@ export const Students: React.FC<StudentsProps> = ({
                         >
                           <Edit2 size={16} />
                         </button>
+                        {student.status === 'active' && (
+                          <button
+                            className="btn-icon-only"
+                            title="휴원 처리"
+                            onClick={e => handlePauseClick(student, e)}
+                            style={{ color: 'var(--color-warning)' }}
+                          >
+                            <Calendar size={16} />
+                          </button>
+                        )}
+                        {student.status === 'paused' && (
+                          <button
+                            className="btn-icon-only"
+                            title="복귀 처리"
+                            onClick={e => handleRestoreClick(student, e)}
+                            style={{ color: 'var(--color-success)' }}
+                          >
+                            <UserPlus size={16} />
+                          </button>
+                        )}
                         <button
                           className="btn-icon-only text-danger"
                           title="퇴원 처리"
@@ -436,8 +481,8 @@ export const Students: React.FC<StudentsProps> = ({
                     <strong>{student.name}</strong>
                     <span>{student.school || '-'} · {student.grade}</span>
                   </div>
-                  <span className={`badge ${student.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
-                    {student.status === 'active' ? '재원' : '퇴원'}
+                  <span className={`badge ${student.status === 'active' ? 'badge-active' : student.status === 'paused' ? 'badge-warning' : 'badge-inactive'}`}>
+                    {student.status === 'active' ? '재원' : student.status === 'paused' ? '휴원' : '퇴원'}
                   </span>
                 </div>
 
@@ -467,6 +512,16 @@ export const Students: React.FC<StudentsProps> = ({
                   <button className="btn btn-secondary" onClick={e => handleOpenEdit(student, e)}>
                     <Edit2 size={14} /> 수정
                   </button>
+                  {student.status === 'active' && (
+                    <button className="btn btn-secondary" onClick={e => handlePauseClick(student, e)} style={{ color: 'var(--color-warning)' }}>
+                      <Calendar size={14} /> 휴원
+                    </button>
+                  )}
+                  {student.status === 'paused' && (
+                    <button className="btn btn-secondary" onClick={e => handleRestoreClick(student, e)} style={{ color: 'var(--color-success)' }}>
+                      <UserPlus size={14} /> 복귀
+                    </button>
+                  )}
                   <button className="btn btn-danger" onClick={e => handleWithdrawClick(student, e)} disabled={student.status === 'inactive'}>
                     <UserX size={14} /> 퇴원 처리
                   </button>
@@ -510,6 +565,7 @@ export const Students: React.FC<StudentsProps> = ({
                       onChange={e => setFormStatus(e.target.value as StudentStatus)}
                     >
                       <option value="active">재원</option>
+                      <option value="paused">휴원</option>
                       <option value="inactive">퇴원</option>
                     </select>
                   </div>
@@ -599,8 +655,8 @@ export const Students: React.FC<StudentsProps> = ({
                 <div>
                   <h3 className="modal-title" style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {activeDetailStudent.name}
-                    <span className={`badge ${activeDetailStudent.status === 'active' ? 'badge-active' : 'badge-inactive'}`} style={{ fontSize: '0.7rem' }}>
-                      {activeDetailStudent.status === 'active' ? '재원생' : '퇴원생'}
+                    <span className={`badge ${activeDetailStudent.status === 'active' ? 'badge-active' : activeDetailStudent.status === 'paused' ? 'badge-warning' : 'badge-inactive'}`} style={{ fontSize: '0.7rem' }}>
+                      {activeDetailStudent.status === 'active' ? '재원생' : activeDetailStudent.status === 'paused' ? '휴원생' : '퇴원생'}
                     </span>
                   </h3>
                   <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '0.15rem' }}>

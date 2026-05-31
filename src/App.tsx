@@ -253,6 +253,8 @@ function AcademyApp({ session }: { session: Session }) {
             onAddStudent={data.handleAddStudent}
             onUpdateStudent={data.handleUpdateStudent}
             onWithdrawStudent={data.handleWithdrawStudent}
+            onPauseStudent={data.handlePauseStudent}
+            onRestoreStudent={data.handleRestoreStudent}
             onAddCounselLog={data.handleAddCounselLog}
             onUpdateCounselLog={data.handleUpdateCounselLog}
           />

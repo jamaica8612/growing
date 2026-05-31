@@ -33,6 +33,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [attendanceMemos, setAttendanceMemos] = useState<{ [key: string]: string }>({});
+  const [makeupForDates, setMakeupForDates] = useState<{ [key: string]: string }>({});
   const [copiedStatusKey, setCopiedStatusKey] = useState<string | null>(null);
 
   // Compile Homework Message from owner-editable templates.
@@ -143,14 +144,33 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       '';
     const shouldStampCheckIn =
       selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
+    const makeupForDate = status === 'makeup'
+      ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '')
+      : undefined;
     onSaveAttendance({
       studentId,
       classId,
       date: selectedDate,
       status,
       memo: currentMemo,
+      makeupForDate: makeupForDate || undefined,
       ...(shouldStampCheckIn ? { checkInTime: getCurrentTimeStr() } : {}),
     });
+  };
+
+  const handleMakeupForDateChange = (studentId: string, classId: string, date: string) => {
+    setMakeupForDates(prev => ({ ...prev, [`${studentId}-${classId}`]: date }));
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    if (record?.status === 'makeup') {
+      onSaveAttendance({
+        studentId,
+        classId,
+        date: selectedDate,
+        status: 'makeup',
+        memo: record.memo,
+        makeupForDate: date || undefined,
+      });
+    }
   };
 
   const handleQueueHomeworkAlert = (studentId: string, status: HomeworkStatus) => {
@@ -389,6 +409,30 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             보강
                           </button>
                         </div>
+                        {currentStatus === 'makeup' && (
+                          <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem' }}>
+                            <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>결석일:</span>
+                            <input
+                              type="date"
+                              className="form-control"
+                              style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '140px' }}
+                              value={makeupForDates[`${student.id}-${cls.id}`] ?? record?.makeupForDate ?? ''}
+                              onChange={e => handleMakeupForDateChange(student.id, cls.id, e.target.value)}
+                              title="이 보강이 대체하는 원래 결석 날짜"
+                            />
+                          </div>
+                        )}
+                        {currentStatus === 'absent' && (() => {
+                          const linkedMakeup = attendance.find(
+                            a => a.studentId === student.id && a.classId === cls.id &&
+                                 a.status === 'makeup' && a.makeupForDate === record?.date
+                          );
+                          return linkedMakeup ? (
+                            <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: 'var(--color-success)' }}>
+                              보강 완료 ({linkedMakeup.date})
+                            </div>
+                          ) : null;
+                        })()}
                       </td>
                       <td>
                         <div className="quick-att-buttons">

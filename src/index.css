@@ -885,6 +885,11 @@ body {
   color: var(--color-text-secondary);
 }
 
+.badge-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
 .badge-paid {
   background-color: var(--color-success-light);
   color: var(--color-success);

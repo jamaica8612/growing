@@ -95,6 +95,24 @@ export function useAcademyData(userId: string) {
       setStudents(prev => prev.map(p => (p.id === id ? updatedStudent : p)));
     });
 
+  // 휴원: 반 배정 유지, 수강료 청구만 중단
+  const handlePauseStudent = (id: string) =>
+    guard(async () => {
+      const student = students.find(s => s.id === id);
+      if (!student) return;
+      const updatedStudent = await api.updateStudent({ ...student, status: 'paused' });
+      setStudents(prev => prev.map(p => (p.id === id ? updatedStudent : p)));
+    });
+
+  // 복귀: 휴원 → 재원
+  const handleRestoreStudent = (id: string) =>
+    guard(async () => {
+      const student = students.find(s => s.id === id);
+      if (!student) return;
+      const updatedStudent = await api.updateStudent({ ...student, status: 'active' });
+      setStudents(prev => prev.map(p => (p.id === id ? updatedStudent : p)));
+    });
+
   // ---- Classes ----
   const handleAddClass = (data: Omit<Class, 'id'>) =>
     guard(async () => {
@@ -129,6 +147,7 @@ export function useAcademyData(userId: string) {
           // 부분 업데이트: 전달된 시각만 갱신하고 나머지는 기존 값 유지
           checkInTime: data.checkInTime !== undefined ? data.checkInTime : existing.checkInTime,
           checkOutTime: data.checkOutTime !== undefined ? data.checkOutTime : existing.checkOutTime,
+          makeupForDate: data.makeupForDate !== undefined ? data.makeupForDate : existing.makeupForDate,
         });
         setAttendance(prev => prev.map(a => (a.id === updated.id ? updated : a)));
       } else {
@@ -141,6 +160,7 @@ export function useAcademyData(userId: string) {
           homeworkStatus: data.homeworkStatus ?? '',
           checkInTime: data.checkInTime,
           checkOutTime: data.checkOutTime,
+          makeupForDate: data.makeupForDate,
         });
         setAttendance(prev => [...prev, created]);
       }
@@ -358,6 +378,8 @@ export function useAcademyData(userId: string) {
     handleAddStudent,
     handleUpdateStudent,
     handleWithdrawStudent,
+    handlePauseStudent,
+    handleRestoreStudent,
     handleAddClass,
     handleUpdateClass,
     handleDeleteClass,

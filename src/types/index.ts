@@ -1,4 +1,4 @@
-export type StudentStatus = 'active' | 'inactive';
+export type StudentStatus = 'active' | 'inactive' | 'paused';
 
 export interface Student {
   id: string;
@@ -46,6 +46,7 @@ export interface Attendance {
   homeworkStatus?: HomeworkStatus;
   checkInTime?: string; // 등원 시각 "HH:MM"
   checkOutTime?: string; // 하원 시각 "HH:MM"
+  makeupForDate?: string; // 보강 시 원래 결석한 날짜 YYYY-MM-DD
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'transfer' | '';

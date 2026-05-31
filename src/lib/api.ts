@@ -88,6 +88,7 @@ const toAttendance = (r: Row): Attendance => ({
   homeworkStatus: (s(r.homework_status) || '') as HomeworkStatus,
   checkInTime: (r.check_in_time as string) ?? undefined,
   checkOutTime: (r.check_out_time as string) ?? undefined,
+  makeupForDate: (r.makeup_for_date as string) ?? undefined,
 });
 
 const toPayment = (r: Row): Payment => ({
@@ -277,6 +278,7 @@ export const api = {
         homework_status: a.homeworkStatus ?? '',
         check_in_time: orNull(a.checkInTime),
         check_out_time: orNull(a.checkOutTime),
+        makeup_for_date: orNull(a.makeupForDate),
       })
       .select()
       .single();
@@ -292,6 +294,7 @@ export const api = {
       homeworkStatus: HomeworkStatus | '';
       checkInTime?: string;
       checkOutTime?: string;
+      makeupForDate?: string;
     }
   ): Promise<Attendance> {
     const { data: row, error } = await supabase
@@ -302,6 +305,7 @@ export const api = {
         homework_status: fields.homeworkStatus,
         check_in_time: orNull(fields.checkInTime),
         check_out_time: orNull(fields.checkOutTime),
+        makeup_for_date: orNull(fields.makeupForDate),
       })
       .eq('id', id)
       .select()
