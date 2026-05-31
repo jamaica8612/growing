@@ -55,12 +55,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Selected date attendance rate.
   const selectedAttendanceRecords = attendance.filter(a => a.date === selectedDate);
-  const totalExpectedAttendance = selectedClasses.reduce(
-    (sum, item) => sum + item.cls.studentIds.filter(sid => activeStudentIds.has(sid)).length,
-    0
-  );
+  // 선택일에 수업이 잡힌 (반, 재원생) 쌍을 집합으로 모은다. 같은 요일에 한 반이
+  // 여러 시간표를 가져도 쌍은 한 번만 세고, 분자도 이 쌍에 해당하는 출결만 세어
+  // 분모와 일치시킨다(다른 요일 보강 등으로 100%를 넘는 현상 방지).
+  const expectedPairs = new Set<string>();
+  selectedClasses.forEach(({ cls }) => {
+    cls.studentIds.forEach(sid => {
+      if (activeStudentIds.has(sid)) expectedPairs.add(`${cls.id}|${sid}`);
+    });
+  });
+  const totalExpectedAttendance = expectedPairs.size;
   const attendedCount = selectedAttendanceRecords.filter(
-    a => isAttendedStatus(a.status) && activeStudentIds.has(a.studentId)
+    a => isAttendedStatus(a.status) && expectedPairs.has(`${a.classId}|${a.studentId}`)
   ).length;
 
   const attendanceRate = totalExpectedAttendance > 0 

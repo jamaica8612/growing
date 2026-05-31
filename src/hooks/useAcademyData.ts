@@ -139,6 +139,8 @@ export function useAcademyData(userId: string) {
       const existing = attendance.find(
         a => a.studentId === data.studentId && a.classId === (data.classId ?? '') && a.date === data.date
       );
+      // 보강(makeup)일 때만 "원래 결석일" 연결을 유지한다. 다른 상태로 바뀌면
+      // 비워서, 이전 보강일이 DB에 stale 값으로 남거나 잘못 복원되지 않게 한다.
       if (existing) {
         const updated = await api.updateAttendance(existing.id, {
           status: data.status,
@@ -147,7 +149,7 @@ export function useAcademyData(userId: string) {
           // 부분 업데이트: 전달된 시각만 갱신하고 나머지는 기존 값 유지
           checkInTime: data.checkInTime !== undefined ? data.checkInTime : existing.checkInTime,
           checkOutTime: data.checkOutTime !== undefined ? data.checkOutTime : existing.checkOutTime,
-          makeupForDate: data.makeupForDate !== undefined ? data.makeupForDate : existing.makeupForDate,
+          makeupForDate: data.status === 'makeup' ? (data.makeupForDate ?? existing.makeupForDate) : undefined,
         });
         setAttendance(prev => prev.map(a => (a.id === updated.id ? updated : a)));
       } else {
@@ -160,7 +162,7 @@ export function useAcademyData(userId: string) {
           homeworkStatus: data.homeworkStatus ?? '',
           checkInTime: data.checkInTime,
           checkOutTime: data.checkOutTime,
-          makeupForDate: data.makeupForDate,
+          makeupForDate: data.status === 'makeup' ? data.makeupForDate : undefined,
         });
         setAttendance(prev => [...prev, created]);
       }
@@ -334,6 +336,7 @@ export function useAcademyData(userId: string) {
           homeworkStatus: a.homeworkStatus ?? '',
           checkInTime: a.checkInTime,
           checkOutTime: a.checkOutTime,
+          makeupForDate: a.makeupForDate,
         });
       }
       for (const p of data.payments) {

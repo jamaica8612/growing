@@ -267,6 +267,10 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const monthlyReport = getMonthlyReportData();
 
+  // 달력 집계도 재원생 기준으로 통일(휴원/퇴원생 잔존 기록 제외).
+  const activeStudentIds = new Set(students.filter(s => s.status === 'active').map(s => s.id));
+  const activeAttendance = attendance.filter(a => activeStudentIds.has(a.studentId));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
@@ -681,7 +685,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           날짜를 누르면 위쪽 [일자별 출결 기록]이 해당 날짜로 이동합니다.
         </p>
         <AttendanceCalendar
-          attendance={attendance}
+          attendance={activeAttendance}
           month={reportMonth}
           selectedDate={selectedDate}
           onSelectDate={date => setSelectedDate(date)}

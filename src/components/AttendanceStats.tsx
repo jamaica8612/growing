@@ -45,9 +45,15 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
     return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [attendance, currentMonth]);
 
+  // 통계는 재원생 기준. 휴원/퇴원생의 잔존 출결 기록은 KPI·반별 출석률에서
+  // 제외해, 학생별 표(재원생만)와 모수를 일치시킨다.
+  const activeStudentIds = useMemo(
+    () => new Set(students.filter(s => s.status === 'active').map(s => s.id)),
+    [students]
+  );
   const monthRecords = useMemo(
-    () => attendance.filter(a => a.date.startsWith(selectedMonth)),
-    [attendance, selectedMonth]
+    () => attendance.filter(a => a.date.startsWith(selectedMonth) && activeStudentIds.has(a.studentId)),
+    [attendance, selectedMonth, activeStudentIds]
   );
 
   // Overall status totals for the selected month.
@@ -441,7 +447,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                 classes.map(cls => {
                   const records = monthRecords.filter(r => r.classId === cls.id);
                   const total = records.length;
-                  const attended = records.filter(r => r.status !== 'absent').length;
+                  const attended = records.filter(r => normalizeAttendanceStatus(r.status) !== 'absent').length;
                   const rate = total > 0 ? Math.round((attended / total) * 100) : -1;
                   return (
                     <div key={cls.id} className="class-rate-row">
