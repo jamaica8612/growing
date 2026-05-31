@@ -13,6 +13,7 @@ import type {
   PaymentStatus,
   CounselLogType,
 } from '../types';
+import { type MessageTemplates, mergeTemplates } from './messageTemplates';
 
 type Row = Record<string, unknown>;
 
@@ -95,6 +96,7 @@ export interface AcademySnapshot {
   counselLogs: CounselLog[];
   kioskAlerts: KioskAlert[];
   kioskPin: string;
+  messageTemplates: MessageTemplates;
 }
 
 export const api = {
@@ -121,6 +123,7 @@ export const api = {
       counselLogs: (counselLogs.data ?? []).map(toCounselLog),
       kioskAlerts: (kioskAlerts.data ?? []).map(toKioskAlert),
       kioskPin: (settings.data?.kiosk_pin as string) ?? '1234',
+      messageTemplates: mergeTemplates(settings.data?.message_templates as Partial<MessageTemplates> | null),
     };
   },
 
@@ -384,6 +387,13 @@ export const api = {
     const { error } = await supabase
       .from('growing_settings')
       .upsert({ owner_id: ownerId, kiosk_pin: pin, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  },
+
+  async setMessageTemplates(ownerId: string, templates: MessageTemplates): Promise<void> {
+    const { error } = await supabase
+      .from('growing_settings')
+      .upsert({ owner_id: ownerId, message_templates: templates, updated_at: new Date().toISOString() });
     if (error) throw error;
   },
 

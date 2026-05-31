@@ -202,6 +202,7 @@ function AcademyApp({ session }: { session: Session }) {
     counselLogs,
     kioskAlerts,
     kioskPin,
+    messageTemplates,
   } = data;
 
   const handleLogout = () => {
@@ -258,6 +259,7 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             students={students}
             classes={classes}
+            messageTemplates={messageTemplates}
             onSaveAttendance={data.handleSaveAttendance}
           />
         );
@@ -302,6 +304,7 @@ function AcademyApp({ session }: { session: Session }) {
             onDismissAlert={data.handleDismissKioskAlert}
             onClearAlerts={data.handleClearKioskAlerts}
             assistantDraft={assistantDraft}
+            messageTemplates={messageTemplates}
           />
         );
       case 'kiosk':
@@ -323,6 +326,8 @@ function AcademyApp({ session }: { session: Session }) {
             getAllData={data.getAllData}
             kioskPin={kioskPin}
             onChangeKioskPin={data.handleChangeKioskPin}
+            messageTemplates={messageTemplates}
+            onSaveMessageTemplates={data.handleSaveMessageTemplates}
           />
         );
       default:

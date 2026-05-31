@@ -1,18 +1,30 @@
 import React, { useState } from 'react';
 import type { Student, Class, Attendance, AttendanceStatus, HomeworkStatus } from '../types';
 import { Calendar, Clock, Save, MessageSquare, Send, Check } from 'lucide-react';
+import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
+import { AttendanceCalendar } from './AttendanceCalendar';
 
 interface AttendanceProps {
   attendance: Attendance[];
   students: Student[];
   classes: Class[];
+  messageTemplates: MessageTemplates;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
 }
+
+// 숙제 상태 → 템플릿 키 매핑. 상태가 없으면 메시지도 없음.
+const HOMEWORK_TEMPLATE_KEY: Record<HomeworkStatus, keyof MessageTemplates | ''> = {
+  done: 'homeworkDone',
+  incomplete: 'homeworkIncomplete',
+  undone: 'homeworkUndone',
+  '': '',
+};
 
 export const AttendanceManager: React.FC<AttendanceProps> = ({
   attendance,
   students,
   classes,
+  messageTemplates,
   onSaveAttendance,
 }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -20,17 +32,11 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [attendanceMemos, setAttendanceMemos] = useState<{ [key: string]: string }>({});
   const [copiedStatusKey, setCopiedStatusKey] = useState<string | null>(null);
 
-  // Compile Homework Message Template
+  // Compile Homework Message from owner-editable templates.
   const getHomeworkMessage = (studentName: string, status: HomeworkStatus): string => {
-    const prefix = `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생은 `;
-    if (status === 'done') {
-      return prefix + `부여된 영어 숙제와 단어 암기 준비를 아주 성실하게 잘 완료하고 수업에 참여하였습니다. 대견한 모습에 가정에서도 많은 칭찬과 격려 부탁드립니다. 감사합니다.`;
-    } else if (status === 'incomplete') {
-      return prefix + `영어 숙제 및 단어 준비가 다소 부족(일부 미완료)한 상태로 등원하였습니다. 교습소에서 개별 보완 지도를 실시하였으나, 가정에서도 학습 습관이 유지되도록 남은 과제를 챙겨주시기를 부탁드립니다.`;
-    } else if (status === 'undone') {
-      return prefix + `영어 숙제 및 단어 암기 준비가 전혀 되어있지 않았습니다. 학업 연속성을 위해 과제 수행이 필수적이오니, 가정에서도 숙제를 반드시 완료해서 보낼 수 있도록 각별한 지도 협조를 부탁드립니다.`;
-    }
-    return '';
+    const key = HOMEWORK_TEMPLATE_KEY[status];
+    if (!key) return '';
+    return renderTemplate(messageTemplates[key], { 학생명: studentName });
   };
 
   // Copy Homework status notification for KakaoTalk
@@ -389,6 +395,34 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Monthly Calendar View */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h3 className="card-title" style={{ marginBottom: 0 }}>
+            <Calendar size={20} className="text-primary" /> 월간 출결 캘린더
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>조회 연월:</span>
+            <input
+              type="month"
+              className="form-control"
+              style={{ width: '160px', padding: '0.35rem 0.65rem' }}
+              value={reportMonth}
+              onChange={e => setReportMonth(e.target.value)}
+            />
+          </div>
+        </div>
+        <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+          날짜를 누르면 위쪽 [일자별 출결 기록]이 해당 날짜로 이동합니다.
+        </p>
+        <AttendanceCalendar
+          attendance={attendance}
+          month={reportMonth}
+          selectedDate={selectedDate}
+          onSelectDate={date => setSelectedDate(date)}
+        />
       </div>
 
       {/* Monthly Attendance Report Sheet */}

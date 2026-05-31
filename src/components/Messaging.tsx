@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Student, KioskAlert } from '../types';
 import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles, Filter, CheckSquare, Square } from 'lucide-react';
+import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 
 interface MessagingProps {
   students: Student[];
@@ -11,6 +12,7 @@ interface MessagingProps {
     id: number;
     content: string;
   } | null;
+  messageTemplates: MessageTemplates;
 }
 
 type TemplateType = 'in' | 'out' | 'homework' | 'makeup' | 'test' | 'custom';
@@ -18,10 +20,9 @@ type AlertFilter = 'all' | 'in' | 'out' | 'missing-contact';
 
 // Shared check-in / check-out message body, reused by both the manual
 // composer and the kiosk auto-queue so the wording stays in one place.
-const buildCheckMessage = (studentName: string, kind: 'in' | 'out', time: string) =>
-  kind === 'in'
-    ? `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 ${time}에 안전하게 등원하였습니다.\n오늘도 밝은 분위기 속에서 즐겁고 성실하게 공부하고 귀가할 수 있도록 지도하겠습니다. 감사합니다.`
-    : `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 ${studentName} 학생이 금일 개별 학습 일정을 건강하게 마치고 ${time}에 하원하였습니다.\n가정에서도 숙제 수행 및 오늘 배운 단어를 복습할 수 있도록 격려와 지도 유도 부탁드립니다. 조은 하루 보내세요!`;
+// Wording comes from the owner-editable templates (settings).
+const buildCheckMessage = (templates: MessageTemplates, studentName: string, kind: 'in' | 'out', time: string) =>
+  renderTemplate(kind === 'in' ? templates.checkIn : templates.checkOut, { 학생명: studentName, 시간: time });
 
 // Build an SMS deep link prefilled with the message, tailored for iOS / Android.
 const buildSMSLink = (parentContact: string, message: string): string => {
@@ -43,7 +44,7 @@ const findDraftStudentId = (students: Student[], draft?: string): string => {
   return activeMatches[0].id;
 };
 
-export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts, assistantDraft }) => {
+export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onDismissAlert, onClearAlerts, assistantDraft, messageTemplates }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(() => findDraftStudentId(students, assistantDraft?.content));
   const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(() => assistantDraft?.content ? 'custom' : 'in');
@@ -82,25 +83,24 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
     if (!student) return '';
 
     const studentName = student.name;
-    const parentName = `${studentName} 학부모님`;
 
     switch (selectedTemplate) {
       case 'custom':
         return customMessage || '아이비 초안이나 직접 작성한 메시지가 이곳에 표시됩니다. 🌱';
       case 'in':
-        return buildCheckMessage(studentName, 'in', paramTime);
+        return buildCheckMessage(messageTemplates, studentName, 'in', paramTime);
       case 'out':
-        return buildCheckMessage(studentName, 'out', paramTime);
+        return buildCheckMessage(messageTemplates, studentName, 'out', paramTime);
       case 'homework':
-        return `안녕하세요, 그로잉영어입니다. 🌱\n\n${parentName}께 안내 말씀드립니다.\n\n오늘 ${studentName} 학생이 숙제 및 단어 준비가 다소 부족하여 교습소에서 1:1 집중 보완 지도 및 밀린 숙제를 완료한 후 귀가할 예정입니다. 귀가 시간이 다소 지연되더라도 양해 부탁드리며, 가정에서도 규칙적인 학습 습관이 잡힐 수 있도록 관심 부탁드립니다.`;
+        return renderTemplate(messageTemplates.homeworkIncomplete, { 학생명: studentName });
       case 'makeup':
-        return `안녕하세요, 그로잉영어입니다. 🌱\n\n${studentName} 학생의 미수강 진도 보충을 위한 개별 보강 수업 일정을 안내드립니다.\n\n- 일시: ${paramDate} ${paramTime}\n\n학생이 늦지 않고 출석하여 진도를 맞출 수 있도록 학부모님의 지도 협조 부탁드립니다. 감사합니다.`;
+        return renderTemplate(messageTemplates.makeup, { 학생명: studentName, 날짜: paramDate, 시간: paramTime });
       case 'test':
-        return `안녕하세요, 그로잉영어입니다. 🌱\n\n오늘 시행한 ${studentName} 학생의 단원 평가 결과를 안내해 드립니다.\n\n- 평가 영역: ${paramTestName}\n- 평가 점수: ${paramScore}\n\n스스로 열심히 노력하여 훌륭한 성취를 낸 ${studentName} 학생에게 아낌없는 칭찬과 응원 부탁드립니다. 늘 믿고 맡겨주셔서 감사드립니다.`;
+        return renderTemplate(messageTemplates.test, { 학생명: studentName, 평가명: paramTestName, 점수: paramScore });
       default:
         return '';
     }
-  }, [selectedStudentId, selectedTemplate, customMessage, paramTime, paramDate, paramTestName, paramScore, students]);
+  }, [selectedStudentId, selectedTemplate, customMessage, paramTime, paramDate, paramTestName, paramScore, students, messageTemplates]);
 
   // Clipboard copy helper
   const handleCopy = () => {
@@ -133,9 +133,9 @@ export const Messaging: React.FC<MessagingProps> = ({ students, kioskAlerts, onD
       student,
       name,
       contact,
-      message: buildCheckMessage(name, alert.kind, alert.time),
+      message: buildCheckMessage(messageTemplates, name, alert.kind, alert.time),
     };
-  }), [kioskAlerts, students]);
+  }), [kioskAlerts, students, messageTemplates]);
 
   const filteredAlertRows = alertRows.filter(row => {
     if (alertFilter === 'in') return row.alert.kind === 'in';
