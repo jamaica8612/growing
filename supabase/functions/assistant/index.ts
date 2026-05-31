@@ -94,7 +94,7 @@ const TOOL_DECLARATIONS = [
   },
   {
     name: 'get_attendance_summary',
-    description: '특정 월의 출결 통계를 학생별로 집계한다(출석/지각/결석/보강 횟수와 출석률).',
+    description: '특정 월의 출결 통계를 학생별로 집계한다(출석/결석/보강 횟수와 출석률).',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -186,8 +186,8 @@ const TOOL_DECLARATIONS = [
         date: { type: 'STRING', description: '날짜 YYYY-MM-DD 형식. 생략 시 오늘' },
         newStatus: {
           type: 'STRING',
-          enum: ['present', 'absent', 'late', 'makeup'],
-          description: '변경할 출결 상태: 출석(present)/결석(absent)/지각(late)/보강(makeup)',
+          enum: ['present', 'absent', 'makeup'],
+          description: '변경할 출결 상태: 출석(present)/결석(absent)/보강(makeup)',
         },
       },
       required: ['studentName', 'newStatus'],
@@ -227,7 +227,7 @@ function compactLines(lines: (string | false | null | undefined)[]) {
 }
 
 const ATTENDANCE_KO: Record<string, string> = {
-  present: '출석', absent: '결석', late: '지각', makeup: '보강',
+  present: '출석', absent: '결석', late: '출석', makeup: '보강',
 };
 
 async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<Json> {
@@ -295,13 +295,14 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       for (const r of attRes.data ?? []) {
         const sid = r.student_id as string;
         if (targetIds && !targetIds.has(sid)) continue;
-        const row = (acc[sid] ??= { name: nameById.get(sid) ?? '(알수없음)', present: 0, late: 0, absent: 0, makeup: 0, total: 0 });
+        const row = (acc[sid] ??= { name: nameById.get(sid) ?? '(알수없음)', present: 0, absent: 0, makeup: 0, total: 0 });
         const st = r.status as string;
-        if (st in row) (row[st] as number)++;
+        const normalizedStatus = st === 'late' ? 'present' : st;
+        if (normalizedStatus in row) (row[normalizedStatus] as number)++;
         row.total = (row.total as number) + 1;
       }
       const rows = Object.values(acc).map(r => {
-        const attended = (r.present as number) + (r.late as number) + (r.makeup as number);
+        const attended = (r.present as number) + (r.makeup as number);
         return { ...r, rate: (r.total as number) > 0 ? Math.round((attended / (r.total as number)) * 100) : 0 };
       }).sort((a, b) => (a.rate as number) - (b.rate as number));
       return { month, studentCount: rows.length, summary: rows };
@@ -439,13 +440,12 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
           .eq('student_id', student.id).like('date', `${month}%`).order('date', { ascending: false });
         if (error) throw error;
         const absences = (data ?? []).filter((r: Json) => r.status === 'absent');
-        const lates = (data ?? []).filter((r: Json) => r.status === 'late');
         return {
           found: true, kind, month, studentName: student.name,
-          absentCount: absences.length, lateCount: lates.length,
+          absentCount: absences.length,
           draft: compactLines([
             `${student.name} 학부모님, 안녕하세요. 그로잉영어입니다.`,
-            `${month} 출결 확인 결과 결석 ${absences.length}회, 지각 ${lates.length}회로 기록되어 안내드립니다.`,
+            `${month} 출결 확인 결과 결석 ${absences.length}회로 기록되어 안내드립니다.`,
             '수업 흐름이 끊기지 않도록 필요한 보강이나 학습 점검을 함께 챙기겠습니다.',
             extraNote, '확인하시고 궁금하신 점이 있으면 언제든 말씀 주세요.',
           ]),

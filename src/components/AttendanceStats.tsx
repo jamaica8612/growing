@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { Student, Class, Attendance, AttendanceStatus } from '../types';
+import type { Student, Class, Attendance, EditableAttendanceStatus } from '../types';
+import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown, Copy, Check, MessageSquare } from 'lucide-react';
 
 interface AttendanceStatsProps {
@@ -16,16 +17,14 @@ interface StudentRow {
   grade: string;
   parentContact: string;
   present: number;
-  late: number;
   absent: number;
   makeup: number;
   total: number;
-  rate: number; // 0-100, "출석 인정"(present+late+makeup) / total
+  rate: number; // 0-100, "출석 인정"(present+makeup) / total
 }
 
-const STATUS_META: Record<AttendanceStatus, { label: string; badge: string; color: string }> = {
+const STATUS_META: Record<EditableAttendanceStatus, { label: string; badge: string; color: string }> = {
   present: { label: '출석', badge: 'badge-present', color: 'var(--color-success)' },
-  late: { label: '지각', badge: 'badge-late', color: 'var(--color-warning)' },
   absent: { label: '결석', badge: 'badge-absent', color: 'var(--color-danger)' },
   makeup: { label: '보강', badge: 'badge-makeup', color: 'var(--color-info, #3b82f6)' },
 };
@@ -53,12 +52,12 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
 
   // Overall status totals for the selected month.
   const totals = useMemo(() => {
-    const t = { present: 0, late: 0, absent: 0, makeup: 0 };
+    const t = { present: 0, absent: 0, makeup: 0 };
     monthRecords.forEach(r => {
-      t[r.status] += 1;
+      t[normalizeAttendanceStatus(r.status)] += 1;
     });
-    const total = t.present + t.late + t.absent + t.makeup;
-    const attended = t.present + t.late + t.makeup;
+    const total = t.present + t.absent + t.makeup;
+    const attended = t.present + t.makeup;
     return { ...t, total, rate: total > 0 ? Math.round((attended / total) * 100) : 0 };
   }, [monthRecords]);
 
@@ -69,12 +68,12 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
       .filter(s => s.status === 'active')
       .map(s => {
         const records = monthRecords.filter(r => r.studentId === s.id);
-        const present = records.filter(r => r.status === 'present').length;
-        const late = records.filter(r => r.status === 'late').length;
-        const absent = records.filter(r => r.status === 'absent').length;
-        const makeup = records.filter(r => r.status === 'makeup').length;
+        const normalized = records.map(r => normalizeAttendanceStatus(r.status));
+        const present = normalized.filter(status => status === 'present').length;
+        const absent = normalized.filter(status => status === 'absent').length;
+        const makeup = normalized.filter(status => status === 'makeup').length;
         const total = records.length;
-        const attended = present + late + makeup;
+        const attended = present + makeup;
         return {
           studentId: s.id,
           name: s.name,
@@ -82,7 +81,6 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           grade: s.grade,
           parentContact: s.parentContact,
           present,
-          late,
           absent,
           makeup,
           total,
@@ -100,12 +98,12 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
   }, [students, monthRecords]);
 
   // Students needing follow-up: at least one record and rate < 80% or >= 3 absences.
-  const concernRows = studentRows.filter(r => r.total > 0 && (r.rate < 80 || r.absent >= 3 || r.late >= 3));
+  const concernRows = studentRows.filter(r => r.total > 0 && (r.rate < 80 || r.absent >= 3));
   const concernCount = concernRows.length;
 
   const monthNum = Number(selectedMonth.split('-')[1]);
   const monthLabel = `${selectedMonth.split('-')[0]}년 ${monthNum}월`;
-  const orderedStatuses: AttendanceStatus[] = ['present', 'late', 'absent', 'makeup'];
+  const orderedStatuses: EditableAttendanceStatus[] = ['present', 'absent', 'makeup'];
 
   // Build a parent-facing attendance summary message for one student. The
   // closing line softens or congratulates depending on the attendance level.
@@ -117,7 +115,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
     return (
       `안녕하세요, 그로잉영어입니다. 🌱\n\n` +
       `${row.name} 학생의 ${monthNum}월 출결 현황을 안내드립니다.\n\n` +
-      `- 출석 ${row.present}회 / 지각 ${row.late}회 / 결석 ${row.absent}회 / 보강 ${row.makeup}회\n` +
+      `- 출석 ${row.present}회 / 결석 ${row.absent}회 / 보강 ${row.makeup}회\n` +
       `- 출석률 ${row.rate}%\n\n` +
       closing
     );
@@ -195,9 +193,9 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
 
             <div className="card metric-card warning">
               <div className="metric-info">
-                <h4>지각</h4>
-                <div className="metric-value">{totals.late}건</div>
-                <div className="metric-sub">보강 {totals.makeup}건 별도</div>
+                <h4>보강</h4>
+                <div className="metric-value">{totals.makeup}건</div>
+                <div className="metric-sub">출석 인정 기록</div>
               </div>
               <div className="metric-icon-wrapper">
                 <CalendarRange size={24} />
@@ -208,7 +206,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
               <div className="metric-info">
                 <h4>관리 필요 학생</h4>
                 <div className="metric-value">{concernCount}명</div>
-                <div className="metric-sub">출석률 80% 미만 · 결석/지각 3회+</div>
+                <div className="metric-sub">출석률 80% 미만 · 결석 3회+</div>
               </div>
               <div className="metric-icon-wrapper">
                 <AlertTriangle size={24} />
@@ -224,7 +222,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                     <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} /> 출결 후속 관리 대상
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                    {monthLabel} 기준 출석률이 낮거나 결석/지각이 반복된 학생입니다. 안내문을 복사하거나 알림장 조립기로 넘겨 바로 다듬을 수 있습니다.
+                    {monthLabel} 기준 출석률이 낮거나 결석이 반복된 학생입니다. 안내문을 복사하거나 알림장 조립기로 넘겨 바로 다듬을 수 있습니다.
                   </p>
                 </div>
                 <span className="badge badge-absent" style={{ fontSize: '0.78rem' }}>{concernRows.length}명 확인 필요</span>
@@ -254,7 +252,6 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                     </div>
                     <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.76rem' }}>
                       <span className="badge badge-absent">결석 {row.absent}</span>
-                      <span className="badge badge-late">지각 {row.late}</span>
                       <span className="badge badge-present">출석 {row.present}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -321,7 +318,6 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                     <th style={{ width: '90px' }}>이름</th>
                     <th style={{ width: '130px' }}>학교 / 학년</th>
                     <th style={{ width: '60px', textAlign: 'center' }}>출석</th>
-                    <th style={{ width: '60px', textAlign: 'center' }}>지각</th>
                     <th style={{ width: '60px', textAlign: 'center' }}>결석</th>
                     <th style={{ width: '60px', textAlign: 'center' }}>보강</th>
                     <th style={{ minWidth: '160px' }}>출석률</th>
@@ -336,7 +332,6 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                         {row.school || '교습소'} · {row.grade.split(' ')[1] || row.grade}
                       </td>
                       <td style={{ textAlign: 'center' }}>{row.present}</td>
-                      <td style={{ textAlign: 'center', color: row.late > 0 ? 'var(--color-warning)' : undefined }}>{row.late}</td>
                       <td style={{ textAlign: 'center', fontWeight: row.absent > 0 ? 700 : 400, color: row.absent > 0 ? 'var(--color-danger)' : undefined }}>{row.absent}</td>
                       <td style={{ textAlign: 'center' }}>{row.makeup}</td>
                       <td>
@@ -407,7 +402,6 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
 
                   <div className="mobile-stat-strip">
                     <span className="badge badge-present">출석 {row.present}</span>
-                    <span className="badge badge-late">지각 {row.late}</span>
                     <span className="badge badge-absent">결석 {row.absent}</span>
                     <span className="badge badge-makeup">보강 {row.makeup}</span>
                   </div>
@@ -433,7 +427,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
               ))}
             </div>
             <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.85rem' }}>
-              ※ 출석률 = (출석 + 지각 + 보강) ÷ 전체 기록. 활성 재원생 {studentRows.length}명 기준이며, 보강은 출석으로 인정합니다.
+              ※ 출석률 = (출석 + 보강) ÷ 전체 기록. 활성 재원생 {studentRows.length}명 기준이며, 보강은 출석으로 인정합니다.
             </p>
           </div>
 

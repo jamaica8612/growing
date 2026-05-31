@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import type { Attendance, AttendanceStatus } from '../types';
+import type { Attendance, EditableAttendanceStatus } from '../types';
+import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 
 interface AttendanceCalendarProps {
   attendance: Attendance[];
@@ -11,14 +12,13 @@ interface AttendanceCalendarProps {
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 // 출결 상태별 표시 색상(기존 디자인 토큰 재사용)과 라벨.
-const STATUS_META: { key: AttendanceStatus; label: string; color: string }[] = [
+const STATUS_META: { key: EditableAttendanceStatus; label: string; color: string }[] = [
   { key: 'present', label: '출석', color: 'var(--color-success)' },
-  { key: 'late', label: '지각', color: 'var(--color-warning)' },
   { key: 'absent', label: '결석', color: 'var(--color-danger)' },
   { key: 'makeup', label: '보강', color: 'var(--color-info)' },
 ];
 
-type DayCounts = Record<AttendanceStatus, number>;
+type DayCounts = Record<EditableAttendanceStatus, number>;
 
 // 기존 출결 데이터를 월간 달력 그리드로 시각화한다. 신규 데이터 없이
 // attendance 배열을 날짜별로 집계만 한다. 날짜 클릭 시 상위로 알린다.
@@ -33,8 +33,8 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     const map: Record<string, DayCounts> = {};
     for (const a of attendance) {
       if (!a.date.startsWith(month)) continue;
-      const day = (map[a.date] ??= { present: 0, late: 0, absent: 0, makeup: 0 });
-      if (a.status in day) day[a.status]++;
+      const day = (map[a.date] ??= { present: 0, absent: 0, makeup: 0 });
+      day[normalizeAttendanceStatus(a.status)]++;
     }
     return map;
   }, [attendance, month]);
@@ -54,10 +54,9 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
   }, [month]);
 
   const monthTotal = useMemo(() => {
-    const total: DayCounts = { present: 0, late: 0, absent: 0, makeup: 0 };
+    const total: DayCounts = { present: 0, absent: 0, makeup: 0 };
     for (const counts of Object.values(countsByDate)) {
       total.present += counts.present;
-      total.late += counts.late;
       total.absent += counts.absent;
       total.makeup += counts.makeup;
     }

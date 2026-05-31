@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
-import { UserPlus, Search, Edit2, Trash2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone } from 'lucide-react';
+import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, GraduationCap, Phone, UserX } from 'lucide-react';
+import { isAttendedStatus, normalizeAttendanceStatus } from '../lib/attendanceStatus';
 
 interface StudentsProps {
   students: Student[];
@@ -10,7 +11,7 @@ interface StudentsProps {
   counselLogs: CounselLog[];
   onAddStudent: (student: Omit<Student, 'id'>) => void;
   onUpdateStudent: (student: Student) => void;
-  onDeleteStudent: (id: string) => void;
+  onWithdrawStudent: (id: string) => void;
   onAddCounselLog: (log: Omit<CounselLog, 'id'>) => void;
   onUpdateCounselLog: (log: CounselLog) => void;
 }
@@ -23,7 +24,7 @@ export const Students: React.FC<StudentsProps> = ({
   counselLogs,
   onAddStudent,
   onUpdateStudent,
-  onDeleteStudent,
+  onWithdrawStudent,
   onAddCounselLog,
   onUpdateCounselLog,
 }) => {
@@ -199,12 +200,17 @@ export const Students: React.FC<StudentsProps> = ({
     setShowLogForm(false);
   };
 
-  // Delete handler
-  const handleDeleteClick = (id: string, name: string, e: React.MouseEvent) => {
+  // Withdraw handler: keep historical records, but remove the student from active operations.
+  const handleWithdrawClick = (student: Student, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm(`정말로 ${name} 학생을 삭제하시겠습니까?\n삭제 시 출결 및 원비 기록이 유지되지 않을 수 있습니다.`)) {
-      onDeleteStudent(id);
-      if (activeDetailStudent?.id === id) {
+    if (student.status === 'inactive') {
+      alert('이미 퇴원 처리된 학생입니다.');
+      return;
+    }
+    if (window.confirm(`${student.name} 학생을 퇴원 처리하시겠습니까?\n출결·수납·상담 기록은 보존되고, 현재 반 배정과 이후 출석/청구 대상에서만 제외됩니다.`)) {
+      onWithdrawStudent(student.id);
+      if (activeDetailStudent?.id === student.id) {
+        setActiveDetailStudent({ ...activeDetailStudent, status: 'inactive' });
         setIsDetailOpen(false);
       }
     }
@@ -259,7 +265,7 @@ export const Students: React.FC<StudentsProps> = ({
   const calculateAttendanceRate = (studentId: string) => {
     const records = getStudentAttendance(studentId);
     if (records.length === 0) return 0;
-    const attended = records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'makeup').length;
+    const attended = records.filter(r => isAttendedStatus(r.status)).length;
     return Math.round((attended / records.length) * 100);
   };
 
@@ -397,10 +403,11 @@ export const Students: React.FC<StudentsProps> = ({
                         </button>
                         <button
                           className="btn-icon-only text-danger"
-                          title="삭제"
-                          onClick={e => handleDeleteClick(student.id, student.name, e)}
+                          title="퇴원 처리"
+                          onClick={e => handleWithdrawClick(student, e)}
+                          disabled={student.status === 'inactive'}
                         >
-                          <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
+                          <UserX size={16} style={{ color: 'var(--color-danger)' }} />
                         </button>
                       </div>
                     </td>
@@ -458,8 +465,8 @@ export const Students: React.FC<StudentsProps> = ({
                   <button className="btn btn-secondary" onClick={e => handleOpenEdit(student, e)}>
                     <Edit2 size={14} /> 수정
                   </button>
-                  <button className="btn btn-danger" onClick={e => handleDeleteClick(student.id, student.name, e)}>
-                    <Trash2 size={14} /> 삭제
+                  <button className="btn btn-danger" onClick={e => handleWithdrawClick(student, e)} disabled={student.status === 'inactive'}>
+                    <UserX size={14} /> 퇴원 처리
                   </button>
                 </div>
               </div>
@@ -736,11 +743,11 @@ export const Students: React.FC<StudentsProps> = ({
                                   <span className={`badge ${
                                     att.status === 'present' ? 'badge-present' :
                                     att.status === 'absent' ? 'badge-absent' :
-                                    att.status === 'late' ? 'badge-late' : 'badge-makeup'
+                                    normalizeAttendanceStatus(att.status) === 'makeup' ? 'badge-makeup' : 'badge-present'
                                   }`} style={{ fontSize: '0.65rem' }}>
                                     {att.status === 'present' ? '출석' :
                                      att.status === 'absent' ? '결석' :
-                                     att.status === 'late' ? '지각' : '보강'}
+                                     normalizeAttendanceStatus(att.status) === 'makeup' ? '보강' : '출석'}
                                   </span>
                                 </td>
                                 <td>{att.memo || '-'}</td>
@@ -1154,11 +1161,11 @@ export const Students: React.FC<StudentsProps> = ({
                       a.date.startsWith(reportMonth)
                     );
                     const totalDays = monthAttendance.length;
-                    const presentDays = monthAttendance.filter(a => a.status === 'present').length;
-                    const lateDays = monthAttendance.filter(a => a.status === 'late').length;
-                    const makeupDays = monthAttendance.filter(a => a.status === 'makeup').length;
-                    const absentDays = monthAttendance.filter(a => a.status === 'absent').length;
-                    const attendedDays = presentDays + lateDays + makeupDays;
+                    const normalizedAttendance = monthAttendance.map(a => normalizeAttendanceStatus(a.status));
+                    const presentDays = normalizedAttendance.filter(status => status === 'present').length;
+                    const makeupDays = normalizedAttendance.filter(status => status === 'makeup').length;
+                    const absentDays = normalizedAttendance.filter(status => status === 'absent').length;
+                    const attendedDays = presentDays + makeupDays;
                     const attendanceRate = totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 100;
 
                     const monthTests = counselLogs.filter(log => 
@@ -1290,14 +1297,10 @@ export const Students: React.FC<StudentsProps> = ({
                                 </div>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginTop: '0.6rem', textAlign: 'center' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', marginTop: '0.6rem', textAlign: 'center' }}>
                                 <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
                                   <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>출석</div>
                                   <strong style={{ color: 'var(--color-success)' }}>{presentDays}회</strong>
-                                </div>
-                                <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
-                                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>지각</div>
-                                  <strong style={{ color: 'var(--color-warning)' }}>{lateDays}회</strong>
                                 </div>
                                 <div style={{ padding: '0.4rem', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.75rem' }}>
                                   <div style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>결석</div>
@@ -1394,9 +1397,10 @@ export const Students: React.FC<StudentsProps> = ({
               <button
                 className="btn btn-danger"
                 style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem' }}
-                onClick={(e) => handleDeleteClick(activeDetailStudent.id, activeDetailStudent.name, e)}
+                onClick={(e) => handleWithdrawClick(activeDetailStudent, e)}
+                disabled={activeDetailStudent.status === 'inactive'}
               >
-                학생 삭제
+                퇴원 처리
               </button>
               <button className="btn btn-primary" style={{ padding: '0.45rem 1rem' }} onClick={() => setIsDetailOpen(false)}>
                 닫기

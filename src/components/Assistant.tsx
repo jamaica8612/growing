@@ -12,7 +12,7 @@ interface AssistantProps {
 }
 
 const ATTENDANCE_KO: Record<string, string> = {
-  present: '출석', absent: '결석', late: '지각', makeup: '보강', '(기록없음)': '기록없음',
+  present: '출석', absent: '결석', late: '출석', makeup: '보강', '(기록없음)': '기록없음',
 };
 
 const ACTION_TITLE: Record<PendingAction['type'], string> = {

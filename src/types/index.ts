@@ -25,6 +25,7 @@ export interface Class {
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'makeup';
+export type EditableAttendanceStatus = Exclude<AttendanceStatus, 'late'>;
 export type HomeworkStatus = 'done' | 'incomplete' | 'undone' | '';
 
 export interface Attendance {

@@ -73,20 +73,17 @@ export function useAcademyData(userId: string) {
       setStudents(prev => prev.map(p => (p.id === st.id ? st : p)));
     });
 
-  const handleDeleteStudent = (id: string) =>
+  const handleWithdrawStudent = (id: string) =>
     guard(async () => {
-      await api.deleteStudent(id); // cascades attendance/payments/logs/alerts
+      const student = students.find(s => s.id === id);
+      if (!student) return;
+      const updatedStudent = await api.updateStudent({ ...student, status: 'inactive' });
       const affectedClasses = classes.filter(c => c.studentIds.includes(id));
       await Promise.all(
         affectedClasses.map(c => api.updateClass({ ...c, studentIds: c.studentIds.filter(sid => sid !== id) }))
       );
       setClasses(prev => prev.map(c => ({ ...c, studentIds: c.studentIds.filter(sid => sid !== id) })));
-      setStudents(prev => prev.filter(p => p.id !== id));
-      setAttendance(prev => prev.filter(a => a.studentId !== id));
-      setPayments(prev => prev.filter(p => p.studentId !== id));
-      setCounselLogs(prev => prev.filter(l => l.studentId !== id));
-      setKioskAlerts(prev => prev.filter(a => a.studentId !== id));
-      setHomeworkAlerts(prev => prev.filter(a => a.studentId !== id));
+      setStudents(prev => prev.map(p => (p.id === id ? updatedStudent : p)));
     });
 
   // ---- Classes ----
@@ -344,7 +341,7 @@ export function useAcademyData(userId: string) {
     messageTemplates,
     handleAddStudent,
     handleUpdateStudent,
-    handleDeleteStudent,
+    handleWithdrawStudent,
     handleAddClass,
     handleUpdateClass,
     handleDeleteClass,

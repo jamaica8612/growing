@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, DayOfWeek, HomeworkStatus } from '../types';
 import { Users, BookOpen, CreditCard, AlertCircle, Copy, Check, Clock, Calendar, ClipboardCheck } from 'lucide-react';
+import { isAttendedStatus } from '../lib/attendanceStatus';
 
 interface DashboardProps {
   students: Student[];
@@ -48,12 +49,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Selected date attendance rate.
   const selectedAttendanceRecords = attendance.filter(a => a.date === selectedDate);
   const totalExpectedAttendance = selectedClasses.reduce((sum, c) => sum + c.studentIds.length, 0);
-  const presentOrLateCount = selectedAttendanceRecords.filter(
-    a => a.status === 'present' || a.status === 'late'
-  ).length;
+  const attendedCount = selectedAttendanceRecords.filter(a => isAttendedStatus(a.status)).length;
 
   const attendanceRate = totalExpectedAttendance > 0 
-    ? Math.round((presentOrLateCount / totalExpectedAttendance) * 100) 
+    ? Math.round((attendedCount / totalExpectedAttendance) * 100) 
     : 100;
 
   // List of unpaid students with details for SMS copy
@@ -160,7 +159,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h4>선택일 등원율</h4>
             <div className="metric-value">{attendanceRate}%</div>
             <div className="metric-sub">
-              {presentOrLateCount} / {totalExpectedAttendance} 명 등원 완료
+              {attendedCount} / {totalExpectedAttendance} 명 등원 완료
             </div>
           </div>
           <div className="metric-icon-wrapper">

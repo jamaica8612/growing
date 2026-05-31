@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import type { Student, Class, Attendance, AttendanceStatus, HomeworkStatus } from '../types';
+import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus } from '../types';
 import { Calendar, Clock, Save, MessageSquare, Send, Check, LogIn, LogOut } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 import { AttendanceCalendar } from './AttendanceCalendar';
+import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 
 interface AttendanceProps {
   attendance: Attendance[];
@@ -116,14 +117,14 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   };
 
   // Handle status update
-  const handleStatusChange = (studentId: string, classId: string, status: AttendanceStatus) => {
+  const handleStatusChange = (studentId: string, classId: string, status: EditableAttendanceStatus) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
     const currentMemo =
       attendanceMemos[`${studentId}-${classId}`] ??
       record?.memo ??
       '';
     const shouldStampCheckIn =
-      selectedDate === todayDateStr && (status === 'present' || status === 'late') && !record?.checkInTime;
+      selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
     onSaveAttendance({
       studentId,
       classId,
@@ -195,7 +196,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         grade: string;
         present: number;
         absent: number;
-        late: number;
         makeup: number;
         total: number;
       };
@@ -209,7 +209,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         grade: s.grade,
         present: 0,
         absent: 0,
-        late: 0,
         makeup: 0,
         total: 0,
       };
@@ -220,7 +219,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       .filter(a => a.date.startsWith(reportMonth))
       .forEach(a => {
         if (reportData[a.studentId]) {
-          reportData[a.studentId][a.status]++;
+          reportData[a.studentId][normalizeAttendanceStatus(a.status)]++;
           reportData[a.studentId].total++;
         }
       });
@@ -298,7 +297,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
               ) : (
                 targetList.map(({ student, class: cls }) => {
                   const record = getAttendanceRecord(student.id, cls.id, selectedDate);
-                  const currentStatus = record?.status;
+                  const currentStatus = record ? normalizeAttendanceStatus(record.status) : undefined;
                   const currentHomework = record?.homeworkStatus || '';
                   const memoKey = `${student.id}-${cls.id}`;
 
@@ -346,12 +345,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             onClick={() => handleStatusChange(student.id, cls.id, 'absent')}
                           >
                             결석
-                          </button>
-                          <button
-                            className={`btn-att-select ${currentStatus === 'late' ? 'active-late' : ''}`}
-                            onClick={() => handleStatusChange(student.id, cls.id, 'late')}
-                          >
-                            지각
                           </button>
                           <button
                             className={`btn-att-select ${currentStatus === 'makeup' ? 'active-makeup' : ''}`}
@@ -471,7 +464,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           ) : (
             targetList.map(({ student, class: cls }) => {
               const record = getAttendanceRecord(student.id, cls.id, selectedDate);
-              const currentStatus = record?.status;
+              const currentStatus = record ? normalizeAttendanceStatus(record.status) : undefined;
               const currentHomework = record?.homeworkStatus || '';
               const memoKey = `${student.id}-${cls.id}`;
 
@@ -514,7 +507,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                     <div className="quick-att-buttons">
                       <button className={`btn-att-select ${currentStatus === 'present' ? 'active-present' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'present')}>출석</button>
                       <button className={`btn-att-select ${currentStatus === 'absent' ? 'active-absent' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'absent')}>결석</button>
-                      <button className={`btn-att-select ${currentStatus === 'late' ? 'active-late' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'late')}>지각</button>
                       <button className={`btn-att-select ${currentStatus === 'makeup' ? 'active-makeup' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'makeup')}>보강</button>
                     </div>
                   </div>
@@ -625,7 +617,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                 <th>학생 이름</th>
                 <th>학교 / 학년</th>
                 <th style={{ textAlign: 'center', color: 'var(--color-success)' }}>출석</th>
-                <th style={{ textAlign: 'center', color: 'var(--color-warning)' }}>지각</th>
                 <th style={{ textAlign: 'center', color: 'var(--color-danger)' }}>결석</th>
                 <th style={{ textAlign: 'center', color: 'var(--color-info)' }}>보강</th>
                 <th style={{ textAlign: 'center', fontWeight: 700 }}>출결 진행률</th>
@@ -634,20 +625,19 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
             <tbody>
               {monthlyReport.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
                     등록된 재원생이 없습니다.
                   </td>
                 </tr>
               ) : (
                 monthlyReport.map(row => {
-                  const attended = row.present + row.late + row.makeup;
+                  const attended = row.present + row.makeup;
                   const rate = row.total > 0 ? Math.round((attended / row.total) * 100) : 100;
                   return (
                     <tr key={row.name}>
                       <td style={{ fontWeight: 700 }}>{row.name}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{row.school} {row.grade.split(' ')[1] || row.grade}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-success)' }}>{row.present}회</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-warning)' }}>{row.late}회</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-danger)' }}>{row.absent}회</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-info)' }}>{row.makeup}회</td>
                       <td style={{ textAlign: 'center' }}>

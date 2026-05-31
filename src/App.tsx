@@ -251,7 +251,7 @@ function AcademyApp({ session }: { session: Session }) {
             counselLogs={counselLogs}
             onAddStudent={data.handleAddStudent}
             onUpdateStudent={data.handleUpdateStudent}
-            onDeleteStudent={data.handleDeleteStudent}
+            onWithdrawStudent={data.handleWithdrawStudent}
             onAddCounselLog={data.handleAddCounselLog}
             onUpdateCounselLog={data.handleUpdateCounselLog}
           />
