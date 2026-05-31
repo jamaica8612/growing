@@ -76,6 +76,7 @@ const toClass = (r: Row): Class => ({
   tuitionFee: (r.tuition_fee as number) ?? 0,
   tuitionOverrides: toTuitionOverrides(r.tuition_overrides),
   studentIds: (r.student_ids as string[]) ?? [],
+  color: (r.color as string) ?? undefined,
 });
 
 const toAttendance = (r: Row): Attendance => ({
@@ -231,6 +232,7 @@ export const api = {
         tuition_fee: data.tuitionFee,
         tuition_overrides: data.tuitionOverrides ?? {},
         student_ids: data.studentIds,
+        color: data.color ?? null,
       })
       .select()
       .single();
@@ -252,6 +254,7 @@ export const api = {
         tuition_fee: cls.tuitionFee,
         tuition_overrides: cls.tuitionOverrides ?? {},
         student_ids: cls.studentIds,
+        color: cls.color ?? null,
       })
       .eq('id', cls.id)
       .select()
