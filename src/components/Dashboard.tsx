@@ -294,7 +294,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 🏡 하원{departureTime ? ` ${departureTime}` : ''}
                               </button>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', marginTop: '0.45rem' }}>
+                            <div className="quick-att-time-inputs">
                               <input
                                 type="time"
                                 className="form-control"
@@ -376,7 +376,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     gap: '0.5rem',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div>
                       <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
                         {item.studentName} 어머니

@@ -1218,6 +1218,13 @@ body {
   flex-wrap: wrap;
 }
 
+.quick-att-time-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+}
+
 .btn-att-select {
   padding: 0.3rem 0.5rem;
   font-size: 0.75rem;
@@ -1937,6 +1944,15 @@ body {
     text-align: right;
     word-break: keep-all;
     overflow-wrap: break-word;
+  }
+
+  .quick-att-time-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-att-buttons > .btn-att-select {
+    flex: 1 1 60px;
+    justify-content: center;
   }
 }
 
