@@ -275,7 +275,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         </div>
 
         {/* Attendance Sheet */}
-        <div className="table-wrapper">
+        <div className="table-wrapper attendance-desktop-table">
           <table className="custom-table">
             <thead>
               <tr>
@@ -461,6 +461,114 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="attendance-mobile-list">
+          {targetList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--color-text-secondary)' }}>
+              🌱 이 조건으로 활성화된 원생이 없습니다. [반/시간표 관리]에서 수강 학생을 지정해 주세요.
+            </div>
+          ) : (
+            targetList.map(({ student, class: cls }) => {
+              const record = getAttendanceRecord(student.id, cls.id, selectedDate);
+              const currentStatus = record?.status;
+              const currentHomework = record?.homeworkStatus || '';
+              const memoKey = `${student.id}-${cls.id}`;
+
+              return (
+                <div key={`${student.id}-${cls.id}-mobile`} className="attendance-mobile-card">
+                  <div className="attendance-mobile-card-header">
+                    <div>
+                      <strong>{student.name}</strong>
+                      <div>{cls.name}</div>
+                      <span>{student.school || '교습소'} • {student.grade.split(' ')[1] || student.grade}</span>
+                    </div>
+                    {(record?.checkInTime || record?.checkOutTime) && (
+                      <div className="attendance-mobile-times">
+                        {record?.checkInTime && <span>등원 {record.checkInTime}</span>}
+                        {record?.checkOutTime && <span>하원 {record.checkOutTime}</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="attendance-mobile-section">
+                    <div className="attendance-mobile-label">등하원</div>
+                    <div className="quick-att-buttons">
+                      <button
+                        className={`btn-att-select ${record?.checkInTime ? 'active-present' : ''}`}
+                        onClick={() => handleArrival(student.id, cls.id)}
+                      >
+                        <LogIn size={12} /> 등원{record?.checkInTime ? ` ${record.checkInTime}` : ''}
+                      </button>
+                      <button
+                        className={`btn-att-select ${record?.checkOutTime ? 'active-makeup' : ''}`}
+                        onClick={() => handleDeparture(student.id, cls.id)}
+                      >
+                        <LogOut size={12} /> 하원{record?.checkOutTime ? ` ${record.checkOutTime}` : ''}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="attendance-mobile-section">
+                    <div className="attendance-mobile-label">출결</div>
+                    <div className="quick-att-buttons">
+                      <button className={`btn-att-select ${currentStatus === 'present' ? 'active-present' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'present')}>출석</button>
+                      <button className={`btn-att-select ${currentStatus === 'absent' ? 'active-absent' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'absent')}>결석</button>
+                      <button className={`btn-att-select ${currentStatus === 'late' ? 'active-late' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'late')}>지각</button>
+                      <button className={`btn-att-select ${currentStatus === 'makeup' ? 'active-makeup' : ''}`} onClick={() => handleStatusChange(student.id, cls.id, 'makeup')}>보강</button>
+                    </div>
+                  </div>
+
+                  <div className="attendance-mobile-section">
+                    <div className="attendance-mobile-label">숙제</div>
+                    <div className="quick-att-buttons">
+                      <button className={`btn-att-select ${currentHomework === 'done' ? 'active-present' : ''}`} onClick={() => handleHomeworkChange(student.id, cls.id, 'done')}>완료</button>
+                      <button className={`btn-att-select ${currentHomework === 'incomplete' ? 'active-late' : ''}`} onClick={() => handleHomeworkChange(student.id, cls.id, 'incomplete')}>미흡</button>
+                      <button className={`btn-att-select ${currentHomework === 'undone' ? 'active-absent' : ''}`} onClick={() => handleHomeworkChange(student.id, cls.id, 'undone')}>안함</button>
+                    </div>
+                  </div>
+
+                  {currentHomework && (
+                    <div className="attendance-mobile-section">
+                      <div className="attendance-mobile-label">알림</div>
+                      <div className="quick-att-buttons">
+                        <button className="btn btn-secondary attendance-mobile-action" onClick={() => handleCopyHomeworkMessage(student.name, currentHomework, memoKey)}>
+                          {copiedStatusKey === memoKey ? <><Check size={12} className="text-success" /> 복사됨</> : <><MessageSquare size={12} /> 카톡</>}
+                        </button>
+                        {onQueueHomeworkAlert && (
+                          <button className="btn btn-secondary attendance-mobile-action" onClick={() => handleQueueHomeworkAlert(student.id, currentHomework)}>
+                            <MessageSquare size={12} /> 알림장
+                          </button>
+                        )}
+                        {student.parentContact && (
+                          <a className="btn btn-primary attendance-mobile-action" href={getSMSLink(student.parentContact, student.name, currentHomework)}>
+                            <Send size={12} /> 문자
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="attendance-mobile-section">
+                    <div className="attendance-mobile-label">메모</div>
+                    <div style={{ display: 'flex', gap: '0.45rem' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.6rem' }}
+                        placeholder="특이사항 메모"
+                        value={attendanceMemos[memoKey] ?? record?.memo ?? ''}
+                        onChange={e => handleMemoChange(student.id, cls.id, e.target.value)}
+                      />
+                      <button className="btn-icon-only" title="메모 저장" onClick={() => handleSaveMemo(student.id, cls.id)}>
+                        <Save size={16} className="text-primary" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

@@ -138,7 +138,7 @@ export const Classes: React.FC<ClassesProps> = ({
       
       {/* Visual Timetable Scheduler */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div className="section-title-row">
           <h3 className="card-title" style={{ marginBottom: 0 }}>
             <Calendar size={20} className="text-primary" /> 주간 강의 시간표 (월 ~ 금)
           </h3>
