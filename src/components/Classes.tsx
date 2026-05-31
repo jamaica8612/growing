@@ -390,7 +390,7 @@ export const Classes: React.FC<ClassesProps> = ({
       {/* Modal: Add/Edit Class */}
       {isFormOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '600px' }}>
+          <div className="modal-content" style={{ maxWidth: 'min(600px, calc(100vw - 1.5rem))' }}>
             <div className="modal-header">
               <h3 className="modal-title">
                 {editingClass ? `${editingClass.name} 정보 수정` : '새로운 클래스 개설'}
