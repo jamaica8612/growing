@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, DayOfWeek, HomeworkStatus } from '../types';
-import { Users, BookOpen, CreditCard, AlertCircle, Copy, Check, Clock, Calendar, ClipboardCheck } from 'lucide-react';
-import { isAttendedStatus } from '../lib/attendanceStatus';
+import { AlertCircle, Copy, Check, Clock, Calendar, ClipboardCheck } from 'lucide-react';
 import { getSchedulesForDay } from '../lib/classSchedules';
 
 interface DashboardProps {
@@ -33,9 +32,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Active students
   const activeStudents = students.filter(s => s.status === 'active');
-  const activeCount = activeStudents.length;
-  const pausedCount = students.filter(s => s.status === 'paused').length;
-  const inactiveCount = students.filter(s => s.status === 'inactive').length;
   // 출결 대상은 재원생만. 휴원/퇴원생은 출석 집계와 출결판에서 제외한다.
   const activeStudentIds = new Set(activeStudents.map(s => s.id));
 
@@ -65,14 +61,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   });
   const totalExpectedAttendance = expectedPairs.size;
-  const attendedCount = selectedAttendanceRecords.filter(
-    a => isAttendedStatus(a.status) && expectedPairs.has(`${a.classId}|${a.studentId}`)
-  ).length;
-
-  const attendanceRate = totalExpectedAttendance > 0
-    ? Math.round((attendedCount / totalExpectedAttendance) * 100)
-    : 100;
-
   // ---- 오늘의 브리핑 (규칙 기반·토큰 0) ----
   // 이미 로드된 데이터로 즉석 계산해, AI 호출 없이 매 진입마다 무료로 보여준다.
   const checkedPairCount = selectedAttendanceRecords.filter(a => expectedPairs.has(`${a.classId}|${a.studentId}`)).length;
@@ -231,57 +219,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </li>
           )}
         </ul>
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid-container cols-4" style={{ marginBottom: '2rem' }}>
-        <div className="card metric-card">
-          <div className="metric-info">
-            <h4>재원생 수</h4>
-            <div className="metric-value">{activeCount}명</div>
-            <div className="metric-sub">
-              휴원 {pausedCount} · 퇴원 {inactiveCount} (총 {students.length}명)
-            </div>
-          </div>
-          <div className="metric-icon-wrapper">
-            <Users size={24} />
-          </div>
-        </div>
-
-        <div className="card metric-card accent-mint">
-          <div className="metric-info">
-            <h4>선택일 수업</h4>
-            <div className="metric-value">{selectedClasses.length}개 반</div>
-            <div className="metric-sub">요일: {selectedDay}요일</div>
-          </div>
-          <div className="metric-icon-wrapper">
-            <BookOpen size={24} />
-          </div>
-        </div>
-
-        <div className="card metric-card accent-sage">
-          <div className="metric-info">
-            <h4>선택일 등원율</h4>
-            <div className="metric-value">{attendanceRate}%</div>
-            <div className="metric-sub">
-              {attendedCount} / {totalExpectedAttendance} 명 등원 완료
-            </div>
-          </div>
-          <div className="metric-icon-wrapper">
-            <Calendar size={24} />
-          </div>
-        </div>
-
-        <div className="card metric-card danger">
-          <div className="metric-info">
-            <h4>미납 교육비</h4>
-            <div className="metric-value">{unpaidCount}건</div>
-            <div className="metric-sub">{totalUnpaid.toLocaleString()}원 미납 상태</div>
-          </div>
-          <div className="metric-icon-wrapper">
-            <CreditCard size={24} />
-          </div>
-        </div>
       </div>
 
       {/* Main Grid: Selected Date Attendance & Unpaid Bills */}
