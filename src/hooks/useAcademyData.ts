@@ -3,6 +3,7 @@ import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, Homew
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
+import type { PayssamRow } from '../lib/payssam';
 
 // Centralises all academy data: loads it from Supabase for the signed-in owner
 // and exposes the same handler surface the UI used with localStorage, so the
@@ -219,6 +220,54 @@ export function useAcademyData(userId: string) {
       setPayments(prev => [...prev, created]);
     });
 
+  // 결제선생 발송수납내역 가져오기.
+  // 매칭된 학생만 처리: 이미 해당 월 청구서 있으면 납부상태 업데이트, 없으면 신규 생성.
+  // 같은 학생+월 중복 행은 첫 번째만 처리(건너뜀 집계).
+  const handleImportPayssam = (matchedRows: (PayssamRow & { studentId: string })[]) =>
+    guard(async () => {
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const seen = new Set<string>(); // studentId:month 중복 방지
+
+      for (const row of matchedRows) {
+        const key = `${row.studentId}:${row.month}`;
+        if (seen.has(key)) { skipped++; continue; }
+        seen.add(key);
+
+        const existing = payments.find(
+          p => p.studentId === row.studentId && p.billingMonth === row.month,
+        );
+
+        if (existing) {
+          if (row.isPaid && existing.status !== 'paid') {
+            const up = await api.updatePayment(existing.id, {
+              status: 'paid',
+              paymentDate: row.paymentDate || new Date().toISOString().split('T')[0],
+              paymentMethod: row.paymentMethod || 'card',
+            });
+            setPayments(prev => prev.map(p => (p.id === up.id ? up : p)));
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          const newP = await api.insertPayment({
+            studentId: row.studentId,
+            billingMonth: row.month,
+            amount: row.amount,
+            status: row.isPaid ? 'paid' : 'unpaid',
+            paymentDate: row.isPaid ? row.paymentDate || undefined : undefined,
+            paymentMethod: row.isPaid ? row.paymentMethod || undefined : undefined,
+          });
+          setPayments(prev => [...prev, newP]);
+          created++;
+        }
+      }
+
+      return { created, updated, skipped };
+    });
+
   // ---- Counsel logs ----
   const handleAddCounselLog = (data: Omit<CounselLog, 'id'>) =>
     guard(async () => {
@@ -392,6 +441,7 @@ export function useAcademyData(userId: string) {
     handleCancelPayment,
     handleDeletePayment,
     handleAddManualPayment,
+    handleImportPayssam,
     handleAddCounselLog,
     handleUpdateCounselLog,
     handleDeleteCounselLog,
