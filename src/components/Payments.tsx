@@ -18,25 +18,35 @@ interface PaymentsProps {
   onImportPayssam: (rows: MatchedRow[]) => Promise<{ created: number; updated: number; skipped: number } | undefined>;
 }
 
-/* 수납률 링 */
 function Ring({ value, total, size = 52, stroke = 6 }: { value: number; total: number; size?: number; stroke?: number }) {
   const pct = total > 0 ? value / total : 0;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
+
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e3ece7" strokeWidth={stroke} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
         stroke={pct >= 1 ? 'var(--color-accent-mint)' : 'var(--color-primary)'}
-        strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={c} strokeDashoffset={c * (1 - pct)}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - pct)}
         style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(.16,1,.3,1)' }}
       />
     </svg>
   );
 }
 
-const METHOD_LABEL: Record<string, string> = { card: '카드', cash: '현금', transfer: '계좌이체' };
+const METHOD_LABEL: Record<string, string> = {
+  card: '카드',
+  cash: '현금',
+  transfer: '계좌이체',
+};
 
 export const Payments: React.FC<PaymentsProps> = ({
   payments,
@@ -68,20 +78,21 @@ export const Payments: React.FC<PaymentsProps> = ({
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('card');
 
-  const filteredPayments = payments
-    .filter(p => p.billingMonth === selectedMonth)
+  const monthPayments = payments.filter(p => p.billingMonth === selectedMonth);
+  const filteredPayments = monthPayments
     .filter(p => {
       const student = students.find(s => s.id === p.studentId);
       if (!student) return false;
-      const matchesSearch = student.name.toLowerCase().includes(search.toLowerCase()) || student.school.toLowerCase().includes(search.toLowerCase());
+      const keyword = search.trim().toLowerCase();
+      const matchesSearch = !keyword || student.name.toLowerCase().includes(keyword) || student.school.toLowerCase().includes(keyword);
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
 
-  const totalPaid = payments.filter(p => p.billingMonth === selectedMonth && p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalUnpaid = payments.filter(p => p.billingMonth === selectedMonth && p.status === 'unpaid').reduce((sum, p) => sum + p.amount, 0);
-  const billingCount = payments.filter(p => p.billingMonth === selectedMonth).length;
-  const paidCount = payments.filter(p => p.billingMonth === selectedMonth && p.status === 'paid').length;
+  const totalPaid = monthPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
+  const totalUnpaid = monthPayments.filter(p => p.status === 'unpaid').reduce((sum, p) => sum + p.amount, 0);
+  const billingCount = monthPayments.length;
+  const paidCount = monthPayments.filter(p => p.status === 'paid').length;
   const totalExpected = totalPaid + totalUnpaid;
   const paymentRate = billingCount > 0 ? Math.round((paidCount / billingCount) * 100) : 0;
 
@@ -96,14 +107,14 @@ export const Payments: React.FC<PaymentsProps> = ({
       months.push(d.toISOString().substring(0, 7));
     }
     return months.map(m => ({
-      label: `${m.split('-')[1]}월`,
+      label: `${Number(m.split('-')[1])}월`,
       value: payments.filter(p => p.billingMonth === m && p.status === 'paid').reduce((sum, p) => sum + p.amount, 0),
       rawMonth: m,
     }));
   })();
   const maxHistoryValue = Math.max(...revenueHistory.map(h => h.value), 1);
-
-  const monthLabel = selectedMonth.split('-')[1];
+  const [yearLabel, monthLabelRaw] = selectedMonth.split('-');
+  const monthLabel = Number(monthLabelRaw);
 
   const handleOpenRecordPayment = (paymentId: string) => {
     setRecordingPaymentId(paymentId);
@@ -122,7 +133,10 @@ export const Payments: React.FC<PaymentsProps> = ({
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualStudentId) { alert('학생을 선택해 주세요.'); return; }
+    if (!manualStudentId) {
+      alert('학생을 선택해 주세요.');
+      return;
+    }
     onAddManualPayment({ studentId: manualStudentId, billingMonth: selectedMonth, amount: manualAmount, status: 'unpaid' });
     setIsManualModalOpen(false);
   };
@@ -130,6 +144,7 @@ export const Payments: React.FC<PaymentsProps> = ({
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = ev => {
       const buf = ev.target?.result as ArrayBuffer;
@@ -137,11 +152,13 @@ export const Payments: React.FC<PaymentsProps> = ({
       const norm = (s: string) => s.replace(/\s/g, '');
       const matched: MatchedRow[] = [];
       const unmatched: PayssamRow[] = [];
+
       for (const row of result.rows) {
-        const st = students.find(s => norm(s.name) === norm(row.name));
-        if (st) matched.push({ ...row, studentId: st.id });
+        const student = students.find(s => norm(s.name) === norm(row.name));
+        if (student) matched.push({ ...row, studentId: student.id });
         else unmatched.push(row);
       }
+
       setImportParsed({ matched, unmatched, errors: result.errors, skippedVoid: result.skippedVoid });
       setImportResult(null);
     };
@@ -156,13 +173,22 @@ export const Payments: React.FC<PaymentsProps> = ({
       const result = await onImportPayssam(importParsed.matched);
       if (result) setImportResult(result);
       else setIsImportOpen(false);
-    } finally { setIsImporting(false); }
+    } finally {
+      setIsImporting(false);
+    }
   };
 
-  const handleCloseImport = () => { setIsImportOpen(false); setImportParsed(null); setImportResult(null); };
+  const handleCloseImport = () => {
+    setIsImportOpen(false);
+    setImportParsed(null);
+    setImportResult(null);
+  };
 
   const handleOpenPreview = () => {
-    if (students.filter(s => s.status === 'active').length === 0) { alert('현재 재원 중인 학생이 없습니다.'); return; }
+    if (students.filter(s => s.status === 'active').length === 0) {
+      alert('현재 재원 중인 학생이 없습니다.');
+      return;
+    }
     setGenResult(null);
     setIsPreviewOpen(true);
   };
@@ -173,13 +199,13 @@ export const Payments: React.FC<PaymentsProps> = ({
       const result = await onGenerateMonthlyBills(selectedMonth);
       if (result) setGenResult(result);
       else setIsPreviewOpen(false);
-    } finally { setIsGenerating(false); }
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
     <div className="gd-root">
-
-      {/* ── 요약 + 차트 ── */}
       <div className="pay-top">
         <section className="gd-card pay-summary">
           <div className="pay-expected">
@@ -211,25 +237,24 @@ export const Payments: React.FC<PaymentsProps> = ({
         </section>
       </div>
 
-      {/* ── 장부 ── */}
       <section className="gd-card">
         <div className="pay-toolbar">
           <div className="pay-tools-left">
             <input type="month" className="form-control" style={{ width: '155px', padding: '0.45rem 0.7rem' }} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
             <div className="pay-search">
               <Search size={15} />
-              <input placeholder="학생 이름 검색…" value={search} onChange={e => setSearch(e.target.value)} />
+              <input placeholder="학생 이름 검색..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <div className="gd-seg pay-statusseg">
-              {([['all', '전체'], ['paid', '완납'], ['unpaid', '미납']] as const).map(([v, l]) => (
-                <button key={v} className={`gd-seg-b ${statusFilter === v ? 'sel ok' : ''}`} onClick={() => setStatusFilter(v)}>{l}</button>
+              {([['all', '전체'], ['paid', '완납'], ['unpaid', '미납']] as const).map(([value, label]) => (
+                <button key={value} className={`gd-seg-b ${statusFilter === value ? 'sel ok' : ''}`} onClick={() => setStatusFilter(value)}>{label}</button>
               ))}
             </div>
           </div>
           <div className="pay-tools-right">
             <button className="pay-btn ghost" onClick={() => setIsManualModalOpen(true)}><Plus size={15} /> 청구서 추가</button>
             <button className="pay-btn ghost" onClick={() => { setIsImportOpen(true); setImportParsed(null); setImportResult(null); }}><Upload size={15} /> 결제선생</button>
-            <button className="pay-btn primary" onClick={handleOpenPreview}>🌱 {monthLabel}월 일괄 생성</button>
+            <button className="pay-btn primary" onClick={handleOpenPreview}>{monthLabel}월 청구 일괄 생성</button>
           </div>
         </div>
 
@@ -248,10 +273,11 @@ export const Payments: React.FC<PaymentsProps> = ({
               const student = students.find(s => s.id === pay.studentId);
               const studentClasses = classes.filter(c => c.studentIds.includes(pay.studentId));
               const classNamesStr = studentClasses.map(c => c.name).join(', ') || '개별 코스';
+
               return (
                 <div className="pay-row" key={pay.id}>
                   <div className="pay-c pay-name">
-                    <b>{student?.name || '알수없음'}</b>
+                    <b>{student?.name || '알 수 없음'}</b>
                     <span className="pay-cls-m">{classNamesStr}</span>
                   </div>
                   <div className="pay-c pay-cls">{classNamesStr}</div>
@@ -259,14 +285,15 @@ export const Payments: React.FC<PaymentsProps> = ({
                   <div className="pay-c">
                     <span className={`pay-badge ${pay.status}`}>{pay.status === 'paid' ? '완납' : '미납'}</span>
                   </div>
-                  <div className="pay-c pay-date">{pay.paymentDate || '—'}</div>
-                  <div className="pay-c pay-method">{pay.paymentMethod ? METHOD_LABEL[pay.paymentMethod] ?? '—' : '—'}</div>
+                  <div className="pay-c pay-date">{pay.paymentDate || '-'}</div>
+                  <div className="pay-c pay-method">{pay.paymentMethod ? METHOD_LABEL[pay.paymentMethod] ?? '-' : '-'}</div>
                   <div className="pay-c pay-act">
-                    {pay.status === 'unpaid'
-                      ? <button className="pay-btn primary sm" onClick={() => handleOpenRecordPayment(pay.id)}>수납 처리</button>
-                      : <button className="pay-btn ghost sm" onClick={() => { if (window.confirm('완납을 취소하고 미납으로 되돌리시겠습니까?')) onCancelPayment(pay.id); }}>수납 취소</button>
-                    }
-                    <button className="pay-icon" title="청구서 삭제" onClick={() => { if (window.confirm('이 청구 내역을 삭제하시겠습니까?')) onDeletePayment(pay.id); }}>
+                    {pay.status === 'unpaid' ? (
+                      <button className="pay-btn primary sm" onClick={() => handleOpenRecordPayment(pay.id)}>수납 처리</button>
+                    ) : (
+                      <button className="pay-btn ghost sm" onClick={() => { if (window.confirm('완납을 취소하고 미납으로 되돌릴까요?')) onCancelPayment(pay.id); }}>수납 취소</button>
+                    )}
+                    <button className="pay-icon" title="청구서 삭제" onClick={() => { if (window.confirm('이 청구 내역을 삭제할까요?')) onDeletePayment(pay.id); }}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -277,7 +304,6 @@ export const Payments: React.FC<PaymentsProps> = ({
         </div>
       </section>
 
-      {/* ── 모달: 수납 상세 입력 ── */}
       {isRecordModalOpen && recordingPaymentId && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '400px' }}>
@@ -309,7 +335,6 @@ export const Payments: React.FC<PaymentsProps> = ({
         </div>
       )}
 
-      {/* ── 모달: 개별 청구서 추가 ── */}
       {isManualModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '450px' }}>
@@ -329,7 +354,7 @@ export const Payments: React.FC<PaymentsProps> = ({
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>청구 연월</label>
+                  <label>청구 월</label>
                   <input type="month" className="form-control" value={selectedMonth} disabled />
                 </div>
                 <div className="form-group">
@@ -346,10 +371,8 @@ export const Payments: React.FC<PaymentsProps> = ({
         </div>
       )}
 
-      {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImportFileChange} />
 
-      {/* ── 모달: 결제선생 가져오기 ── */}
       {isImportOpen && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '560px' }}>
@@ -369,18 +392,18 @@ export const Payments: React.FC<PaymentsProps> = ({
               ) : !importParsed ? (
                 <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
                   <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '1.25rem', lineHeight: 1.7 }}>
-                    결제선생 매니저 앱 또는 웹에서<br /><strong>발송수납내역 엑셀(.xlsx)</strong>을 내보낸 후 업로드하세요.
+                    결제선생 매니저 또는 엑셀에서<br /><strong>발송수납내역 파일(.xlsx)</strong>을 내려받아 업로드하세요.
                   </div>
                   <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}><Upload size={16} /> 파일 선택</button>
                   <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-                    지원 형식: xlsx · 컬럼: 발송일시, 이름, 금액(원), 품목, 수납상태<br />수납완료 + 현장납부(파기)만 가져옵니다.
+                    지원 형식: xlsx · 컬럼: 발송일시, 이름, 금액(원), 품목, 수납상태<br />수납 완료와 현장수납 내역만 가져오고, 파기 내역은 자동 제외합니다.
                   </div>
                 </div>
               ) : (
                 <>
                   {importParsed.errors.length > 0 && (
                     <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.85rem', marginBottom: '0.85rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>
-                      {importParsed.errors.map((e, i) => <div key={i}>{e}</div>)}
+                      {importParsed.errors.map((error, i) => <div key={i}>{error}</div>)}
                     </div>
                   )}
                   <div style={{ marginBottom: '1rem' }}>
@@ -407,11 +430,11 @@ export const Payments: React.FC<PaymentsProps> = ({
                     <div style={{ marginBottom: '0.75rem' }}>
                       <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>학생 미매칭 · 건너뜀 {importParsed.unmatched.length}건</strong>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', lineHeight: 1.6 }}>
-                        {importParsed.unmatched.map(r => r.name).join(', ')} — Growing에 등록된 이름과 다릅니다.
+                        {importParsed.unmatched.map(row => row.name).join(', ')} 은 Growing에 등록된 이름과 다릅니다.
                       </div>
                     </div>
                   )}
-                  {importParsed.skippedVoid > 0 && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>실제 취소(파기) {importParsed.skippedVoid}건은 자동 제외됩니다.</div>}
+                  {importParsed.skippedVoid > 0 && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>실제 취소/파기 {importParsed.skippedVoid}건은 자동 제외합니다.</div>}
                   <button className="btn btn-secondary" style={{ marginTop: '0.85rem', fontSize: '0.82rem' }} onClick={() => fileInputRef.current?.click()}>다른 파일 선택</button>
                 </>
               )}
@@ -434,12 +457,11 @@ export const Payments: React.FC<PaymentsProps> = ({
         </div>
       )}
 
-      {/* ── 모달: 일괄 생성 미리보기 ── */}
       {isPreviewOpen && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">{selectedMonth.split('-')[0]}년 {monthLabel}월 청구 일괄 생성</h3>
+              <h3 className="modal-title">{yearLabel}년 {monthLabel}월 청구 일괄 생성</h3>
               <button className="btn-icon-only" onClick={() => setIsPreviewOpen(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
@@ -453,7 +475,7 @@ export const Payments: React.FC<PaymentsProps> = ({
                 </div>
               ) : (
                 <>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>재원생의 반별 원비를 기준으로 청구서를 만듭니다. 확인 후 생성하세요.</p>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>재원생의 반별 수업료를 기준으로 청구서를 만듭니다. 확인 후 생성하세요.</p>
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                       <strong style={{ fontSize: '0.9rem', color: 'var(--color-primary-dark)' }}>생성 예정 {preview.toCreate.length}건</strong>
@@ -475,13 +497,13 @@ export const Payments: React.FC<PaymentsProps> = ({
                   {preview.alreadyBilled.length > 0 && (
                     <div style={{ marginBottom: '0.85rem' }}>
                       <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>이미 있음 · 건너뜀 {preview.alreadyBilled.length}건</strong>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{preview.alreadyBilled.map(r => r.name).join(', ')}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{preview.alreadyBilled.map(row => row.name).join(', ')}</div>
                     </div>
                   )}
                   {preview.excluded.length > 0 && (
                     <div>
                       <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>제외 {preview.excluded.length}건</strong>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{preview.excluded.map(r => `${r.name}(${r.reason})`).join(', ')}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{preview.excluded.map(row => `${row.name}(${row.reason})`).join(', ')}</div>
                     </div>
                   )}
                 </>
