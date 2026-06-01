@@ -142,53 +142,27 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     .slice(0, 6);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      {/* Search & Filter Toolbar */}
-      <div className="filter-bar">
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1 }}>
-          <div className="search-input-wrapper" style={{ maxWidth: '300px', flexGrow: 1 }}>
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              className="form-control"
-              placeholder="일지 제목, 내용, 학생 이름으로 검색..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-
-          <select
-            className="form-control"
-            style={{ width: '130px' }}
-            value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value as CounselLogType | 'all')}
-          >
-            <option value="all">전체 유형</option>
-            <option value="counsel">상담 일지</option>
-            <option value="progress">진도/수업</option>
-            <option value="test">테스트 평가</option>
-          </select>
-
-          <select
-            className="form-control"
-            style={{ width: '150px' }}
-            value={studentFilter}
-            onChange={e => setStudentFilter(e.target.value)}
-          >
-            <option value="all">전체 학생</option>
-            {students.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+    <div className="gd-root">
+      {/* ── 툴바 ── */}
+      <div className="cl-toolbar">
+        <div className="cl-search pay-search">
+          <Search size={15} />
+          <input placeholder="일지 제목, 내용, 학생 이름으로 검색…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-
-        <button className="btn btn-secondary" onClick={handleExport} title="현재 목록을 마크다운 파일로 저장">
-          <Download size={16} /> 내보내기
-        </button>
-        <button className="btn btn-primary" onClick={handleOpenAdd}>
-          <Plus size={16} /> 일지 신규 등록
-        </button>
+        <div className="gd-seg cl-typeseg">
+          {([['all','전체'],['counsel','상담'],['progress','진도'],['test','테스트']] as const).map(([v,l]) => (
+            <button key={v} className={`gd-seg-b ${typeFilter === v ? 'sel ok' : ''}`} onClick={() => setTypeFilter(v)}>{l}</button>
+          ))}
+        </div>
+        <select className="form-control" style={{ width: '140px', padding: '0.4rem 0.6rem' }} value={studentFilter} onChange={e => setStudentFilter(e.target.value)}>
+          <option value="all">전체 학생</option>
+          {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <span className="cl-count">{filteredLogs.length}건</span>
+        <div className="cl-tools-right">
+          <button className="pay-btn ghost" onClick={handleExport}><Download size={14} /> 내보내기</button>
+          <button className="pay-btn primary" onClick={handleOpenAdd}><Plus size={14} /> 일지 등록</button>
+        </div>
       </div>
 
       {recentShareCandidates.length > 0 && (
@@ -267,116 +241,51 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
         </div>
       )}
 
-      {/* Main Logs List */}
-      <div className="card">
-        <h3 className="card-title">
-          <MessageSquare size={20} className="text-primary" /> 교습소 상담 및 학습 일지 타임라인 ({filteredLogs.length}건)
-        </h3>
-
-        {filteredLogs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
-            🌱 등록된 일지 기록이 없습니다. 새로운 내용을 등록해 보세요!
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
-            {[...filteredLogs].reverse().map(log => {
-              const student = students.find(s => s.id === log.studentId);
-              return (
-                <div
-                  key={log.id}
-                  style={{
-                    padding: '1.25rem',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: log.type === 'counsel' ? '#fffdfb' : log.type === 'test' ? '#fafdfc' : '#fafbfc',
-                    borderLeft: `5px solid ${
-                      log.type === 'counsel' ? 'var(--color-warning)' :
-                      log.type === 'test' ? 'var(--color-accent-mint)' : 'var(--color-info)'
-                    }`,
-                    transition: 'transform var(--transition-fast)',
-                    position: 'relative'
-                  }}
-                >
-                  {/* Top line of log card */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      {/* Badge */}
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '4px',
-                          color: 'white',
-                          backgroundColor:
-                            log.type === 'counsel' ? 'var(--color-warning)' :
-                            log.type === 'test' ? 'var(--color-accent-mint)' : 'var(--color-info)'
-                        }}
-                      >
-                        {log.type === 'counsel' ? '상담' : log.type === 'test' ? '테스트' : '진도'}
-                      </span>
-
-                      {/* Student info link */}
-                      <span style={{ fontWeight: 800, color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.95rem' }}>
-                        <User size={14} className="text-secondary" />
-                        {student?.name || '퇴원생'} ({student?.school || '학교없음'} {student?.grade.split(' ')[1] || student?.grade})
-                      </span>
-
-                      {/* Log Title */}
-                      <span style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
-                        | {log.title}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <Calendar size={13} /> {log.date}
-                      </span>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '0.3rem 0.55rem', fontSize: '0.74rem', gap: '0.25rem' }}
-                        onClick={() => handleCopyParentMessage(log, student)}
-                      >
-                        {copiedLogId === log.id ? <><Check size={12} className="text-success" /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
-                      </button>
-                      {onSendDraftToMessaging && (
-                        <button
-                          className="btn btn-primary"
-                          style={{ padding: '0.3rem 0.55rem', fontSize: '0.74rem', gap: '0.25rem' }}
-                          onClick={() => handleSendToMessaging(log, student)}
-                        >
-                          <MessageSquare size={12} /> 알림장으로
-                        </button>
-                      )}
-                      <button
-                        className="btn-icon-only text-danger"
-                        onClick={() => handleDelete(log.id, log.title)}
-                        title="일지 삭제"
-                        style={{ padding: '0.25rem' }}
-                      >
-                        <Trash2 size={15} style={{ color: 'var(--color-danger)' }} />
-                      </button>
-                    </div>
+      {/* ── 일지 목록 ── */}
+      {filteredLogs.length === 0 ? (
+        <div className="gd-card" style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
+          🌱 등록된 일지 기록이 없습니다. 일지 등록 버튼을 눌러 새 내용을 추가해 보세요.
+        </div>
+      ) : (
+        <div className="cl-list">
+          {[...filteredLogs].reverse().map(log => {
+            const student = students.find(s => s.id === log.studentId);
+            const typeColor = log.type === 'counsel' ? 'var(--color-warning)' : log.type === 'test' ? 'var(--color-accent-mint)' : 'var(--color-info)';
+            return (
+              <div key={log.id} className="cl-log" style={{ borderLeftColor: typeColor }}>
+                <div className="cl-log-top">
+                  <div className="cl-log-id">
+                    <span className="cl-type" style={{ background: typeColor }}>
+                      {log.type === 'counsel' ? '상담' : log.type === 'test' ? '테스트' : '진도'}
+                    </span>
+                    <span className="cl-who">
+                      <User size={13} /> {student?.name || '퇴원생'}
+                      <em>{student?.school} {student?.grade.split(' ')[1] || student?.grade}</em>
+                    </span>
                   </div>
-
-                  {/* Content */}
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', whiteSpace: 'pre-wrap', lineHeight: '1.6', paddingLeft: '0.25rem' }}>
-                    {log.content}
-                  </p>
-
-                  {/* Test score highlight */}
-                  {log.type === 'test' && log.score && (
-                    <div style={{ marginTop: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: 'var(--color-accent-mint-light)', color: 'var(--color-primary)', padding: '0.25rem 0.65rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', fontWeight: 700 }}>
-                      <Award size={15} />
-                      평가 결과: {log.score}
-                    </div>
-                  )}
+                  <div className="cl-log-actions">
+                    <span className="cl-date"><Calendar size={12} /> {log.date}</span>
+                    <button className={`at-act ${copiedLogId === log.id ? 'done' : ''}`} onClick={() => handleCopyParentMessage(log, student)}>
+                      {copiedLogId === log.id ? <><Check size={12} /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
+                    </button>
+                    {onSendDraftToMessaging && (
+                      <button className="at-act primary" onClick={() => handleSendToMessaging(log, student)}>
+                        <MessageSquare size={12} /> 알림장으로
+                      </button>
+                    )}
+                    <button className="cl-del" onClick={() => handleDelete(log.id, log.title)} title="일지 삭제"><Trash2 size={14} /></button>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                <div className="cl-title">{log.title}</div>
+                <p className="cl-content">{log.content}</p>
+                {log.type === 'test' && log.score && (
+                  <div className="cl-score"><Award size={14} /> 평가 결과: {log.score}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal: Add Log */}
       {isFormOpen && (

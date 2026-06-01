@@ -403,55 +403,29 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      {/* Introduction Card */}
-      <div className="card" style={{ borderLeft: '5px solid var(--color-primary)', order: 50 }}>
-        <h3 className="card-title">🌱 AI·알림·백업 설정 안내</h3>
-        <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: '1.7' }}>
-          데이터는 로그인 계정 기준으로 클라우드에 저장됩니다. 중요한 변경 전에는 백업 파일을 받아두세요.
-        </p>
+    <div className="gd-root">
+
+      {/* ── 안내 배너 ── */}
+      <div className="set-intro">
+        <span className="set-intro-ic">🌱</span>
+        <p>데이터는 로그인 계정 기준으로 클라우드에 저장됩니다. 중요한 변경 전에는 백업 파일을 받아두세요.</p>
       </div>
 
-      {/* Main Operations Grid */}
-      <div className="grid-container cols-2" style={{ order: 51 }}>
-        
-        {/* Export Data */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1.5rem' }}>
-          <div>
-            <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Download size={18} /> 데이터 백업하기 (내보내기)
-            </h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              학생, 반, 출결, 수납, 상담 데이터를 파일로 저장합니다.
-            </p>
-          </div>
-          <button className="btn btn-primary" onClick={handleExport} style={{ width: '100%' }}>
-            컴퓨터에 백업 파일 다운로드 (.json)
-          </button>
+      {/* ── 백업/복원 2열 ── */}
+      <div className="set-grid2">
+        <div className="gd-card set-tile">
+          <div className="set-tile-ic ok"><Download size={20} /></div>
+          <div className="set-tile-t">데이터 백업하기</div>
+          <div className="set-tile-d">학생, 반, 출결, 수납, 상담 데이터를 파일로 저장합니다.</div>
+          <button className="btn btn-primary set-w" onClick={handleExport}>컴퓨터에 백업 파일 다운로드 (.json)</button>
         </div>
 
-        {/* Import Data */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1.5rem' }}>
-          <div>
-            <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Upload size={18} /> 데이터 복원하기 (가져오기)
-            </h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              백업 파일(.json)로 데이터를 복원합니다.
-              <strong> 기존 클라우드 데이터가 대체됩니다.</strong>
-            </p>
-          </div>
-          <input
-            type="file"
-            accept=".json"
-            ref={fileInputRef}
-            onChange={handleImport}
-            style={{ display: 'none' }}
-          />
-          <button className="btn btn-secondary" onClick={triggerFileInput} style={{ width: '100%', borderColor: 'var(--color-primary)' }}>
-            백업 파일 업로드하여 복원하기
-          </button>
+        <div className="gd-card set-tile">
+          <div className="set-tile-ic info"><Upload size={20} /></div>
+          <div className="set-tile-t">데이터 복원하기</div>
+          <div className="set-tile-d">백업 파일(.json)로 데이터를 복원합니다. <b>기존 데이터가 대체됩니다.</b></div>
+          <input type="file" accept=".json" ref={fileInputRef} onChange={handleImport} style={{ display: 'none' }} />
+          <button className="btn btn-secondary set-w" style={{ borderColor: 'var(--color-primary)' }} onClick={triggerFileInput}>백업 파일 업로드하여 복원하기</button>
         </div>
       </div>
 
