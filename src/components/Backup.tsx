@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen, MessageSquare, RotateCcw } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen, MessageSquare, RotateCcw, FolderOpen, FileSpreadsheet, FileArchive, File, X } from 'lucide-react';
 import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { type MessageTemplates, DEFAULT_TEMPLATES, TEMPLATE_META } from '../lib/messageTemplates';
 
 // Bump when the backup file shape changes so old/foreign files can be detected.
@@ -37,9 +38,97 @@ const isRecordArray = (value: unknown): value is { id: unknown }[] =>
 
 export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin, messageTemplates, onSaveMessageTemplates }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinStatus, setPinStatus] = useState<string | null>(null);
+
+  // ---- 파일 보관함 (Supabase Storage) ----
+  interface StoredFile { name: string; size: number; updated_at: string; }
+  const [storedFiles, setStoredFiles] = useState<StoredFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(true); // 초기값 true → 마운트 즉시 로딩 표시
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+
+  const BUCKET = 'academy-files';
+  const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.zip', '.pdf'];
+
+  const loadStoredFiles = () => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setFilesLoading(false); return; }
+      supabase.storage.from(BUCKET)
+        .list(`${user.id}/`, { sortBy: { column: 'updated_at', order: 'desc' } })
+        .then(({ data, error }) => {
+          setStoredFiles(!error && data ? data.map(f => ({ name: f.name, size: f.metadata?.size ?? 0, updated_at: f.updated_at ?? '' })) : []);
+          setFilesLoading(false);
+        });
+    });
+  };
+
+  // setState는 모두 .then() 콜백(비동기) 안에서만 호출 — set-state-in-effect 규칙 준수.
+  useEffect(loadStoredFiles, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!uploadInputRef.current) return;
+    uploadInputRef.current.value = '';
+    if (!file) return;
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED_EXT.includes(ext)) {
+      alert(`지원하지 않는 형식입니다. (허용: ${ALLOWED_EXT.join(', ')})`);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('파일 크기는 최대 10MB까지 가능합니다.');
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { alert('로그인이 필요합니다.'); return; }
+    setUploadProgress(`${file.name} 올리는 중...`);
+    const path = `${user.id}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+    setUploadProgress(null);
+    if (error) { alert(`업로드 실패: ${error.message}`); return; }
+    await loadStoredFiles();
+  };
+
+  const handleDownload = async (fileName: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.storage.from(BUCKET).download(`${user.id}/${fileName}`);
+    if (error || !data) { alert('다운로드 실패: ' + error?.message); return; }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteFile = async (fileName: string) => {
+    if (!window.confirm(`"${fileName}" 파일을 삭제하시겠습니까?`)) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.storage.from(BUCKET).remove([`${user.id}/${fileName}`]);
+    if (error) { alert('삭제 실패: ' + error.message); return; }
+    setStoredFiles(prev => prev.filter(f => f.name !== fileName));
+  };
+
+  const fileIcon = (name: string) => {
+    const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+    if (['.xlsx', '.xls', '.csv'].includes(ext)) return <FileSpreadsheet size={16} style={{ color: '#16a34a' }} />;
+    if (ext === '.zip') return <FileArchive size={16} style={{ color: '#ca8a04' }} />;
+    return <File size={16} style={{ color: 'var(--color-text-secondary)' }} />;
+  };
+
+  const fmtSize = (bytes: number) =>
+    bytes < 1024 ? `${bytes}B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)}KB` : `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+
+  const fmtDate = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  // 업로드할 때 서버에 저장된 파일명 앞 타임스탬프를 제거해 표시용 이름을 추출.
+  const displayName = (stored: string) => stored.replace(/^\d+_/, '');
 
   const MEMORY_MAX = 3000;
   const DEFAULT_MEMORY = `- 아이비는 그로잉영어 원장님을 돕는 학원 운영 비서다.
@@ -385,6 +474,74 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             <Download size={14} /> 수납 내역
           </button>
         </div>
+      </div>
+
+      {/* 파일 보관함 */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem' }}>
+          <div>
+            <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FolderOpen size={18} /> 참고 파일 보관함
+            </h4>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+              학원 양식·리포트·장부 파일을 올려두세요. 엑셀, ZIP, PDF 허용 (최대 10MB)
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {uploadProgress && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{uploadProgress}</span>
+            )}
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.zip,.pdf"
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
+            />
+            <button className="btn btn-primary" onClick={() => uploadInputRef.current?.click()} disabled={!!uploadProgress}>
+              <Upload size={15} /> 파일 올리기
+            </button>
+          </div>
+        </div>
+
+        {filesLoading ? (
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+        ) : storedFiles.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem', border: '2px dashed var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+            아직 올린 파일이 없습니다.<br />
+            <span style={{ fontSize: '0.78rem' }}>월말 리포트, 수납 장부, 기존 양식 등을 올려두면 나중에 기능 설계에 활용할 수 있습니다.</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            {storedFiles.map(f => (
+              <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', backgroundColor: '#fafbfc' }}>
+                {fileIcon(f.name)}
+                <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayName(f.name)}>
+                  {displayName(f.name)}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                  {fmtSize(f.size)} · {fmtDate(f.updated_at)}
+                </span>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                  onClick={() => handleDownload(f.name)}
+                  title="다운로드"
+                >
+                  <Download size={13} />
+                </button>
+                <button
+                  className="btn-icon-only"
+                  style={{ color: 'var(--color-danger)' }}
+                  onClick={() => handleDeleteFile(f.name)}
+                  title="삭제"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Kiosk Security PIN Setting */}
