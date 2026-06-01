@@ -313,7 +313,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
                 </div>
                 <span className="badge badge-absent" style={{ fontSize: '0.78rem' }}>{concernRows.length}명 확인 필요</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.75rem' }}>
                 {concernRows.slice(0, 8).map(row => (
                   <div
                     key={row.studentId}
