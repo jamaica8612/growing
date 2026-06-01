@@ -586,8 +586,8 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         ) : (
           <>
             <textarea
-              className="form-control"
-              style={{ resize: 'vertical', minHeight: '160px', fontFamily: 'inherit', fontSize: '0.85rem', lineHeight: 1.7, marginBottom: '0.5rem' }}
+              className="form-control settings-memory-textarea"
+              style={{ resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.5rem' }}
               maxLength={MEMORY_MAX}
               value={memoryText}
               onChange={e => setMemoryText(e.target.value)}
@@ -708,8 +708,9 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
                 </button>
               </div>
               <textarea
-                className="form-control"
-                style={{ resize: 'vertical', minHeight: '92px', fontFamily: 'inherit', fontSize: '0.83rem', lineHeight: 1.6 }}
+                className="form-control settings-template-textarea"
+                rows={2}
+                style={{ resize: 'vertical', fontFamily: 'inherit' }}
                 value={templateDraft[key]}
                 onChange={e => setTemplateDraft(prev => ({ ...prev, [key]: e.target.value }))}
               />

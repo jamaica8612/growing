@@ -719,18 +719,15 @@ export const Messaging: React.FC<MessagingProps> = ({
           </h3>
 
           <textarea
-            className="form-control"
-            rows={8}
+            className="form-control message-preview-textarea"
+            rows={6}
             readOnly={selectedTemplate !== 'custom'}
             style={{
               fontFamily: 'inherit',
-              lineHeight: '1.6',
-              fontSize: '0.95rem',
               backgroundColor: '#fafcfb',
               cursor: selectedTemplate === 'custom' ? 'text' : 'default',
               border: '1px solid var(--color-border)',
               resize: 'none',
-              padding: '1rem',
             }}
             value={compiledMessage}
             onChange={e => setCustomMessage(e.target.value)}

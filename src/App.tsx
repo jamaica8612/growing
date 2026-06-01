@@ -389,7 +389,7 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   // Renders the navigation list shared by the desktop sidebar and mobile drawer.
-  const renderNavSection = (opts: { closeOnNav: boolean; kioskAccent: string }) => {
+  const renderNavSection = (opts: { closeOnNav: boolean; kioskAccent: string; showKiosk: boolean }) => {
     const go = (id: string) => {
       setActiveTab(id);
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
@@ -404,25 +404,29 @@ function AcademyApp({ session }: { session: Session }) {
     return (
       <>
         <nav style={{ flexGrow: 1 }}>
-          {NAV_GROUPS.map(group => (
-            <div key={group.title} style={{ marginBottom: '0.35rem' }}>
-              <div style={NAV_GROUP_TITLE_STYLE}>{group.title}</div>
-              <ul className="nav-menu">
-                {group.items.map(item => (
-                  <li key={item.id}>
-                    <NavItemButton
-                      active={activeTab === item.id}
-                      icon={item.icon}
-                      label={item.label}
-                      onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
-                      badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : undefined}
-                      style={item.kind === 'kiosk' ? { color: opts.kioskAccent, fontWeight: 'bold' } : undefined}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {NAV_GROUPS.map(group => {
+            const items = opts.showKiosk ? group.items : group.items.filter(item => item.kind !== 'kiosk');
+
+            return (
+              <div key={group.title} style={{ marginBottom: '0.35rem' }}>
+                <div style={NAV_GROUP_TITLE_STYLE}>{group.title}</div>
+                <ul className="nav-menu">
+                  {items.map(item => (
+                    <li key={item.id}>
+                      <NavItemButton
+                        active={activeTab === item.id}
+                        icon={item.icon}
+                        label={item.label}
+                        onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
+                        badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : undefined}
+                        style={item.kind === 'kiosk' ? { color: opts.kioskAccent, fontWeight: 'bold' } : undefined}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
@@ -471,7 +475,7 @@ function AcademyApp({ session }: { session: Session }) {
           </div>
         </button>
 
-        {renderNavSection({ closeOnNav: false, kioskAccent: 'var(--color-primary-dark)' })}
+        {renderNavSection({ closeOnNav: false, kioskAccent: 'var(--color-primary-dark)', showKiosk: true })}
       </aside>
 
       {/* Mobile Top Header (Mobile only) */}
@@ -501,7 +505,7 @@ function AcademyApp({ session }: { session: Session }) {
               </button>
             </div>
 
-            {renderNavSection({ closeOnNav: true, kioskAccent: '#a3e2c9' })}
+            {renderNavSection({ closeOnNav: true, kioskAccent: '#a3e2c9', showKiosk: true })}
           </div>
         </div>
       )}
