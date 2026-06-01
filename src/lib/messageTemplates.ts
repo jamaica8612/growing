@@ -22,7 +22,7 @@ export const DEFAULT_TEMPLATES: MessageTemplates = {
   homeworkDone: '{학생명} 숙제완료',
   homeworkIncomplete: '{학생명} 숙제미흡',
   homeworkUndone: '{학생명} 숙제미제출',
-  makeup: '{학생명} {날짜} {시간} 보강',
+  makeup: '{학생명} {날짜} {시간} 보강\n\n보강 시간 확인 후, 가능 여부 답장주세요 😊',
   test: '{학생명} {평가명} {점수}',
 };
 
