@@ -964,6 +964,7 @@ async function runAgent(
 
   const toolsUsed: string[] = [];
   let pendingAction: PendingAction | undefined;
+  let dataSourceNames: string[] | null = null;
 
   for (let i = 0; i < 6; i++) {
     const content = await callGeminiRaw(contents, memory);
@@ -972,6 +973,13 @@ async function runAgent(
 
     if (calls.length === 0) {
       const text = parts.map(p => p.text ?? '').join('').trim();
+      if (!text && dataSourceNames?.length) {
+        return {
+          reply: `지선쌤, 제가 읽을 수 있는 데이터는 아래와 같아요.\n\n${dataSourceNames.map(name => `- ${name}`).join('\n')}`,
+          toolsUsed,
+          action: pendingAction,
+        };
+      }
       return { reply: text || '죄송해요, 답변을 생성하지 못했어요.', toolsUsed, action: pendingAction };
     }
 
@@ -984,6 +992,9 @@ async function runAgent(
       let result: Json;
       try {
         result = await execTool(sb, fc.name, fc.args ?? {});
+        if (fc.name === 'list_data_sources' && Array.isArray(result.dataSources)) {
+          dataSourceNames = result.dataSources.map(item => String(item)).filter(Boolean);
+        }
         if (result.action_proposed === true && result.action) {
           pendingAction = result.action as PendingAction;
         }
