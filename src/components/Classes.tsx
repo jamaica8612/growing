@@ -223,233 +223,108 @@ export const Classes: React.FC<ClassesProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      
-      {/* Visual Timetable Scheduler */}
-      <div className="card">
-        <div className="section-title-row">
-          <h3 className="card-title" style={{ marginBottom: 0 }}>
-            <Calendar size={20} className="text-primary" /> 주간 강의 시간표 (월 ~ 금)
-          </h3>
-          <button className="btn btn-primary" onClick={handleOpenAdd}>
-            <Plus size={16} /> 클래스 추가
-          </button>
+    <div className="gd-root">
+
+      {/* ── 주간 시간표 ── */}
+      <div className="gd-card">
+        <div className="gd-card-head">
+          <h2 className="gd-card-title"><Calendar size={18} /> 주간 강의 시간표 (월 ~ 금)</h2>
+          <button className="pay-btn primary" onClick={handleOpenAdd}><Plus size={15} /> 클래스 추가</button>
         </div>
+        <div className="tt-wrap">
+          <div className="tt-grid">
+            <div className="tt-corner">시간</div>
+            {daysOfWeek.map(day => <div key={day} className="tt-dayhead">{day}요일</div>)}
 
-        <div className="timetable-wrapper">
-          <div className="timetable-grid">
-            {/* Times column */}
-            <div className="timetable-header-cell" style={{ background: '#f4f7f4' }}>시간</div>
-            {daysOfWeek.map(day => (
-              <div key={day} className="timetable-header-cell">
-                {day}요일
-              </div>
-            ))}
-
-            {/* Time markers on the left */}
-            <div className="timetable-time-col">
+            <div className="tt-timecol">
               {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    position: 'absolute',
-                    top: `${(i / (END_HOUR - START_HOUR)) * 100}%`,
-                    left: 0,
-                    right: 0,
-                    padding: '0 4px',
-                    transform: 'translateY(-0.6em)',
-                    textAlign: 'center',
-                  }}
-                >
+                <div key={i} className="tt-time" style={{ top: `${(i / (END_HOUR - START_HOUR)) * 100}%` }}>
                   {String(START_HOUR + i).padStart(2, '0')}:00
                 </div>
               ))}
             </div>
 
-            {/* Day columns */}
             {daysOfWeek.map(day => (
-              <div key={day} className="timetable-day-col">
-                {classes
-                  .flatMap(cls => getSchedulesForDay(cls, day).map(schedule => ({ cls, schedule })))
-                  .map(({ cls, schedule }) => {
-                    const startMins = getMinutesFromStart(schedule.startTime);
-                    const duration = getDurationMinutes(schedule.startTime, schedule.endTime);
-                    const topPercent = (startMins / TOTAL_MINUTES) * 100;
-                    const heightPercent = (duration / TOTAL_MINUTES) * 100;
-                    const color = getClassColor(cls);
-
-                    return (
-                      <div
-                        key={`${cls.id}-${day}-${schedule.startTime}-${schedule.endTime}`}
-                        className="class-slot"
-                        style={{
-                          top: `${topPercent}%`,
-                          height: `${heightPercent}%`,
-                          background: `${color}22`,
-                          borderLeftColor: color,
-                          color: color,
-                        }}
-                        onClick={() => handleOpenEdit(cls)}
-                        title={`${cls.name} (${schedule.startTime} - ${schedule.endTime})`}
-                      >
-                        <div>
-                          <div className="class-slot-name">{cls.name}</div>
-                          <div className="class-slot-time" style={{ color: `${color}bb` }}>
-                            {schedule.startTime} - {schedule.endTime}
-                          </div>
-                        </div>
-                        <div className="class-slot-count" style={{ color: `${color}bb` }}>
-                          👤 {cls.studentIds.length}명
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div key={day} className="tt-daycol">
+                {classes.flatMap(cls => getSchedulesForDay(cls, day).map(schedule => ({ cls, schedule }))).map(({ cls, schedule }) => {
+                  const startMins = getMinutesFromStart(schedule.startTime);
+                  const duration = getDurationMinutes(schedule.startTime, schedule.endTime);
+                  const topPct = (startMins / TOTAL_MINUTES) * 100;
+                  const heightPct = (duration / TOTAL_MINUTES) * 100;
+                  const color = getClassColor(cls);
+                  return (
+                    <div key={`${cls.id}-${day}-${schedule.startTime}`} className="tt-slot"
+                      style={{ top: `${topPct}%`, height: `${heightPct}%`, background: `${color}22`, borderLeftColor: color, color }}
+                      onClick={() => handleOpenEdit(cls)}>
+                      <span className="tt-slot-name">{cls.name}</span>
+                      <span className="tt-slot-time">{schedule.startTime}–{schedule.endTime}</span>
+                      <span className="tt-slot-count">👤 {cls.studentIds.length}명</span>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Per-class summary: student count + monthly tuition */}
+      {/* ── 반별 현황 + 클래스 카드 ── */}
       {classes.length > 0 && (
-        <div className="card">
-          <h3 className="card-title" style={{ marginBottom: '0.85rem' }}>
-            <Users size={20} className="text-primary" /> 반별 현황 요약
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-            {classSummary.map(({ cls, count, tuitionSum }) => {
-              const color = getClassColor(cls);
-              return (
-                <div
-                  key={cls.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.55rem 0.85rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-border)',
-                    borderLeft: `4px solid ${color}`,
-                    backgroundColor: '#fafbfc',
-                  }}
-                >
-                  <span style={{ fontWeight: 700, color, minWidth: '110px', fontSize: '0.88rem' }}>{cls.name}</span>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', flex: 1 }}>재원생 {count}명</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{tuitionSum.toLocaleString()}원</span>
+        <div className="cls-grid2">
+          {/* 좌: 현황 요약 */}
+          <section className="gd-card">
+            <h2 className="gd-card-title" style={{ marginBottom: '0.85rem' }}><Users size={18} /> 반별 현황 요약</h2>
+            <div className="cls-summary">
+              {classSummary.map(({ cls, count, tuitionSum }) => (
+                <div key={cls.id} className="cls-srow" style={{ borderLeftColor: getClassColor(cls) }}>
+                  <span className="cls-sname" style={{ color: getClassColor(cls) }}>{cls.name}</span>
+                  <span className="cls-scount">재원생 {count}명</span>
+                  <span className="cls-stui">{tuitionSum.toLocaleString()}원</span>
                 </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.55rem 0.85rem',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: '#f0f7f3',
-                borderLeft: '4px solid var(--color-primary)',
-                fontWeight: 700,
-              }}
-            >
-              <span style={{ minWidth: '110px', fontSize: '0.88rem', color: 'var(--color-primary-dark)' }}>전체 합계</span>
-              <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>재원생 {summaryTotals.count}명</span>
-              <span style={{ fontSize: '0.85rem', color: 'var(--color-primary-dark)' }}>{summaryTotals.tuition.toLocaleString()}원</span>
+              ))}
+              <div className="cls-srow total">
+                <span className="cls-sname">전체 합계</span>
+                <span className="cls-scount">재원생 {summaryTotals.count}명</span>
+                <span className="cls-stui">{summaryTotals.tuition.toLocaleString()}원</span>
+              </div>
             </div>
-          </div>
+          </section>
+
+          {/* 우: 클래스 카드 */}
+          <section className="gd-card">
+            <h2 className="gd-card-title" style={{ marginBottom: '0.85rem' }}><BookOpen size={18} /> 운영 중인 클래스 ({classes.length}개)</h2>
+            {classes.length === 0 ? (
+              <p className="cls-empty">등록된 클래스가 없습니다. 상단에서 추가하세요.</p>
+            ) : (
+              <div className="cls-cards">
+                {classes.map(cls => {
+                  const color = getClassColor(cls);
+                  return (
+                    <div key={cls.id} className="cls-card" style={{ borderTopColor: color, cursor: 'pointer' }} onClick={() => handleOpenEdit(cls)}>
+                      <div className="cls-card-name" style={{ color }}>{cls.name}</div>
+                      <div className="cls-card-line"><Clock size={13} /> {getClassScheduleLabel(cls)}</div>
+                      <div className="cls-card-line">💰 {cls.tuitionFee.toLocaleString()}원
+                        {getTuitionOverrideCount(cls) > 0 && <span className="cls-chip">개별 {getTuitionOverrideCount(cls)}명</span>}
+                      </div>
+                      <div className="cls-chips">
+                        {cls.studentIds.length === 0 ? (
+                          <span className="cls-empty">배정 없음</span>
+                        ) : (
+                          cls.studentIds.map(sid => {
+                            const st = students.find(s => s.id === sid);
+                            const isPaused = st?.status === 'paused';
+                            return <span key={sid} className={`cls-chip ${isPaused ? 'paused' : ''}`}>{st?.name || '미등록'}{isPaused ? ' 휴원' : ''}</span>;
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
       )}
-
-      {/* Class Directory Cards */}
-      <div className="card">
-        <h3 className="card-title">
-          <BookOpen size={20} className="text-primary" /> 운영 중인 클래스 목록 ({classes.length}개)
-        </h3>
-
-        {classes.length === 0 ? (
-          <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
-            등록된 클래스가 없습니다. 상단의 [클래스 추가] 버튼을 눌러 새 수업을 개설하세요.
-          </p>
-        ) : (
-          <div className="grid-container cols-3">
-            {classes.map(cls => {
-              const color = getClassColor(cls);
-              return (
-              <div
-                key={cls.id}
-                style={{
-                  border: `1px solid var(--color-border)`,
-                  borderTop: `3px solid ${color}`,
-                  borderRadius: 'var(--radius-md)',
-                  padding: '1.25rem',
-                  backgroundColor: '#fafbfc',
-                  cursor: 'pointer',
-                }}
-                onClick={() => handleOpenEdit(cls)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <h4 style={{ fontWeight: 700, color, fontSize: '1.05rem' }}>
-                    {cls.name}
-                  </h4>
-                  <button
-                    className="btn-icon-only"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenEdit(cls);
-                    }}
-                  >
-                    <Clock size={16} />
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                  <div>
-                    🕒 <strong>시간표:</strong> {getClassScheduleLabel(cls)}
-                  </div>
-                  <div>
-                    💰 <strong>기본 원비:</strong> {cls.tuitionFee.toLocaleString()}원
-                    {getTuitionOverrideCount(cls) > 0 && (
-                      <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 700 }}>
-                        개별 원비 {getTuitionOverrideCount(cls)}명
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Users size={16} className="text-primary" />
-                    <strong>학생 ({cls.studentIds.length}명):</strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.2rem' }}>
-                      {cls.studentIds.length === 0 ? (
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>배정 없음</span>
-                      ) : (
-                        cls.studentIds.map(sid => {
-                          const student = students.find(s => s.id === sid);
-                          const isPaused = student?.status === 'paused';
-                          return (
-                            <span
-                              key={sid}
-                              style={{
-                                display: 'inline-block',
-                                backgroundColor: isPaused ? '#fef3c7' : '#f0f7f3',
-                                color: isPaused ? '#92400e' : 'var(--color-primary)',
-                                padding: '0.1rem 0.4rem',
-                                borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                              }}
-                            >
-                              {student?.name || '미등록'}{isPaused ? ' (휴원)' : ''}
-                            </span>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* Modal: Add/Edit Class */}
       {isFormOpen && (

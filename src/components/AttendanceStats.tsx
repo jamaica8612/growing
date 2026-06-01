@@ -176,116 +176,78 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Month selector */}
-      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="gd-root">
+      {/* ── 월 선택 바 ── */}
+      <div className="st-statbar">
         <div>
-          <h3 className="card-title" style={{ marginBottom: '0.35rem' }}>
-            <BarChart3 size={20} className="text-primary" /> 월별 출결 통계 리포트
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-            선택한 달의 출결 현황을 집계하여 출석률과 관리가 필요한 학생을 한눈에 보여줍니다.
-          </p>
+          <h3 className="gd-card-title" style={{ marginBottom: '0.2rem' }}><BarChart3 size={18} /> 월별 출결 통계 리포트</h3>
+          <div className="st-statbar-sub">선택한 달의 출결 현황을 집계하여 출석률과 관리 필요 학생을 한눈에 봅니다.</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CalendarRange size={18} className="text-secondary" />
-          <select
-            className="form-control"
-            style={{ width: 'auto', minWidth: '140px' }}
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}
-          >
-            {availableMonths.map(m => (
-              <option key={m} value={m}>
-                {m.split('-')[0]}년 {Number(m.split('-')[1])}월
-              </option>
-            ))}
+          <CalendarRange size={16} style={{ color: 'var(--color-text-secondary)' }} />
+          <select className="form-control st-monthsel" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+            {availableMonths.map(m => <option key={m} value={m}>{m.split('-')[0]}년 {Number(m.split('-')[1])}월</option>)}
           </select>
         </div>
       </div>
 
       {totals.total === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--color-text-secondary)' }}>
+        <div className="gd-card" style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--color-text-secondary)' }}>
           🌱 {monthLabel}에 기록된 출결 데이터가 없습니다. [출결 관리]에서 출결을 체크하면 통계가 집계됩니다.
         </div>
       ) : (
         <>
-          {/* KPI cards */}
-          <div className="grid-container cols-4">
-            <div className="card metric-card accent-sage">
-              <div className="metric-info">
-                <h4>전체 출석률</h4>
-                <div className="metric-value">{totals.rate}%</div>
-                <div className="metric-sub">총 {totals.total}건 기록 기준</div>
-              </div>
-              <div className="metric-icon-wrapper">
-                <Percent size={24} />
+          {/* ── KPI 타일 4개 ── */}
+          <div className="gd-stats">
+            <div className="gd-stat">
+              <div className="gd-stat-ic" style={{ background: '#ecfccb', color: 'var(--color-accent-sage)' }}><Percent size={18} /></div>
+              <div className="gd-stat-body">
+                <span className="gd-stat-label">전체 출석률</span>
+                <span className="gd-stat-val">{totals.rate}<em>%</em></span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>총 {totals.total}건 기준</span>
               </div>
             </div>
-
-            <div className="card metric-card danger">
-              <div className="metric-info">
-                <h4>결석</h4>
-                <div className="metric-value">{totals.absent}건</div>
-                <div className="metric-sub">전체의 {totals.total > 0 ? Math.round((totals.absent / totals.total) * 100) : 0}%</div>
-              </div>
-              <div className="metric-icon-wrapper">
-                <TrendingDown size={24} />
+            <div className="gd-stat">
+              <div className="gd-stat-ic" style={{ background: '#fdeaea', color: 'var(--color-danger)' }}><TrendingDown size={18} /></div>
+              <div className="gd-stat-body">
+                <span className="gd-stat-label">결석</span>
+                <span className="gd-stat-val">{totals.absent}<em>건</em></span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>전체의 {totals.total > 0 ? Math.round((totals.absent / totals.total) * 100) : 0}%</span>
               </div>
             </div>
-
-            <div className="card metric-card warning">
-              <div className="metric-info">
-                <h4>보강</h4>
-                <div className="metric-value">{totals.makeup}건</div>
-                <div className="metric-sub">출석 인정 기록</div>
-              </div>
-              <div className="metric-icon-wrapper">
-                <CalendarRange size={24} />
+            <div className="gd-stat">
+              <div className="gd-stat-ic" style={{ background: '#fef3c7', color: 'var(--color-warning)' }}><CalendarRange size={18} /></div>
+              <div className="gd-stat-body">
+                <span className="gd-stat-label">보강</span>
+                <span className="gd-stat-val">{totals.makeup}<em>건</em></span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>출석 인정 기록</span>
               </div>
             </div>
-
-            <div className="card metric-card danger">
-              <div className="metric-info">
-                <h4>관리 필요 학생</h4>
-                <div className="metric-value">{concernCount}명</div>
-                <div className="metric-sub">출석률 80% 미만 · 결석 3회+</div>
-              </div>
-              <div className="metric-icon-wrapper">
-                <AlertTriangle size={24} />
+            <div className={`gd-stat ${concernCount > 0 ? 'gd-stat-danger' : ''}`}>
+              <div className="gd-stat-ic" style={{ background: concernCount > 0 ? '#fdeaea' : '#eaf4ee', color: concernCount > 0 ? 'var(--color-danger)' : 'var(--color-accent-mint)' }}><AlertTriangle size={18} /></div>
+              <div className="gd-stat-body">
+                <span className="gd-stat-label">관리 필요</span>
+                <span className="gd-stat-val">{concernCount}<em>명</em></span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>80% 미만·결석 3회+</span>
               </div>
             </div>
           </div>
 
-          {/* 3-month attendance trend */}
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '1rem' }}>
-              <BarChart3 size={18} className="text-primary" /> 최근 3개월 출석 추세
-            </h3>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', justifyContent: 'center', minHeight: '96px' }}>
+          {/* ── 3개월 추세 ── */}
+          <div className="gd-card">
+            <h2 className="gd-card-title" style={{ marginBottom: '1rem' }}><BarChart3 size={18} /> 최근 3개월 출석 추세</h2>
+            <div className="stat-trend">
               {trend.map((t, i) => {
                 const isSelected = i === 2;
                 const color = t.rate >= 0 ? rateColor(t.rate) : '#d1d5db';
                 const barPct = t.rate >= 0 ? t.rate : 0;
                 return (
-                  <div key={t.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', flex: 1, maxWidth: '88px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: t.rate >= 0 ? color : 'var(--color-text-muted)' }}>
-                      {t.rate >= 0 ? `${t.rate}%` : '—'}
-                    </span>
-                    <div style={{ width: '100%', height: '68px', background: '#f3f4f6', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          width: '100%',
-                          height: `${barPct}%`,
-                          minHeight: barPct > 0 ? '4px' : '0',
-                          backgroundColor: color,
-                          opacity: isSelected ? 1 : 0.6,
-                        }}
-                      />
+                  <div key={t.month} className="stat-tcol">
+                    <span className="stat-tv" style={{ color: t.rate >= 0 ? color : 'var(--color-text-muted)' }}>{t.rate >= 0 ? `${t.rate}%` : '—'}</span>
+                    <div className="stat-tbar-bg">
+                      <div className="stat-tbar" style={{ height: `${barPct}%`, minHeight: barPct > 0 ? '4px' : '0', backgroundColor: color, opacity: isSelected ? 1 : 0.65 }} />
                     </div>
-                    <span style={{ fontSize: '0.78rem', fontWeight: isSelected ? 700 : 400, color: isSelected ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)' }}>
-                      {t.label}
-                    </span>
+                    <span className="stat-tl" style={{ fontWeight: isSelected ? 700 : 400, color: isSelected ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)' }}>{t.label}</span>
                   </div>
                 );
               })}
