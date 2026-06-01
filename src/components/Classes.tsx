@@ -91,6 +91,21 @@ export const Classes: React.FC<ClassesProps> = ({
     return (endH * 60 + endM) - (startH * 60 + startM);
   };
 
+  const getDayEvents = (day: DayOfWeek) =>
+    classes
+      .flatMap(cls => getSchedulesForDay(cls, day).map(schedule => ({ cls, schedule })))
+      .sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime) || a.cls.name.localeCompare(b.cls.name));
+
+  const daySummaries = daysOfWeek.map(day => {
+    const events = getDayEvents(day);
+    return {
+      day,
+      events,
+      studentCount: events.reduce((sum, event) => sum + event.cls.studentIds.length, 0),
+    };
+  });
+  const weeklySlotCount = daySummaries.reduce((sum, summary) => sum + summary.events.length, 0);
+
   // Toggle day selection
   const handleDayToggle = (day: DayOfWeek) => {
     if (formDays.includes(day)) {
@@ -229,7 +244,20 @@ export const Classes: React.FC<ClassesProps> = ({
       <div className="gd-card">
         <div className="gd-card-head">
           <h2 className="gd-card-title"><Calendar size={18} /> 주간 강의 시간표 (월 ~ 금)</h2>
+          <div className="tt-head-meta">
+            <span>{classes.length}개 반</span>
+            <span>주 {weeklySlotCount}타임</span>
+          </div>
           <button className="pay-btn primary" onClick={handleOpenAdd}><Plus size={15} /> 클래스 추가</button>
+        </div>
+        <div className="tt-overview">
+          {daySummaries.map(({ day, events, studentCount }) => (
+            <button key={day} type="button" className="tt-overview-day">
+              <b>{day}</b>
+              <span>{events.length}타임</span>
+              <em>{studentCount}명</em>
+            </button>
+          ))}
         </div>
         <div className="tt-wrap">
           <div className="tt-grid">
@@ -246,7 +274,8 @@ export const Classes: React.FC<ClassesProps> = ({
 
             {daysOfWeek.map(day => (
               <div key={day} className="tt-daycol">
-                {classes.flatMap(cls => getSchedulesForDay(cls, day).map(schedule => ({ cls, schedule }))).map(({ cls, schedule }) => {
+                {getDayEvents(day).length === 0 && <div className="tt-day-empty">수업 없음</div>}
+                {getDayEvents(day).map(({ cls, schedule }) => {
                   const startMins = getMinutesFromStart(schedule.startTime);
                   const duration = getDurationMinutes(schedule.startTime, schedule.endTime);
                   const topPct = (startMins / TOTAL_MINUTES) * 100;
@@ -258,13 +287,45 @@ export const Classes: React.FC<ClassesProps> = ({
                       onClick={() => handleOpenEdit(cls)}>
                       <span className="tt-slot-name">{cls.name}</span>
                       <span className="tt-slot-time">{schedule.startTime}–{schedule.endTime}</span>
-                      <span className="tt-slot-count">👤 {cls.studentIds.length}명</span>
+                      <span className="tt-slot-count">재원 {cls.studentIds.length}명</span>
                     </div>
                   );
                 })}
               </div>
             ))}
           </div>
+        </div>
+        <div className="tt-mobile-agenda">
+          {daySummaries.map(({ day, events }) => (
+            <section key={day} className="tt-mobile-day">
+              <div className="tt-mobile-dayhead">
+                <b>{day}요일</b>
+                <span>{events.length}타임</span>
+              </div>
+              {events.length === 0 ? (
+                <p className="tt-mobile-empty">수업 없음</p>
+              ) : (
+                <div className="tt-mobile-list">
+                  {events.map(({ cls, schedule }) => {
+                    const color = getClassColor(cls);
+                    return (
+                      <button
+                        key={`${cls.id}-${day}-${schedule.startTime}`}
+                        type="button"
+                        className="tt-mobile-slot"
+                        style={{ borderLeftColor: color }}
+                        onClick={() => handleOpenEdit(cls)}
+                      >
+                        <span className="tt-mobile-time">{schedule.startTime}–{schedule.endTime}</span>
+                        <b style={{ color }}>{cls.name}</b>
+                        <em>{cls.studentIds.length}명</em>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          ))}
         </div>
       </div>
 
