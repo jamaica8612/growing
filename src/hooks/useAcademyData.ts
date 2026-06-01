@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, HomeworkAlert, HomeworkStatus, PaymentMethod } from '../types';
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
-import { getStudentClassTuition } from '../lib/classTuition';
+import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 
 // Centralises all academy data: loads it from Supabase for the signed-in owner
 // and exposes the same handler surface the UI used with localStorage, so the
@@ -51,13 +51,14 @@ export function useAcademyData(userId: string) {
   }, [load, userId]);
 
   // Wrap a mutation so any DB error surfaces to the user and resyncs state.
-  const guard = async (fn: () => Promise<void>) => {
+  const guard = async <T>(fn: () => Promise<T>): Promise<T | undefined> => {
     try {
-      await fn();
+      return await fn();
     } catch (e) {
       console.error('Academy mutation failed:', e);
       alert(e instanceof Error ? `저장에 실패했습니다: ${e.message}` : '저장에 실패했습니다.');
       void load();
+      return undefined;
     }
   };
 
@@ -169,28 +170,25 @@ export function useAcademyData(userId: string) {
     });
 
   // ---- Payments ----
+  // 미리보기와 동일한 로직(buildMonthlyBillingPreview)으로 청구를 생성한다.
+  // 결과(생성/건너뜀 건수)를 반환해 화면에서 피드백을 보여줄 수 있게 한다.
+  // 알림(alert)은 호출하는 컴포넌트가 담당한다.
   const handleGenerateMonthlyBills = (month: string) =>
     guard(async () => {
-      const newBills: Omit<Payment, 'id'>[] = [];
-      students
-        .filter(s => s.status === 'active')
-        .forEach(student => {
-          const studentClasses = classes.filter(c => c.studentIds.includes(student.id));
-          if (studentClasses.length === 0) return;
-          const totalTuition = studentClasses.reduce((sum, c) => sum + getStudentClassTuition(c, student.id), 0);
-          const billExists = payments.some(p => p.studentId === student.id && p.billingMonth === month);
-          if (!billExists && totalTuition > 0) {
-            newBills.push({ studentId: student.id, billingMonth: month, amount: totalTuition, status: 'unpaid' });
-          }
-        });
-
-      if (newBills.length === 0) {
-        alert('생성할 대상 학생이 없거나 이미 해당 월의 모든 청구서가 등록되어 있습니다.');
-        return;
+      const preview = buildMonthlyBillingPreview(students, classes, payments, month);
+      const skipped = preview.alreadyBilled.length;
+      if (preview.toCreate.length === 0) {
+        return { created: 0, skipped };
       }
+      const newBills: Omit<Payment, 'id'>[] = preview.toCreate.map(row => ({
+        studentId: row.studentId,
+        billingMonth: month,
+        amount: row.amount,
+        status: 'unpaid',
+      }));
       const created = await api.insertPayments(newBills);
       setPayments(prev => [...prev, ...created]);
-      alert(`성공적으로 ${created.length}건의 청구서를 일괄 발행하였습니다!`);
+      return { created: created.length, skipped };
     });
 
   const handleRecordPayment = (paymentId: string, paymentDate: string, method: PaymentMethod) =>

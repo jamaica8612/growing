@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Student, Class, Payment, PaymentMethod, PaymentStatus } from '../types';
-import { CreditCard, Plus, Trash2, ArrowUpRight, X } from 'lucide-react';
+import { CreditCard, Plus, Trash2, ArrowUpRight, X, CheckCircle2 } from 'lucide-react';
+import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 
 interface PaymentsProps {
   payments: Payment[];
   students: Student[];
   classes: Class[];
-  onGenerateMonthlyBills: (month: string) => void;
+  onGenerateMonthlyBills: (month: string) => Promise<{ created: number; skipped: number } | undefined>;
   onRecordPayment: (paymentId: string, paymentDate: string, method: PaymentMethod) => void;
   onCancelPayment: (paymentId: string) => void;
   onDeletePayment: (paymentId: string) => void;
@@ -31,6 +32,11 @@ export const Payments: React.FC<PaymentsProps> = ({
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualStudentId, setManualStudentId] = useState('');
   const [manualAmount, setManualAmount] = useState(200000);
+
+  // Batch bill preview state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genResult, setGenResult] = useState<{ created: number; skipped: number } | null>(null);
   
   // Record payment state
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -63,6 +69,17 @@ export const Payments: React.FC<PaymentsProps> = ({
   const billingCount = payments.filter(p => p.billingMonth === selectedMonth).length;
   const paidCount = payments.filter(p => p.billingMonth === selectedMonth && p.status === 'paid').length;
   const paymentRate = billingCount > 0 ? Math.round((paidCount / billingCount) * 100) : 0;
+
+  // 예상 수납액 = 이번 달 청구 총액(납부 + 미납), 미납률은 금액 기준.
+  const totalExpected = totalPaid + totalUnpaid;
+  const unpaidRate = totalExpected > 0 ? Math.round((totalUnpaid / totalExpected) * 100) : 0;
+
+  // 미리보기는 생성 로직과 동일한 헬퍼로 계산 → 보이는 것과 만들어지는 것이 일치.
+  const preview = useMemo(
+    () => buildMonthlyBillingPreview(students, classes, payments, selectedMonth),
+    [students, classes, payments, selectedMonth]
+  );
+  const previewCreateTotal = preview.toCreate.reduce((sum, r) => sum + r.amount, 0);
 
   // Open Record Payment Modal
   const handleOpenRecordPayment = (paymentId: string) => {
@@ -99,23 +116,30 @@ export const Payments: React.FC<PaymentsProps> = ({
     setIsManualModalOpen(false);
   };
 
-  // Automated batch bill generation
-  const handleGenerateBatchBills = () => {
-    const activeCount = students.filter(s => s.status === 'active').length;
-    if (activeCount === 0) {
+  // 미리보기 모달 열기 (바로 생성하지 않고 대상부터 확인)
+  const handleOpenPreview = () => {
+    if (students.filter(s => s.status === 'active').length === 0) {
       alert('현재 재원 중인 학생이 없습니다.');
       return;
     }
-    
-    // Check if bills already exist for the selected month
-    const existCount = payments.filter(p => p.billingMonth === selectedMonth).length;
-    if (existCount > 0) {
-      if (!window.confirm(`${selectedMonth}월에 이미 등록된 수납 내역이 ${existCount}건 존재합니다. 추가로 누락된 학생 청구서를 생성할까요?`)) {
-        return;
-      }
-    }
+    setGenResult(null);
+    setIsPreviewOpen(true);
+  };
 
-    onGenerateMonthlyBills(selectedMonth);
+  // 미리보기에서 확인을 눌렀을 때만 실제 생성. 결과(생성/건너뜀)를 모달에 표시.
+  const handleConfirmGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const result = await onGenerateMonthlyBills(selectedMonth);
+      if (result) {
+        setGenResult(result);
+      } else {
+        // guard가 오류를 처리(알림)한 경우 — 모달만 닫는다.
+        setIsPreviewOpen(false);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Historical revenue calculation for the last 5 months
@@ -154,32 +178,40 @@ export const Payments: React.FC<PaymentsProps> = ({
             <CreditCard size={20} className="text-primary" /> {selectedMonth.split('-')[1]}월 수납 요약 지표
           </h3>
 
-          <div className="grid-container cols-3" style={{ gap: '1rem', margin: '1rem 0' }}>
+          {/* 예상 수납액(이번 달 청구 총액)을 가장 크게 — 운영 첫 화면 숫자 */}
+          <div style={{ margin: '0.75rem 0 0.25rem' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>이번 달 예상 수납액</div>
+            <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
+              {totalExpected.toLocaleString()}원
+            </div>
+          </div>
+
+          <div className="grid-container cols-3" style={{ gap: '1rem', margin: '0.75rem 0' }}>
             <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-success-light)', border: '1px solid #a3e2c9', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-success)', fontWeight: 600 }}>수납 완료 (누계)</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-success)', fontWeight: 600 }}>납부액</div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginTop: '0.25rem' }}>
                 {totalPaid.toLocaleString()}원
               </div>
             </div>
 
             <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-danger-light)', border: '1px solid #fee2e2', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-danger)', fontWeight: 600 }}>미납 금액</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-danger)', fontWeight: 600 }}>미납액</div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-danger)', marginTop: '0.25rem' }}>
                 {totalUnpaid.toLocaleString()}원
               </div>
             </div>
 
             <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', backgroundColor: '#f0f7f3', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>수납 진행률</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginTop: '0.25rem' }}>
-                {paymentRate}%
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>미납률</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: unpaidRate > 0 ? 'var(--color-danger)' : 'var(--color-primary-dark)', marginTop: '0.25rem' }}>
+                {unpaidRate}%
               </div>
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-            <span>총 청구 건수: {billingCount}건</span>
-            <span>수납 완료 건수: {paidCount}건</span>
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.35rem' }}>
+            <span>총 청구 {billingCount}건 · 완료 {paidCount}건</span>
+            <span>건수 기준 수납률 {paymentRate}%</span>
           </div>
         </div>
 
@@ -243,7 +275,7 @@ export const Payments: React.FC<PaymentsProps> = ({
             <button className="btn btn-secondary" onClick={() => setIsManualModalOpen(true)}>
               <Plus size={16} /> 청구서 추가
             </button>
-            <button className="btn btn-primary" onClick={handleGenerateBatchBills}>
+            <button className="btn btn-primary" onClick={handleOpenPreview}>
               🌱 {selectedMonth.split('-')[1]}월 청구 일괄 생성
             </button>
           </div>
@@ -534,6 +566,118 @@ export const Payments: React.FC<PaymentsProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Batch Bill Preview & Confirm */}
+      {isPreviewOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {selectedMonth.split('-')[0]}년 {selectedMonth.split('-')[1]}월 청구 일괄 생성
+              </h3>
+              <button className="btn-icon-only" onClick={() => setIsPreviewOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {genResult ? (
+                // 생성 완료 결과 화면
+                <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
+                  <CheckCircle2 size={40} style={{ color: 'var(--color-success)' }} />
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginTop: '0.75rem' }}>
+                    청구서 {genResult.created}건 생성 완료
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '0.35rem' }}>
+                    {genResult.skipped > 0
+                      ? `이미 청구가 있어 ${genResult.skipped}건은 건너뛰었습니다.`
+                      : '건너뛴 항목은 없습니다.'}
+                  </div>
+                </div>
+              ) : (
+                // 미리보기 화면
+                <>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
+                    재원생의 반별 원비(개별 원비 반영)를 기준으로 청구서를 만듭니다. 아래 내용을 확인한 뒤 생성하세요.
+                  </p>
+
+                  {/* 생성 예정 */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--color-primary-dark)' }}>
+                        생성 예정 {preview.toCreate.length}건
+                      </strong>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>
+                        합계 {previewCreateTotal.toLocaleString()}원
+                      </span>
+                    </div>
+                    {preview.toCreate.length === 0 ? (
+                      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', padding: '0.5rem 0' }}>
+                        새로 생성할 청구서가 없습니다. (모두 이미 청구되었거나 제외 대상)
+                      </div>
+                    ) : (
+                      <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                        {preview.toCreate.map(row => (
+                          <div key={row.studentId} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.75rem', fontSize: '0.85rem', borderBottom: '1px solid #f0f2f0' }}>
+                            <span>{row.name}</span>
+                            <span style={{ fontWeight: 600 }}>{row.amount.toLocaleString()}원</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 이미 청구됨 (건너뜀) */}
+                  {preview.alreadyBilled.length > 0 && (
+                    <div style={{ marginBottom: '0.85rem' }}>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                        이미 있음 · 건너뜀 {preview.alreadyBilled.length}건
+                      </strong>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', lineHeight: 1.5 }}>
+                        {preview.alreadyBilled.map(r => r.name).join(', ')}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 제외 (반 미배정·원비 0) */}
+                  {preview.excluded.length > 0 && (
+                    <div>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                        제외 {preview.excluded.length}건
+                      </strong>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', lineHeight: 1.5 }}>
+                        {preview.excluded.map(r => `${r.name}(${r.reason})`).join(', ')}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              {genResult ? (
+                <button type="button" className="btn btn-primary" onClick={() => setIsPreviewOpen(false)}>
+                  닫기
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="btn btn-secondary" onClick={() => setIsPreviewOpen(false)} disabled={isGenerating}>
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleConfirmGenerate}
+                    disabled={isGenerating || preview.toCreate.length === 0}
+                  >
+                    {isGenerating ? '생성 중...' : `${preview.toCreate.length}건 생성`}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
