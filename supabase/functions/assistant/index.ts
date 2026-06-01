@@ -302,6 +302,24 @@ const ATTENDANCE_KO: Record<string, string> = {
   present: '출석', absent: '결석', makeup: '보강',
 };
 
+const DATA_SOURCE_LABELS: Record<string, string> = {
+  growing_students: '학생 기본 정보',
+  growing_classes: '반/시간표 정보',
+  growing_attendance: '출결·등하원·숙제 기록',
+  growing_payments: '수납·미납 기록',
+  growing_counsel_logs: '상담·진도·시험 일지',
+  growing_kiosk_alerts: '키오스크 등하원 알림 대기열',
+  growing_homework_alerts: '숙제 알림 대기열',
+  growing_message_logs: '알림장/알림톡 발송 기록',
+  growing_settings: '학원 설정과 메시지 템플릿',
+  growing_assistant_memory: '아이비 운영 기준 메모',
+  growing_assistant_notes: '아이비 자가학습 메모',
+};
+
+function labelDataSource(tableName: string): string {
+  return DATA_SOURCE_LABELS[tableName] ?? tableName.replace(/^growing_/, '').replaceAll('_', ' ');
+}
+
 async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<Json> {
   switch (name) {
     case 'list_students': {
@@ -746,7 +764,13 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
     case 'list_data_sources': {
       const { data, error } = await sb.rpc('growing_list_tables');
       if (error) throw error;
-      return { tables: data ?? [] };
+      const tableNames = ((data ?? []) as unknown[])
+        .map(row => typeof row === 'string' ? row : norm((row as Json).table_name ?? (row as Json).table))
+        .filter(Boolean);
+      return {
+        dataSources: tableNames.map(table => labelDataSource(table)),
+        instruction: '사용자에게는 dataSources의 업무용 이름만 보여준다. 내부 테이블명은 노출하지 않는다.',
+      };
     }
 
     case 'query_table': {
@@ -866,6 +890,7 @@ function systemPrompt(memory: string): string {
 - 출결 변경·수납 처리·상담일지 작성·학생 메모 수정 같은 DB 변경 요청은 반드시 propose_attendance_change / propose_payment_change / propose_counsel_log / propose_student_memo 도구를 사용해 원장님의 승인을 구합니다. 직접 변경하지 않습니다.
 - propose_* 도구가 action_proposed: true를 반환하면 "아래 내용으로 변경하시겠어요? 확인 버튼을 눌러 승인해 주세요."처럼 안내합니다.
 - 데이터를 근거로 답할 때는 마지막에 어떤 자료를 봤는지 한 줄로 덧붙입니다(예: "(오늘 현황·이번 달 수납 기준)"). 여러 자료가 필요하면 한 번에 여러 도구를 호출해도 됩니다.
+- 사용자에게 내부 구현명, DB 테이블명, 컬럼명, RPC 이름, 도구 이름을 그대로 노출하지 않습니다. 특히 list_data_sources 결과를 설명할 때는 "학생 정보", "출결 기록", "수납 기록"처럼 업무용 이름으로만 말합니다. 사용자가 개발자용 내부 이름을 명시적으로 요청한 경우에만 테이블명을 보여줍니다.
 - "브리핑" 또는 "오늘 어때" 같은 요청에는 get_today_overview로 오늘 수업·출결·미납을 확인하고, 필요하면 출결 요약도 함께 본 뒤, 챙겨야 할 학생(잦은 결석·미납 등)을 짚어 간결한 아침 브리핑으로 정리합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.
