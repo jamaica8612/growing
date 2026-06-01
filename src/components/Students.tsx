@@ -289,7 +289,7 @@ export const Students: React.FC<StudentsProps> = ({
       </div>
 
       {/* ── 마스터-디테일 레이아웃 ── */}
-      <div className="st-shell">
+      <div className={`st-shell${activeDetailStudent ? ' has-detail' : ''}`}>
         {/* 좌: 학생 목록 */}
         <div className="gd-card st-card-list">
           <div className="st-list">
@@ -340,6 +340,10 @@ export const Students: React.FC<StudentsProps> = ({
             </div>
           ) : (
             <div className="st-detail">
+              {/* 모바일 뒤로가기 버튼 */}
+              <button className="st-back-mobile" onClick={() => setActiveDetailStudent(null)}>
+                ← 목록으로
+              </button>
               {/* 상세 헤더 */}
               <div className="st-dhead">
                 <div className="st-dhead-top">

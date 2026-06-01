@@ -190,6 +190,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </label>
       </header>
 
+      {/* ── 모바일 전용 날짜 선택 바 ── */}
+      <div className="gd-datepick-mobile">
+        <label htmlFor="mobile-date-input">📅 조회 날짜</label>
+        <input
+          id="mobile-date-input"
+          type="date"
+          value={selectedDate}
+          onChange={e => setSelectedDate(e.target.value)}
+        />
+      </div>
+
       {/* ── 요약 타일 4개 ── */}
       <div className="gd-stats">
         <div className="gd-stat">
