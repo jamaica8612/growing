@@ -35,7 +35,6 @@ export const Students: React.FC<StudentsProps> = ({
   onPauseStudent,
   onRestoreStudent,
   onAddCounselLog,
-  onUpdateCounselLog: _onUpdateCounselLog,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
