@@ -1,7 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { Student, Class, Payment, PaymentMethod, PaymentStatus } from '../types';
-import { CreditCard, Plus, Trash2, ArrowUpRight, X, CheckCircle2 } from 'lucide-react';
+import { CreditCard, Plus, Trash2, ArrowUpRight, X, CheckCircle2, Upload } from 'lucide-react';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
+import { parsePayssamExcel, type PayssamRow } from '../lib/payssam';
+
+type MatchedRow = PayssamRow & { studentId: string };
 
 interface PaymentsProps {
   payments: Payment[];
@@ -12,6 +15,7 @@ interface PaymentsProps {
   onCancelPayment: (paymentId: string) => void;
   onDeletePayment: (paymentId: string) => void;
   onAddManualPayment: (paymentData: Omit<Payment, 'id'>) => void;
+  onImportPayssam: (rows: MatchedRow[]) => Promise<{ created: number; updated: number; skipped: number } | undefined>;
 }
 
 export const Payments: React.FC<PaymentsProps> = ({
@@ -23,6 +27,7 @@ export const Payments: React.FC<PaymentsProps> = ({
   onCancelPayment,
   onDeletePayment,
   onAddManualPayment,
+  onImportPayssam,
 }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
   const [search, setSearch] = useState('');
@@ -37,6 +42,18 @@ export const Payments: React.FC<PaymentsProps> = ({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [genResult, setGenResult] = useState<{ created: number; skipped: number } | null>(null);
+
+  // 결제선생 import state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importParsed, setImportParsed] = useState<{
+    matched: MatchedRow[];
+    unmatched: PayssamRow[];
+    errors: string[];
+    skippedVoid: number;
+  } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
   
   // Record payment state
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -114,6 +131,55 @@ export const Payments: React.FC<PaymentsProps> = ({
     });
 
     setIsManualModalOpen(false);
+  };
+
+  // 결제선생 파일 선택 후 파싱
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const buf = ev.target?.result as ArrayBuffer;
+      const result = parsePayssamExcel(buf);
+
+      // 학생 이름으로 매칭 (공백 제거 후 비교)
+      const norm = (s: string) => s.replace(/\s/g, '');
+      const matched: MatchedRow[] = [];
+      const unmatched: PayssamRow[] = [];
+
+      for (const row of result.rows) {
+        const st = students.find(s => norm(s.name) === norm(row.name));
+        if (st) {
+          matched.push({ ...row, studentId: st.id });
+        } else {
+          unmatched.push(row);
+        }
+      }
+
+      setImportParsed({ matched, unmatched, errors: result.errors, skippedVoid: result.skippedVoid });
+      setImportResult(null);
+    };
+    reader.readAsArrayBuffer(file);
+    // 같은 파일 재선택 허용
+    e.target.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importParsed || importParsed.matched.length === 0) return;
+    setIsImporting(true);
+    try {
+      const result = await onImportPayssam(importParsed.matched);
+      if (result) setImportResult(result);
+      else setIsImportOpen(false);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleCloseImport = () => {
+    setIsImportOpen(false);
+    setImportParsed(null);
+    setImportResult(null);
   };
 
   // 미리보기 모달 열기 (바로 생성하지 않고 대상부터 확인)
@@ -271,9 +337,15 @@ export const Payments: React.FC<PaymentsProps> = ({
             </select>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={() => setIsManualModalOpen(true)}>
               <Plus size={16} /> 청구서 추가
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => { setIsImportOpen(true); setImportParsed(null); setImportResult(null); }}
+            >
+              <Upload size={16} /> 결제선생 가져오기
             </button>
             <button className="btn btn-primary" onClick={handleOpenPreview}>
               🌱 {selectedMonth.split('-')[1]}월 청구 일괄 생성
@@ -566,6 +638,144 @@ export const Payments: React.FC<PaymentsProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden file input for 결제선생 Excel */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        style={{ display: 'none' }}
+        onChange={handleImportFileChange}
+      />
+
+      {/* Modal: 결제선생 가져오기 */}
+      {isImportOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">결제선생 발송수납내역 가져오기</h3>
+              <button className="btn-icon-only" onClick={handleCloseImport}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {importResult ? (
+                // 완료 결과
+                <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
+                  <CheckCircle2 size={40} style={{ color: 'var(--color-success)' }} />
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginTop: '0.75rem' }}>
+                    가져오기 완료
+                  </div>
+                  <div style={{ fontSize: '0.87rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem', lineHeight: 1.7 }}>
+                    신규 생성 {importResult.created}건 &nbsp;·&nbsp; 납부 업데이트 {importResult.updated}건 &nbsp;·&nbsp; 건너뜀 {importResult.skipped}건
+                  </div>
+                </div>
+              ) : !importParsed ? (
+                // 파일 업로드 안내
+                <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '1.25rem', lineHeight: 1.7 }}>
+                    결제선생 매니저 앱 또는 웹에서<br />
+                    <strong>발송수납내역 엑셀(.xlsx)</strong>을 내보낸 후 업로드하세요.
+                  </div>
+                  <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
+                    <Upload size={16} /> 파일 선택
+                  </button>
+                  <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+                    지원 형식: xlsx · 컬럼: 발송일시, 이름, 금액(원), 품목, 수납상태<br />
+                    수납완료 + 현장납부(파기)만 가져옵니다. 실제 취소건은 자동 제외.
+                  </div>
+                </div>
+              ) : (
+                // 파싱 결과 미리보기
+                <>
+                  {importParsed.errors.length > 0 && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.85rem', marginBottom: '0.85rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>
+                      {importParsed.errors.map((e, i) => <div key={i}>{e}</div>)}
+                    </div>
+                  )}
+
+                  {/* 매칭된 항목 */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--color-primary-dark)' }}>
+                        가져올 항목 {importParsed.matched.length}건
+                      </strong>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                        학생 매칭 완료
+                      </span>
+                    </div>
+                    {importParsed.matched.length === 0 ? (
+                      <div style={{ fontSize: '0.83rem', color: 'var(--color-text-muted)', padding: '0.5rem 0' }}>
+                        Growing에 등록된 학생과 일치하는 항목이 없습니다.
+                      </div>
+                    ) : (
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                        {importParsed.matched.map((row, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.75rem', fontSize: '0.84rem', borderBottom: '1px solid #f0f2f0', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: 600, minWidth: 60 }}>{row.name}</span>
+                            <span style={{ color: 'var(--color-text-secondary)', flex: 1 }}>{row.item}</span>
+                            <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{row.amount.toLocaleString()}원</span>
+                            <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', borderRadius: 999, background: row.isPaid ? '#d1fae5' : '#fef3c7', color: row.isPaid ? '#065f46' : '#92400e', whiteSpace: 'nowrap' }}>
+                              {row.rawStatus}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 미매칭 항목 */}
+                  {importParsed.unmatched.length > 0 && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                        학생 미매칭 · 건너뜀 {importParsed.unmatched.length}건
+                      </strong>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', lineHeight: 1.6 }}>
+                        {importParsed.unmatched.map(r => r.name).join(', ')} — Growing에 등록된 이름과 다릅니다.
+                      </div>
+                    </div>
+                  )}
+
+                  {importParsed.skippedVoid > 0 && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                      실제 취소(파기) {importParsed.skippedVoid}건은 자동 제외됩니다.
+                    </div>
+                  )}
+
+                  <button
+                    className="btn btn-secondary"
+                    style={{ marginTop: '0.85rem', fontSize: '0.82rem' }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    다른 파일 선택
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              {importResult ? (
+                <button type="button" className="btn btn-primary" onClick={handleCloseImport}>닫기</button>
+              ) : !importParsed ? (
+                <button type="button" className="btn btn-secondary" onClick={handleCloseImport}>취소</button>
+              ) : (
+                <>
+                  <button type="button" className="btn btn-secondary" onClick={handleCloseImport} disabled={isImporting}>취소</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleConfirmImport}
+                    disabled={isImporting || importParsed.matched.length === 0}
+                  >
+                    {isImporting ? '가져오는 중...' : `${importParsed.matched.length}건 가져오기`}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

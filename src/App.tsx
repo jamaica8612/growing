@@ -330,6 +330,7 @@ function AcademyApp({ session }: { session: Session }) {
             onCancelPayment={data.handleCancelPayment}
             onDeletePayment={data.handleDeletePayment}
             onAddManualPayment={data.handleAddManualPayment}
+            onImportPayssam={data.handleImportPayssam}
           />
         );
       case 'counsel':
