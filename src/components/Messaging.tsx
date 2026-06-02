@@ -352,6 +352,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     } catch (error) {
       const message = error instanceof Error ? error.message : '알림톡 발송에 실패했습니다.';
       alert(message);
+      setSendingAlimtalkId(null);
     } finally {
       setSendingAlimtalkId(null);
     }

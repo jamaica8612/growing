@@ -51,6 +51,8 @@ export const Students: React.FC<StudentsProps> = ({
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
 
   const [, setIsDetailOpen] = useState(false);
   const [activeDetailStudent, setActiveDetailStudent] = useState<Student | null>(null);
@@ -109,8 +111,9 @@ export const Students: React.FC<StudentsProps> = ({
   // Submit Add or Edit
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim()) return;
+    if (!formName.trim() || isSubmittingForm) return;
 
+    setIsSubmittingForm(true);
     const studentData = {
       name: formName.trim(),
       school: formSchool.trim(),
@@ -122,12 +125,16 @@ export const Students: React.FC<StudentsProps> = ({
       memo: formMemo.trim(),
     };
 
-    if (editingStudent) {
-      onUpdateStudent({ ...studentData, id: editingStudent.id });
-    } else {
-      onAddStudent(studentData);
+    try {
+      if (editingStudent) {
+        onUpdateStudent({ ...studentData, id: editingStudent.id });
+      } else {
+        onAddStudent(studentData);
+      }
+    } finally {
+      setIsFormOpen(false);
+      setIsSubmittingForm(false);
     }
-    setIsFormOpen(false);
   };
 
   // Open Detail Modal
@@ -141,21 +148,26 @@ export const Students: React.FC<StudentsProps> = ({
   // Submit Counsel Log inside detail modal
   const handleAddLogSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeDetailStudent || !logTitle.trim() || !logContent.trim()) return;
+    if (!activeDetailStudent || !logTitle.trim() || !logContent.trim() || isSubmittingLog) return;
 
-    onAddCounselLog({
-      studentId: activeDetailStudent.id,
-      date: new Date().toISOString().split('T')[0],
-      title: logTitle.trim(),
-      content: logContent.trim(),
-      type: logType,
-      score: logType === 'test' ? logScore.trim() : undefined,
-    });
+    setIsSubmittingLog(true);
+    try {
+      onAddCounselLog({
+        studentId: activeDetailStudent.id,
+        date: new Date().toISOString().split('T')[0],
+        title: logTitle.trim(),
+        content: logContent.trim(),
+        type: logType,
+        score: logType === 'test' ? logScore.trim() : undefined,
+      });
 
-    setLogTitle('');
-    setLogContent('');
-    setLogScore('');
-    setShowLogForm(false);
+      setLogTitle('');
+      setLogContent('');
+      setLogScore('');
+      setShowLogForm(false);
+    } finally {
+      setIsSubmittingLog(false);
+    }
   };
 
   // Withdraw handler: keep historical records, but remove the student from active operations.
@@ -531,8 +543,8 @@ export const Students: React.FC<StudentsProps> = ({
                           <textarea className="form-control" rows={3} value={logContent} onChange={e => setLogContent(e.target.value)} required />
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                          <button type="button" className="at-act" onClick={() => setShowLogForm(false)}>취소</button>
-                          <button type="submit" className="at-act primary">저장</button>
+                          <button type="button" className="at-act" onClick={() => setShowLogForm(false)} disabled={isSubmittingLog}>취소</button>
+                          <button type="submit" className="at-act primary" disabled={isSubmittingLog}>저장</button>
                         </div>
                       </form>
                     )}
@@ -851,10 +863,10 @@ export const Students: React.FC<StudentsProps> = ({
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsFormOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsFormOpen(false)} disabled={isSubmittingForm}>
                   취소
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={isSubmittingForm}>
                   {editingStudent ? '수정 완료' : '등록'}
                 </button>
               </div>

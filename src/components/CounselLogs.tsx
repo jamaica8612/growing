@@ -24,6 +24,7 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
 
   // Form Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formStudentId, setFormStudentId] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
@@ -45,21 +46,27 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formStudentId || !formTitle.trim() || !formContent.trim()) {
+    if (!formStudentId || !formTitle.trim() || !formContent.trim() || isSubmitting) {
+      if (isSubmitting) return;
       alert('필수 입력란을 모두 채워주세요.');
       return;
     }
 
-    onAddCounselLog({
-      studentId: formStudentId,
-      date: new Date().toISOString().split('T')[0],
-      title: formTitle.trim(),
-      content: formContent.trim(),
-      type: formType,
-      score: formType === 'test' ? formScore.trim() : undefined,
-    });
+    setIsSubmitting(true);
+    try {
+      onAddCounselLog({
+        studentId: formStudentId,
+        date: new Date().toISOString().split('T')[0],
+        title: formTitle.trim(),
+        content: formContent.trim(),
+        type: formType,
+        score: formType === 'test' ? formScore.trim() : undefined,
+      });
 
-    setIsFormOpen(false);
+      setIsFormOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDelete = (id: string, title: string) => {
@@ -372,10 +379,10 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
 
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsFormOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsFormOpen(false)} disabled={isSubmitting}>
                   취소
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                   등록 완료
                 </button>
               </div>
