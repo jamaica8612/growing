@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, CheckCircle2, Info } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowRight, Bell, CheckCircle2, Info } from 'lucide-react';
 import type { Attendance, Class, CounselLog, Payment, Student } from '../types';
 import { getDataQualitySections, type DataQualitySeverity, type DataQualityTarget } from '../lib/dataQuality';
 
@@ -11,10 +11,13 @@ interface DataQualityProps {
   onNavigate: (tab: string) => void;
 }
 
-const severityMeta: Record<DataQualitySeverity, { label: string; icon: typeof AlertTriangle; color: string; background: string }> = {
-  danger: { label: '데이터 꼬임', icon: AlertTriangle, color: 'var(--color-danger)', background: 'var(--color-danger-light)' },
-  warning: { label: '확인 필요', icon: AlertTriangle, color: 'var(--color-warning)', background: '#fff7ed' },
-  info: { label: '개선 추천', icon: Info, color: 'var(--color-info)', background: '#eff6ff' },
+const severityMeta: Record<
+  DataQualitySeverity,
+  { label: string; icon: typeof AlertTriangle; icClass: string }
+> = {
+  danger: { label: '데이터 꼬임', icon: AlertCircle, icClass: 'danger' },
+  warning: { label: '확인 필요', icon: AlertTriangle, icClass: 'warn' },
+  info: { label: '개선 추천', icon: Info, icClass: 'info' },
 };
 
 const targetTab: Record<DataQualityTarget, string> = {
@@ -26,76 +29,95 @@ const targetTab: Record<DataQualityTarget, string> = {
 
 export function DataQuality({ students, classes, attendance, payments, counselLogs, onNavigate }: DataQualityProps) {
   const sections = getDataQualitySections({ students, classes, attendance, payments, counselLogs });
-  const totalIssues = sections.reduce((sum, section) => sum + section.issues.length, 0);
-  const activeSections = sections.filter(section => section.issues.length > 0);
+  const totalIssues = sections.reduce((sum, sec) => sum + sec.issues.length, 0);
+  const activeSections = sections.filter(sec => sec.issues.length > 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div className="grid-container cols-3" style={{ gap: '1rem' }}>
-        <div className="card metric-card danger">
-          <div className="metric-label">전체 점검 항목</div>
-          <div className="metric-value">{totalIssues}건</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+      {/* ── KPI 3개 ── */}
+      <div className="gd-stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="gd-stat gd-stat-danger">
+          <div className="gd-stat-ic" style={{ background: '#fdeaea', color: 'var(--color-danger)' }}>
+            <AlertCircle size={22} />
+          </div>
+          <div className="gd-stat-body">
+            <span className="gd-stat-label">전체 점검 항목</span>
+            <span className="gd-stat-val">{totalIssues}<em>건</em></span>
+          </div>
         </div>
-        <div className="card metric-card warning">
-          <div className="metric-label">확인 필요 카드</div>
-          <div className="metric-value">{activeSections.length}개</div>
+
+        <div className="gd-stat">
+          <div className="gd-stat-ic" style={{ background: '#fef3c7', color: '#b4710a' }}>
+            <Bell size={22} />
+          </div>
+          <div className="gd-stat-body">
+            <span className="gd-stat-label">확인 필요 카드</span>
+            <span className="gd-stat-val">{activeSections.length}<em>개</em></span>
+          </div>
         </div>
-        <div className="card metric-card accent-mint">
-          <div className="metric-label">자동 수정</div>
-          <div className="metric-value" style={{ fontSize: '1.1rem' }}>없음</div>
+
+        <div className="gd-stat">
+          <div className="gd-stat-ic" style={{ background: '#e9f8f1', color: 'var(--color-accent-mint)' }}>
+            <CheckCircle2 size={22} />
+          </div>
+          <div className="gd-stat-body">
+            <span className="gd-stat-label">자동 수정</span>
+            <span className="gd-stat-val" style={{ fontSize: '1.15rem' }}>없음</span>
+          </div>
         </div>
       </div>
 
+      {/* ── 점검 카드 그리드 ── */}
       {activeSections.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
-          <CheckCircle2 size={34} color="var(--color-success)" />
-          <h3 style={{ color: 'var(--color-primary-dark)', margin: '0.75rem 0 0.25rem' }}>현재 데이터 점검 결과가 좋습니다.</h3>
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>로드된 데이터 기준으로 바로 확인할 항목이 없습니다.</p>
+        <div className="gd-card">
+          <div className="gd-empty" style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>
+            <CheckCircle2 size={34} />
+            <span>현재 데이터 점검 결과가 좋아요!</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>
+              로드된 데이터 기준으로 바로 확인할 항목이 없습니다.
+            </span>
+          </div>
         </div>
       ) : (
-        <div className="grid-container cols-2" style={{ gap: '1rem' }}>
-          {activeSections.map(section => {
-            const meta = severityMeta[section.severity];
+        <div className="dq-grid">
+          {activeSections.map(sec => {
+            const meta = severityMeta[sec.severity];
             const Icon = meta.icon;
             return (
-              <div key={section.key} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: meta.color,
-                        backgroundColor: meta.background,
-                      }}
-                    >
+              <section key={sec.key} className="gd-card dq-card">
+                {/* 카드 헤더 */}
+                <div className="dq-head">
+                  <div className="dq-head-id">
+                    <span className={`dq-ic ${meta.icClass}`}>
                       <Icon size={18} />
-                    </div>
+                    </span>
                     <div>
-                      <h3 className="card-title" style={{ margin: 0 }}>{section.title}</h3>
-                      <span style={{ color: meta.color, fontSize: '0.78rem', fontWeight: 800 }}>{meta.label}</span>
+                      <h3>{sec.title}</h3>
+                      <span className={`dq-sev ${meta.icClass}`}>{meta.label}</span>
                     </div>
                   </div>
-                  <span className="badge badge-inactive">{section.issues.length}건</span>
+                  <span className="dq-count">{sec.issues.length}건</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 240, overflow: 'auto' }}>
-                  {section.issues.map(issue => (
-                    <div key={issue.id} style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.65rem', backgroundColor: '#fff' }}>
-                      <strong style={{ display: 'block', color: 'var(--color-primary-dark)', fontSize: '0.9rem' }}>{issue.title}</strong>
-                      <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.82rem' }}>{issue.description}</span>
+                {/* 이슈 리스트 */}
+                <div className="dq-issues">
+                  {sec.issues.map(issue => (
+                    <div key={issue.id} className="dq-issue">
+                      <b>{issue.title}</b>
+                      <span>{issue.description}</span>
                     </div>
                   ))}
                 </div>
 
-                <button type="button" className="btn btn-secondary" onClick={() => onNavigate(targetTab[section.target])}>
-                  {section.actionLabel} <ArrowRight size={15} />
+                {/* 해당 화면으로 버튼 */}
+                <button
+                  type="button"
+                  className="pay-btn ghost dq-action"
+                  onClick={() => onNavigate(targetTab[sec.target])}
+                >
+                  {sec.actionLabel} <ArrowRight size={14} />
                 </button>
-              </div>
+              </section>
             );
           })}
         </div>

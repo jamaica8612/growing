@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import type { Attendance, EditableAttendanceStatus } from '../types';
+import { useMemo } from 'react';
+import type { Attendance } from '../types';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 
 interface AttendanceCalendarProps {
@@ -7,30 +7,22 @@ interface AttendanceCalendarProps {
   month: string; // YYYY-MM
   selectedDate?: string; // YYYY-MM-DD
   onSelectDate?: (date: string) => void;
+  compact?: boolean;
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-// 출결 상태별 표시 색상(기존 디자인 토큰 재사용)과 라벨.
-const STATUS_META: { key: EditableAttendanceStatus; label: string; color: string }[] = [
-  { key: 'present', label: '출석', color: 'var(--color-success)' },
-  { key: 'absent', label: '결석', color: 'var(--color-danger)' },
-  { key: 'makeup', label: '보강', color: 'var(--color-info)' },
-];
-
-type DayCounts = Record<EditableAttendanceStatus, number>;
-
-// 기존 출결 데이터를 월간 달력 그리드로 시각화한다. 신규 데이터 없이
-// attendance 배열을 날짜별로 집계만 한다. 날짜 클릭 시 상위로 알린다.
+// normalizeAttendanceStatus 집계만 — 신규 데이터 없음.
 export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
   attendance,
   month,
   selectedDate,
   onSelectDate,
+  compact = false,
 }) => {
   // 날짜(YYYY-MM-DD) → 상태별 건수 집계
   const countsByDate = useMemo(() => {
-    const map: Record<string, DayCounts> = {};
+    const map: Record<string, { present: number; absent: number; makeup: number }> = {};
     for (const a of attendance) {
       if (!a.date.startsWith(month)) continue;
       const day = (map[a.date] ??= { present: 0, absent: 0, makeup: 0 });
@@ -39,7 +31,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     return map;
   }, [attendance, month]);
 
-  // 달력 셀 구성: 1일의 요일만큼 앞에 빈 칸을 채운 뒤 날짜를 나열.
+  // 달력 셀: 1일 요일만큼 빈 칸 + 날짜 나열
   const cells = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
     if (!y || !m) return [] as (string | null)[];
@@ -53,101 +45,66 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     return list;
   }, [month]);
 
+  // 월 합계
   const monthTotal = useMemo(() => {
-    const total: DayCounts = { present: 0, absent: 0, makeup: 0 };
-    for (const counts of Object.values(countsByDate)) {
-      total.present += counts.present;
-      total.absent += counts.absent;
-      total.makeup += counts.makeup;
+    const total = { present: 0, absent: 0, makeup: 0 };
+    for (const c of Object.values(countsByDate)) {
+      total.present += c.present;
+      total.absent += c.absent;
+      total.makeup += c.makeup;
     }
     return total;
   }, [countsByDate]);
 
   return (
-    <div>
-      {/* 범례 + 월 합계 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-        {STATUS_META.map(s => (
-          <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-            <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: s.color, display: 'inline-block' }} />
-            {s.label} {monthTotal[s.key]}
-          </span>
-        ))}
-      </div>
-
+    <div className={`cal${compact ? ' cal-compact' : ''}`}>
       {/* 요일 헤더 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
+      <div className="cal-grid cal-head">
         {WEEKDAYS.map((w, i) => (
           <div
             key={w}
-            style={{
-              textAlign: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              padding: '0.25rem 0',
-              color: i === 0 ? 'var(--color-danger)' : i === 6 ? 'var(--color-info)' : 'var(--color-text-secondary)',
-            }}
+            className={`cal-wd${i === 0 ? ' sun' : ''}${i === 6 ? ' sat' : ''}`}
           >
             {w}
           </div>
         ))}
       </div>
 
-      {/* 날짜 셀 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+      {/* 날짜 셀 그리드 */}
+      <div className="cal-grid">
         {cells.map((date, idx) => {
-          if (!date) return <div key={`empty-${idx}`} />;
-          const counts = countsByDate[date];
+          if (!date) return <div key={`e-${idx}`} className="cal-cell empty" />;
+          const c = countsByDate[date];
           const dayNum = Number(date.slice(-2));
           const isSelected = date === selectedDate;
-          const hasData = !!counts;
+          const hasData = !!c;
           return (
             <button
               key={date}
               type="button"
+              className={`cal-cell${hasData ? ' has' : ''}${isSelected ? ' selected' : ''}`}
               onClick={() => onSelectDate?.(date)}
               title={date}
-              style={{
-                minHeight: '64px',
-                padding: '0.3rem',
-                border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: isSelected ? 'var(--color-accent-mint-light, #d1fae5)' : hasData ? '#fafcfb' : '#fff',
-                cursor: onSelectDate ? 'pointer' : 'default',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: '0.2rem',
-                font: 'inherit',
-                textAlign: 'left',
-              }}
+              style={{ cursor: onSelectDate ? 'pointer' : 'default', border: 'none', font: 'inherit', padding: 0 }}
             >
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{dayNum}</span>
+              <span className="cal-d">{dayNum}</span>
               {hasData && (
-                <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
-                  {STATUS_META.map(s =>
-                    counts[s.key] > 0 ? (
-                      <span
-                        key={s.key}
-                        style={{
-                          fontSize: '0.66rem',
-                          fontWeight: 700,
-                          lineHeight: 1,
-                          padding: '2px 4px',
-                          borderRadius: '4px',
-                          color: '#fff',
-                          backgroundColor: s.color,
-                        }}
-                      >
-                        {s.label[0]}{counts[s.key]}
-                      </span>
-                    ) : null
-                  )}
-                </span>
+                <div className="cal-dots">
+                  {c.present > 0 && <span className="cal-dot present" title={`출석 ${c.present}`} />}
+                  {c.makeup > 0 && <span className="cal-dot makeup" title={`보강 ${c.makeup}`} />}
+                  {c.absent > 0 && <span className="cal-dot absent" title={`결석 ${c.absent}`} />}
+                </div>
               )}
             </button>
           );
         })}
+      </div>
+
+      {/* 범례 + 월 합계 */}
+      <div className="cal-legend">
+        <span><i className="cal-dot present" /> 출석 {monthTotal.present}</span>
+        <span><i className="cal-dot makeup" /> 보강 {monthTotal.makeup}</span>
+        <span><i className="cal-dot absent" /> 결석 {monthTotal.absent}</span>
       </div>
     </div>
   );

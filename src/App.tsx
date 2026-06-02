@@ -28,7 +28,6 @@ import {
   CreditCard,
   MessageSquare,
   ShieldCheck,
-  Sprout,
   Menu,
   X,
   Smartphone,
@@ -37,6 +36,14 @@ import {
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
+
+// 담쟁이(Ivy) 브랜드 아이콘
+const IvyIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7 20h10M10 20c5.5-2.5.8-6.4 5-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6c-.6 1.4-.5 2.6-.4 4 1.7-.4 3-1 4-2.2 1-1.3 1.3-3 1.4-4.8-2.4.6-3.9 1.5-4.7 3z" />
+  </svg>
+);
 
 // Navigation grouped by usage flow so the most-frequent daily tasks sit at the
 // top. Rendered by both the desktop sidebar and the mobile drawer. The 'kiosk'
@@ -71,13 +78,6 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   },
 ];
 
-const NAV_GROUP_TITLE_STYLE: React.CSSProperties = {
-  fontSize: '0.68rem',
-  fontWeight: 700,
-  letterSpacing: '0.04em',
-  color: 'rgba(255, 255, 255, 0.38)',
-  padding: '0.75rem 1rem 0.3rem',
-};
 
 const TAB_TITLES: Record<string, string> = {
   dashboard: '학원 운영 대시보드',
@@ -94,56 +94,29 @@ const TAB_TITLES: Record<string, string> = {
   backup: 'AI·알림·백업 설정',
 };
 
-const NAV_ITEM_STYLE: React.CSSProperties = {
-  width: '100%',
-  background: 'none',
-  border: 'none',
-  textAlign: 'left',
-  font: 'inherit',
-};
-
 function NavItemButton({
   active,
   icon: Icon,
   label,
   onClick,
-  style,
   badge,
+  kioskStyle,
 }: {
   active: boolean;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
-  style?: React.CSSProperties;
   badge?: number;
+  kioskStyle?: boolean;
 }) {
   return (
     <button
-      className={`nav-item ${active ? 'active' : ''}`}
-      style={{ ...NAV_ITEM_STYLE, ...style }}
+      className={`side-item${active ? ' active' : ''}`}
+      style={kioskStyle ? { color: '#a3e2c9', fontWeight: 700 } : undefined}
       onClick={onClick}
     >
       <Icon size={18} /> {label}
-      {badge ? (
-        <span
-          style={{
-            marginLeft: 'auto',
-            backgroundColor: 'var(--color-danger)',
-            color: '#fff',
-            fontSize: '0.7rem',
-            fontWeight: 700,
-            minWidth: '18px',
-            height: '18px',
-            borderRadius: '9px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 5px',
-          }}
-        >
-          {badge}
-        </span>
-      ) : null}
+      {badge ? <span className="badge-n">{badge}</span> : null}
     </button>
   );
 }
@@ -182,7 +155,7 @@ function App() {
   }, []);
 
   if (!authReady) {
-    return <FullScreen><Sprout size={28} className="text-primary" /><div style={{ marginTop: '0.75rem' }}>불러오는 중...</div></FullScreen>;
+    return <FullScreen><IvyIcon size={28} /><div style={{ marginTop: '0.75rem', color: 'var(--color-text-secondary)' }}>불러오는 중...</div></FullScreen>;
   }
   if (!session) {
     return <Login />;
@@ -388,8 +361,8 @@ function AcademyApp({ session }: { session: Session }) {
     }
   };
 
-  // Renders the navigation list shared by the desktop sidebar and mobile drawer.
-  const renderNavSection = (opts: { closeOnNav: boolean; kioskAccent: string }) => {
+  // 데스크탑 사이드바 + 모바일 드로어 공용 네비게이션
+  const renderNavSection = (opts: { closeOnNav: boolean }) => {
     const go = (id: string) => {
       setActiveTab(id);
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
@@ -405,27 +378,24 @@ function AcademyApp({ session }: { session: Session }) {
       <>
         <nav style={{ flexGrow: 1 }}>
           {NAV_GROUPS.map(group => (
-            <div key={group.title} style={{ marginBottom: '0.35rem' }}>
-              <div style={NAV_GROUP_TITLE_STYLE}>{group.title}</div>
-              <ul className="nav-menu">
-                {group.items.map(item => (
-                  <li key={item.id}>
-                    <NavItemButton
-                      active={activeTab === item.id}
-                      icon={item.icon}
-                      label={item.label}
-                      onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
-                      badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : undefined}
-                      style={item.kind === 'kiosk' ? { color: opts.kioskAccent, fontWeight: 'bold' } : undefined}
-                    />
-                  </li>
-                ))}
-              </ul>
+            <div key={group.title} className="side-group">
+              <div className="side-group-t">{group.title}</div>
+              {group.items.map(item => (
+                <NavItemButton
+                  key={item.id}
+                  active={activeTab === item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
+                  badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length || undefined : undefined}
+                  kioskStyle={item.kind === 'kiosk'}
+                />
+              ))}
             </div>
           ))}
         </nav>
 
-        <div className="sidebar-footer">
+        <div className="side-foot">
           <NavItemButton
             active={activeTab === 'backup'}
             icon={ShieldCheck}
@@ -438,7 +408,7 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   if (loading) {
-    return <FullScreen><Sprout size={28} className="text-primary" /><div style={{ marginTop: '0.75rem' }}>데이터를 불러오는 중...</div></FullScreen>;
+    return <FullScreen><IvyIcon size={28} /><div style={{ marginTop: '0.75rem', color: 'var(--color-text-secondary)' }}>데이터를 불러오는 중...</div></FullScreen>;
   }
 
   if (error) {
@@ -459,75 +429,96 @@ function AcademyApp({ session }: { session: Session }) {
 
   return (
     <div className="app-container">
-      {/* Sidebar Navigation (Desktop only) */}
+      {/* ── 데스크탑 사이드바 ── */}
       <aside className="sidebar desktop-sidebar">
-        <button className="logo-container logo-button" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
-          <div className="logo-icon">
-            <Sprout size={24} />
-          </div>
-          <div>
-            <h1 className="logo-text">그로잉영어</h1>
-            <span className="logo-sub">Growing English</span>
+        <button className="side-logo" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
+          <span className="side-logo-ic">
+            <IvyIcon size={22} />
+          </span>
+          <div className="side-logo-tx">
+            <h1>그로잉영어</h1>
+            <span>Growing English</span>
           </div>
         </button>
 
-        {renderNavSection({ closeOnNav: false, kioskAccent: 'var(--color-primary-dark)' })}
+        {renderNavSection({ closeOnNav: false })}
       </aside>
 
-      {/* Mobile Top Header (Mobile only) */}
-      <header className="mobile-header">
-        <button className="mobile-logo-button" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
-          <div className="logo-icon" style={{ padding: '0.35rem', borderRadius: '6px' }}>
-            <Sprout size={18} />
-          </div>
-          <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>그로잉영어</span>
+      {/* ── 모바일 상단 헤더 ── */}
+      <header className="mobile-header m-header">
+        <button className="m-header-logo" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
+          <span className="side-logo-ic" style={{ width: 30, height: 30, borderRadius: 9 }}>
+            <IvyIcon size={18} />
+          </span>
+          <span>그로잉영어</span>
         </button>
-        <button className="menu-toggle-btn" onClick={() => setIsMobileMenuOpen(true)}>
-          <Menu size={24} />
-        </button>
+        <div className="m-header-actions">
+          <button
+            type="button"
+            className="m-header-btn"
+            onClick={handleLogout}
+            title={session.user.email ?? ''}
+          >
+            <LogOut size={14} /> 로그아웃
+          </button>
+          <button
+            type="button"
+            className="m-header-btn"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="메뉴 열기"
+          >
+            <Menu size={20} />
+          </button>
+        </div>
       </header>
 
-      {/* Mobile Menu Drawer Overlay */}
+      {/* ── 모바일 드로어 ── */}
       {isMobileMenuOpen && (
         <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)}>
           <div className="mobile-menu-drawer" onClick={e => e.stopPropagation()}>
             <div className="mobile-menu-header">
-              <button className="mobile-logo-button" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
-                <Sprout size={20} className="text-primary" />
-                <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#ffffff' }}>그로잉영어</span>
+              <button className="m-header-logo" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
+                <span className="side-logo-ic" style={{ width: 30, height: 30, borderRadius: 9 }}>
+                  <IvyIcon size={18} />
+                </span>
+                <span style={{ color: '#fff' }}>그로잉영어</span>
               </button>
               <button className="btn-icon-only" style={{ color: '#ffffff' }} onClick={() => setIsMobileMenuOpen(false)}>
                 <X size={22} />
               </button>
             </div>
 
-            {renderNavSection({ closeOnNav: true, kioskAccent: '#a3e2c9' })}
+            {renderNavSection({ closeOnNav: true })}
           </div>
         </div>
       )}
 
-      {/* Main Panel Content */}
+      {/* ── 메인 콘텐츠 ── */}
       <main className="main-content">
-        <header className="header">
+        <header className="app-topbar">
           <div>
-            <h2 className="page-title">{TAB_TITLES[activeTab] ?? '그로잉영어'}</h2>
-            <p className="page-subtitle">그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.</p>
+            <h2>{TAB_TITLES[activeTab] ?? '그로잉영어'}</h2>
+            <p>그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.</p>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button className="btn btn-secondary" style={{ gap: '0.4rem' }} onClick={handleLogout} title={session.user.email ?? ''}>
+            <button
+              className="btn btn-secondary"
+              style={{ gap: '0.4rem' }}
+              onClick={handleLogout}
+              title={session.user.email ?? ''}
+            >
               <LogOut size={15} /> 로그아웃
             </button>
           </div>
         </header>
 
-        {/* Dynamic page component */}
         <div style={{ animation: 'fadeIn 0.25s ease-out' }}>
           {renderContent()}
         </div>
       </main>
 
-      <nav className="mobile-bottom-nav" aria-label="빠른 이동">
+      {/* ── 모바일 하단 탭 (m-tabs) ── */}
+      <nav className="mobile-bottom-nav m-tabs" aria-label="빠른 이동">
         {mobileQuickNavItems.map(item => {
           const Icon = item.icon;
           const badge = item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : 0;
@@ -535,16 +526,14 @@ function AcademyApp({ session }: { session: Session }) {
             <button
               key={item.id}
               type="button"
-              className={activeTab === item.id ? 'active' : ''}
+              className={`m-tab${activeTab === item.id ? ' active' : ''}`}
               onClick={() => {
                 setActiveTab(item.id);
                 setIsMobileMenuOpen(false);
               }}
             >
-              <span className="mobile-bottom-nav-icon">
-                <Icon size={19} />
-                {badge > 0 ? <em>{badge}</em> : null}
-              </span>
+              <Icon size={20} />
+              {badge > 0 && <em>{badge}</em>}
               <span>{item.label}</span>
             </button>
           );

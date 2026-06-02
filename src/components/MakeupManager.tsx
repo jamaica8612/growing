@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarCheck, CheckCircle2, Search, X } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, RefreshCw, Search, X } from 'lucide-react';
 import type { Attendance, Class, Student } from '../types';
 import { getMakeupSummary, hasMakeupForAbsence, type MakeupNeededItem } from '../lib/makeupUtils';
 
@@ -15,13 +15,17 @@ type Filter = 'all' | 'needed' | 'completed';
 export function MakeupManager({ students, classes, attendance, onSaveAttendance }: MakeupManagerProps) {
   const [filter, setFilter] = useState<Filter>('needed');
   const [search, setSearch] = useState('');
-  const [activeOnly, setActiveOnly] = useState(true);
   const [processingItem, setProcessingItem] = useState<MakeupNeededItem | null>(null);
   const [makeupDate, setMakeupDate] = useState(new Date().toISOString().split('T')[0]);
   const [makeupClassId, setMakeupClassId] = useState('');
 
-  const summary = useMemo(() => getMakeupSummary(students, classes, attendance), [students, classes, attendance]);
+  const summary = useMemo(
+    () => getMakeupSummary(students, classes, attendance),
+    [students, classes, attendance],
+  );
+
   const normalizedSearch = search.trim().toLowerCase();
+  const activeOnly = true;
 
   const needed = summary.needed.filter(item => {
     const matchesSearch =
@@ -66,173 +70,192 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
     setProcessingItem(null);
   };
 
-  const renderNeeded = () => (
-    <div className="grid-container cols-2" style={{ gap: '1rem' }}>
-      {needed.length === 0 ? (
-        <div className="mobile-empty-card" style={{ gridColumn: '1 / -1' }}>보강이 필요한 결석 기록이 없습니다.</div>
-      ) : (
-        needed.map(item => (
-          <div key={item.id} className="mobile-data-card" style={{ cursor: 'default' }}>
-            <div className="mobile-data-card-header">
-              <div>
-                <strong>{item.student.name}</strong>
-                <span>{item.class?.name ?? '반 정보 없음'}</span>
-              </div>
-              <span className="badge badge-absent">보강 필요</span>
-            </div>
-            <div className="mobile-data-grid">
-              <div>
-                <span>원래 결석일</span>
-                <strong>{item.absentRecord.date}</strong>
-              </div>
-              <div>
-                <span>메모</span>
-                <strong>{item.absentRecord.memo || '-'}</strong>
-              </div>
-            </div>
-            <div className="mobile-card-actions">
-              <button type="button" className="btn btn-primary" onClick={() => openProcessModal(item)}>
-                <CalendarCheck size={15} /> 보강 처리
-              </button>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-
-  const renderCompleted = () => (
-    <div className="grid-container cols-2" style={{ gap: '1rem' }}>
-      {completed.length === 0 ? (
-        <div className="mobile-empty-card" style={{ gridColumn: '1 / -1' }}>완료된 보강 기록이 없습니다.</div>
-      ) : (
-        completed.map(item => (
-          <div key={item.id} className="mobile-data-card" style={{ cursor: 'default' }}>
-            <div className="mobile-data-card-header">
-              <div>
-                <strong>{item.student?.name ?? '알 수 없는 학생'}</strong>
-                <span>{item.class?.name ?? '반 정보 없음'}</span>
-              </div>
-              <span className="badge badge-makeup">완료</span>
-            </div>
-            <div className="mobile-data-grid">
-              <div>
-                <span>보강일</span>
-                <strong>{item.makeupRecord.date}</strong>
-              </div>
-              <div>
-                <span>원래 결석일</span>
-                <strong>{item.makeupRecord.makeupForDate}</strong>
-              </div>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
+  const FILTERS: [Filter, string][] = [
+    ['needed', '보강 필요'],
+    ['completed', '보강 완료'],
+    ['all', '전체'],
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div
-        className="card makeup-summary-card"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '0.75rem',
-          padding: '1rem',
-          boxShadow: 'var(--shadow-sm)',
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+      {/* ── 현황 요약 배너 ── */}
+      <div className="mk-summary">
         <div>
-          <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>
-            보강 현황
-          </h3>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.84rem' }}>
-            결석 기록과 연결된 보강만 관리합니다.
-          </p>
+          <h3>보강 현황</h3>
+          <p>결석 기록과 연결된 보강만 관리합니다.</p>
         </div>
-        <div className="makeup-summary-badges" style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <span className="badge badge-absent" style={{ fontSize: '0.78rem' }}>
-            필요 {summary.needed.length}건
-          </span>
-          <span className="badge badge-makeup" style={{ fontSize: '0.78rem' }}>
-            완료 {summary.completed.length}건
-          </span>
-          <span className="badge badge-active" style={{ fontSize: '0.78rem' }}>
-            출결 저장
-          </span>
+        <div className="mk-badges">
+          <span className="at-pill danger">필요 {summary.needed.length}건</span>
+          <span className="at-pill info">완료 {summary.completed.length}건</span>
         </div>
       </div>
 
-      <div className="makeup-filter-card">
-        <div className="search-input-wrapper">
-          <Search size={18} className="search-icon" />
+      {/* ── 툴바: 검색 + 상태 세그먼트 ── */}
+      <div className="mk-toolbar">
+        <div className="pay-search" style={{ flex: 1, minWidth: 180 }}>
+          <Search size={15} />
           <input
-            className="form-control"
+            placeholder="학생·반 검색…"
             value={search}
-            onChange={event => setSearch(event.target.value)}
-            placeholder="학생명 또는 반 이름 검색"
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="makeup-filter-tabs" role="group" aria-label="보강 상태 필터">
-          {(['all', 'needed', 'completed'] as Filter[]).map(item => (
+        <div className="gd-seg mk-seg">
+          {FILTERS.map(([v, l]) => (
             <button
-              key={item}
+              key={v}
               type="button"
-              className={filter === item ? 'active' : ''}
-              onClick={() => setFilter(item)}
+              className={`gd-seg-b${filter === v ? ' sel ok' : ''}`}
+              onClick={() => setFilter(v)}
             >
-              {item === 'all' ? '전체' : item === 'needed' ? '보강 필요' : '보강 완료'}
+              {l}
             </button>
           ))}
         </div>
-        <button type="button" className={`makeup-active-toggle ${activeOnly ? 'active' : ''}`} onClick={() => setActiveOnly(value => !value)}>
-          재원생만 {activeOnly ? 'ON' : 'OFF'}
-        </button>
       </div>
 
-      {(filter === 'all' || filter === 'needed') && renderNeeded()}
-      {(filter === 'all' || filter === 'completed') && renderCompleted()}
+      {/* ── 보강 필요 카드 그리드 ── */}
+      {(filter === 'all' || filter === 'needed') && (
+        <section className="gd-card">
+          <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+            <RefreshCw size={18} /> 보강 필요
+            <span className="cl-count">{needed.length}</span>
+          </h2>
+          {needed.length === 0 ? (
+            <div className="gd-empty">
+              <CheckCircle2 size={26} />
+              <span>보강이 필요한 결석 기록이 없어요</span>
+            </div>
+          ) : (
+            <div className="mk-cards">
+              {needed.map(item => (
+                <div key={item.id} className="mk-card need">
+                  <div className="mk-card-head">
+                    <div>
+                      <b>{item.student.name}</b>
+                      <span>{item.class?.name ?? '반 정보 없음'}</span>
+                    </div>
+                    <span className="at-pill danger">보강 필요</span>
+                  </div>
+                  <div className="mk-grid">
+                    <div>
+                      <span>원래 결석일</span>
+                      <b>{item.absentRecord.date}</b>
+                    </div>
+                    <div>
+                      <span>메모</span>
+                      <b>{item.absentRecord.memo || '—'}</b>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="pay-btn primary sm mk-btn"
+                    onClick={() => openProcessModal(item)}
+                  >
+                    <CalendarCheck size={14} /> 보강 처리
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
-      {processingItem ? (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: 460 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">보강 처리</h3>
-              <button type="button" className="btn-icon-only" onClick={() => setProcessingItem(null)}>
-                <X size={20} />
+      {/* ── 보강 완료 카드 그리드 ── */}
+      {(filter === 'all' || filter === 'completed') && (
+        <section className="gd-card">
+          <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+            <CheckCircle2 size={18} /> 보강 완료
+            <span className="cl-count">{completed.length}</span>
+          </h2>
+          {completed.length === 0 ? (
+            <div className="gd-empty">
+              <CalendarCheck size={24} />
+              <span>완료된 보강 기록이 없어요</span>
+            </div>
+          ) : (
+            <div className="mk-cards">
+              {completed.map(item => (
+                <div key={item.id} className="mk-card done">
+                  <div className="mk-card-head">
+                    <div>
+                      <b>{item.student?.name ?? '알 수 없는 학생'}</b>
+                      <span>{item.class?.name ?? '반 정보 없음'}</span>
+                    </div>
+                    <span className="at-pill info">완료</span>
+                  </div>
+                  <div className="mk-grid">
+                    <div>
+                      <span>보강일</span>
+                      <b>{item.makeupRecord.date}</b>
+                    </div>
+                    <div>
+                      <span>원래 결석일</span>
+                      <b>{item.makeupRecord.makeupForDate}</b>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── 보강 처리 모달 ── */}
+      {processingItem && (
+        <div className="mk-modal-bg" onClick={() => setProcessingItem(null)}>
+          <div className="mk-modal" onClick={e => e.stopPropagation()}>
+            <div className="mk-modal-head">
+              <h3>보강 처리</h3>
+              <button type="button" onClick={() => setProcessingItem(null)} aria-label="닫기">
+                <X size={18} />
               </button>
             </div>
-            <div className="modal-body">
-              <div className="card" style={{ boxShadow: 'none', marginBottom: '1rem' }}>
-                <CheckCircle2 size={20} color="var(--color-primary)" />
-                <p style={{ margin: '0.5rem 0 0', color: 'var(--color-text-secondary)' }}>
-                  {processingItem.student.name} 학생의 {processingItem.absentRecord.date} 결석분을 보강 기록으로 연결합니다.
-                </p>
-              </div>
-              <div className="form-group">
-                <label>보강 날짜</label>
-                <input type="date" className="form-control" value={makeupDate} onChange={event => setMakeupDate(event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>보강 반</label>
-                <select className="form-control" value={makeupClassId} onChange={event => setMakeupClassId(event.target.value)}>
-                  {classes
-                    .filter(cls => cls.studentIds.includes(processingItem.student.id) || cls.id === processingItem.absentRecord.classId)
-                    .map(cls => (
-                      <option key={cls.id} value={cls.id}>{cls.name}</option>
-                    ))}
-                </select>
-              </div>
+
+            <div className="mk-modal-info">
+              <CheckCircle2 size={18} />
+              <p>
+                <b>{processingItem.student.name}</b> 학생의{' '}
+                <b>{processingItem.absentRecord.date}</b> 결석분을 보강 기록으로 연결합니다.
+              </p>
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setProcessingItem(null)}>취소</button>
-              <button type="button" className="btn btn-primary" onClick={handleProcess}>저장</button>
+
+            <label className="msg-label">보강 날짜</label>
+            <input
+              type="date"
+              className="msg-select"
+              value={makeupDate}
+              onChange={e => setMakeupDate(e.target.value)}
+            />
+
+            <label className="msg-label">보강 반</label>
+            <select
+              className="msg-select"
+              value={makeupClassId}
+              onChange={e => setMakeupClassId(e.target.value)}
+            >
+              {classes
+                .filter(
+                  cls =>
+                    cls.studentIds.includes(processingItem.student.id) ||
+                    cls.id === processingItem.absentRecord.classId,
+                )
+                .map(cls => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+            </select>
+
+            <div className="mk-modal-btns">
+              <button type="button" className="pay-btn ghost" onClick={() => setProcessingItem(null)}>
+                취소
+              </button>
+              <button type="button" className="pay-btn primary" onClick={handleProcess}>
+                저장
+              </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
