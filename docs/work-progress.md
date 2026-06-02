@@ -61,6 +61,15 @@
 - `semantic_search` 도구: 질의 임베딩 → RPC 병렬 조회 → 유사도 정렬 반환
 - `backfill_embeddings` 도구: 임베딩 없는 기존 행 최대 50건 백필
 
+### 시험 성적 관리 + 청구서 내보내기 + 아이비 쓰기 확장 (2026-06-02)
+- **B — 시험 성적 관리**: `growing_scores` 테이블(RLS) + Students 성적 탭
+  - 과목·시험명·점수·만점·날짜·메모 CRUD
+  - 점수 색상 등급: 초록 ≥80%, 노랑 ≥60%, 빨강 <60%
+- **C — 월별 청구서 내보내기**: Payments "청구서 내보내기" 버튼 → 마크다운 Blob 다운로드 (`수납현황_YYYY-MM.md`)
+- **E — 아이비 쓰기 확장** (엣지 함수 v24):
+  - `propose_tuition_override`: 학생별 수강료 오버라이드 제안 → `execute_action`으로 `tuition_overrides` JSONB 업데이트
+  - `propose_makeup`: 보강 일정 제안 → `execute_action`으로 `growing_attendance` 레코드 삽입(status='makeup')
+
 ---
 
 ## ⏳ 진행 예정 (다음 세션에서 이어서)
