@@ -220,7 +220,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                   출결 대상인 재원생이 없습니다.
                 </div>
               ) : (
-                <>
+                <div style={{ overflowX: 'auto' }}>
                   <div className="at-table-head">
                     <span>학생</span>
                     <span>등 · 하원</span>
@@ -346,7 +346,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                       );
                     })}
                   </div>
-                </>
+                </div>
               )}
             </section>
           );
@@ -375,16 +375,16 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
             <input type="month" className="form-control" style={{ width: '160px', padding: '0.35rem 0.65rem' }} value={reportMonth} onChange={e => setReportMonth(e.target.value)} />
           </div>
         </div>
-        <div className="table-wrapper">
+        <div className="table-wrapper at-monthly-tbl">
           <table className="custom-table" style={{ fontSize: '0.85rem' }}>
             <thead>
               <tr>
                 <th>학생 이름</th>
-                <th>학교 / 학년</th>
+                <th className="at-col-school">학교 / 학년</th>
                 <th style={{ textAlign: 'center', color: 'var(--color-success)' }}>출석</th>
                 <th style={{ textAlign: 'center', color: 'var(--color-danger)' }}>결석</th>
                 <th style={{ textAlign: 'center', color: 'var(--color-info)' }}>보강</th>
-                <th style={{ textAlign: 'center' }}>출결 진행률</th>
+                <th style={{ textAlign: 'center' }}>출결률</th>
               </tr>
             </thead>
             <tbody>
@@ -397,15 +397,13 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                   return (
                     <tr key={row.id}>
                       <td style={{ fontWeight: 700 }}>{row.name}{row.isPaused && <span style={{ marginLeft: '0.35rem', fontSize: '0.7rem', color: '#92400e', fontWeight: 700 }}>휴원</span>}</td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{row.school} {row.grade.split(' ')[1] || row.grade}</td>
+                      <td className="at-col-school" style={{ color: 'var(--color-text-secondary)' }}>{row.school} {row.grade.split(' ')[1] || row.grade}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-success)' }}>{row.present}회</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-danger)' }}>{row.absent}회</td>
                       <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-info)' }}>{row.makeup}회</td>
                       <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                          <span style={{ fontWeight: 700 }}>{rate}%</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>({row.total}일 중 {attended}일)</span>
-                        </div>
+                        <span style={{ fontWeight: 700 }}>{rate}%</span>
+                        <span className="at-rate-detail" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginLeft: '0.35rem' }}>({row.total}일 중 {attended}일)</span>
                       </td>
                     </tr>
                   );
