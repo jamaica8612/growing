@@ -2206,6 +2206,13 @@ textarea.form-control {
   .gd-brief-list li { font-size: 0.82rem; }
   .gd-toast { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 }
+/* 아주 좁은 화면(≤380px): 숙제 세그먼트 버튼 & 시간 입력 압축 */
+@media (max-width: 380px) {
+  .gd-seg-b { font-size: 0.68rem; }
+  .gd-st-inout { grid-template-columns: 1fr; }
+  .gd-st-hw { flex-wrap: wrap; }
+  .gd-hw-lbl { width: 100%; }
+}
 
 /* ── 출결 관리 ── */
 .at-filterbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.9rem 1.1rem; box-shadow: var(--shadow-sm); }
@@ -2260,6 +2267,12 @@ textarea.form-control {
   .at-clabel { display: block; font-size: 0.7rem; font-weight: 800; color: var(--color-text-secondary); margin-bottom: 0.3rem; }
   .at-filterbar { padding: 0.85rem; }
   .at-summary { padding: 0.7rem 0.85rem; }
+  /* 월간 통계 테이블: 학교/학년 열 숨기고 진행률 상세 숨김 */
+  .at-monthly-tbl .at-col-school { display: none; }
+  .at-monthly-tbl .at-rate-detail { display: none; }
+  /* 알림장 템플릿 버튼 단일 열 */
+  .msg-tpls { grid-template-columns: 1fr; }
+  .msg-tpl-wide { grid-column: span 1 !important; }
 }
 
 /* ── 수납 관리 ── */
