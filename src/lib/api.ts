@@ -6,6 +6,7 @@ import type {
   Attendance,
   Payment,
   CounselLog,
+  Score,
   KioskAlert,
   HomeworkAlert,
   StudentStatus,
@@ -113,6 +114,17 @@ const toCounselLog = (r: Row): CounselLog => ({
   score: (r.score as string) ?? undefined,
 });
 
+const toScore = (r: Row): Score => ({
+  id: r.id as string,
+  studentId: r.student_id as string,
+  subject: s(r.subject),
+  testName: s(r.test_name),
+  score: (r.score as number) ?? 0,
+  maxScore: (r.max_score as number) ?? 100,
+  testDate: s(r.test_date),
+  memo: s(r.memo),
+});
+
 const toKioskAlert = (r: Row): KioskAlert => ({
   id: r.id as string,
   studentId: r.student_id as string,
@@ -136,6 +148,7 @@ export interface AcademySnapshot {
   attendance: Attendance[];
   payments: Payment[];
   counselLogs: CounselLog[];
+  scores: Score[];
   kioskAlerts: KioskAlert[];
   homeworkAlerts: HomeworkAlert[];
   kioskPin: string;
@@ -144,19 +157,20 @@ export interface AcademySnapshot {
 
 export const api = {
   async loadAll(): Promise<AcademySnapshot> {
-    const [students, classes, attendance, payments, counselLogs, kioskAlerts, homeworkAlerts, settings] = await Promise.all([
+    const [students, classes, attendance, payments, counselLogs, scores, kioskAlerts, homeworkAlerts, settings] = await Promise.all([
       supabase.from('growing_students').select('*').order('created_at'),
       supabase.from('growing_classes').select('*').order('created_at'),
       supabase.from('growing_attendance').select('*'),
       supabase.from('growing_payments').select('*'),
       supabase.from('growing_counsel_logs').select('*'),
+      supabase.from('growing_scores').select('*').order('test_date', { ascending: false }),
       supabase.from('growing_kiosk_alerts').select('*').order('created_at'),
       supabase.from('growing_homework_alerts').select('*').order('created_at'),
       supabase.from('growing_settings').select('*').maybeSingle(),
     ]);
     const error =
       students.error || classes.error || attendance.error || payments.error ||
-      counselLogs.error || kioskAlerts.error || homeworkAlerts.error || settings.error;
+      counselLogs.error || scores.error || kioskAlerts.error || homeworkAlerts.error || settings.error;
     if (error) throw error;
 
     return {
@@ -165,6 +179,7 @@ export const api = {
       attendance: (attendance.data ?? []).map(toAttendance),
       payments: (payments.data ?? []).map(toPayment),
       counselLogs: (counselLogs.data ?? []).map(toCounselLog),
+      scores: (scores.data ?? []).map(toScore),
       kioskAlerts: (kioskAlerts.data ?? []).map(toKioskAlert),
       homeworkAlerts: (homeworkAlerts.data ?? []).map(toHomeworkAlert),
       kioskPin: (settings.data?.kiosk_pin as string) ?? '1234',
@@ -415,6 +430,48 @@ export const api = {
 
   async deleteCounselLog(id: string): Promise<void> {
     const { error } = await supabase.from('growing_counsel_logs').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // ---- Scores ----
+  async addScore(data: Omit<Score, 'id'>): Promise<Score> {
+    const { data: row, error } = await supabase
+      .from('growing_scores')
+      .insert({
+        student_id: data.studentId,
+        subject: data.subject,
+        test_name: orNull(data.testName),
+        score: data.score,
+        max_score: data.maxScore,
+        test_date: data.testDate,
+        memo: orNull(data.memo),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return toScore(row);
+  },
+
+  async updateScore(score: Score): Promise<Score> {
+    const { data: row, error } = await supabase
+      .from('growing_scores')
+      .update({
+        subject: score.subject,
+        test_name: orNull(score.testName),
+        score: score.score,
+        max_score: score.maxScore,
+        test_date: score.testDate,
+        memo: orNull(score.memo),
+      })
+      .eq('id', score.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return toScore(row);
+  },
+
+  async deleteScore(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_scores').delete().eq('id', id);
     if (error) throw error;
   },
 

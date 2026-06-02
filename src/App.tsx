@@ -179,6 +179,7 @@ function AcademyApp({ session }: { session: Session }) {
     attendance,
     payments,
     counselLogs,
+    scores,
     kioskAlerts,
     homeworkAlerts,
     kioskPin,
@@ -229,6 +230,7 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             payments={payments}
             counselLogs={counselLogs}
+            scores={scores}
             onAddStudent={data.handleAddStudent}
             onUpdateStudent={data.handleUpdateStudent}
             onWithdrawStudent={data.handleWithdrawStudent}
@@ -236,6 +238,9 @@ function AcademyApp({ session }: { session: Session }) {
             onRestoreStudent={data.handleRestoreStudent}
             onAddCounselLog={data.handleAddCounselLog}
             onUpdateCounselLog={data.handleUpdateCounselLog}
+            onAddScore={data.handleAddScore}
+            onUpdateScore={data.handleUpdateScore}
+            onDeleteScore={data.handleDeleteScore}
           />
         );
       case 'classes':

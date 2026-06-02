@@ -113,3 +113,14 @@ export interface CounselLog {
   type: CounselLogType;
   score?: string; // For test scores, e.g. "95/100" or "A+"
 }
+
+export interface Score {
+  id: string;
+  studentId: string;
+  subject: string;
+  testName: string;
+  score: number;
+  maxScore: number;
+  testDate: string; // YYYY-MM-DD
+  memo: string;
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, HomeworkAlert, HomeworkStatus, PaymentMethod } from '../types';
+import type { Student, Class, Attendance, Payment, CounselLog, Score, KioskAlert, HomeworkAlert, HomeworkStatus, PaymentMethod } from '../types';
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
@@ -15,6 +15,7 @@ export function useAcademyData(userId: string) {
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [counselLogs, setCounselLogs] = useState<CounselLog[]>([]);
+  const [scores, setScores] = useState<Score[]>([]);
   const [kioskAlerts, setKioskAlerts] = useState<KioskAlert[]>([]);
   const [homeworkAlerts, setHomeworkAlerts] = useState<HomeworkAlert[]>([]);
   const [kioskPin, setKioskPin] = useState('1234');
@@ -32,6 +33,7 @@ export function useAcademyData(userId: string) {
       setAttendance(snap.attendance);
       setPayments(snap.payments);
       setCounselLogs(snap.counselLogs);
+      setScores(snap.scores);
       setKioskAlerts(snap.kioskAlerts);
       setHomeworkAlerts(snap.homeworkAlerts);
       setKioskPin(snap.kioskPin);
@@ -287,6 +289,25 @@ export function useAcademyData(userId: string) {
       setCounselLogs(prev => prev.filter(l => l.id !== id));
     });
 
+  // ---- Scores ----
+  const handleAddScore = (data: Omit<Score, 'id'>) =>
+    guard(async () => {
+      const created = await api.addScore(data);
+      setScores(prev => [created, ...prev]);
+    });
+
+  const handleUpdateScore = (score: Score) =>
+    guard(async () => {
+      const updated = await api.updateScore(score);
+      setScores(prev => prev.map(s => (s.id === updated.id ? updated : s)));
+    });
+
+  const handleDeleteScore = (id: string) =>
+    guard(async () => {
+      await api.deleteScore(id);
+      setScores(prev => prev.filter(s => s.id !== id));
+    });
+
   // ---- Kiosk alerts ----
   const handleQueueKioskAlert = (studentId: string, kind: 'in' | 'out', date: string, time: string) =>
     guard(async () => {
@@ -423,6 +444,7 @@ export function useAcademyData(userId: string) {
     attendance,
     payments,
     counselLogs,
+    scores,
     kioskAlerts,
     homeworkAlerts,
     kioskPin,
@@ -445,6 +467,9 @@ export function useAcademyData(userId: string) {
     handleAddCounselLog,
     handleUpdateCounselLog,
     handleDeleteCounselLog,
+    handleAddScore,
+    handleUpdateScore,
+    handleDeleteScore,
     handleQueueKioskAlert,
     handleDismissKioskAlert,
     handleClearKioskAlerts,

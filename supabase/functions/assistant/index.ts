@@ -89,12 +89,32 @@ interface UpdateStudentMemoAction {
   new_memo: string;
 }
 
+interface UpdateTuitionAction {
+  type: 'update_tuition';
+  student_id: string;
+  student_name: string;
+  class_id: string;
+  class_name: string;
+  old_amount: number;
+  new_amount: number;
+}
+
+interface CreateMakeupAction {
+  type: 'create_makeup';
+  student_id: string;
+  student_name: string;
+  makeup_date: string;
+  original_date: string;
+}
+
 type PendingAction =
   | UpdateAttendanceAction
   | CreateAttendanceAction
   | UpdatePaymentAction
   | CreateCounselLogAction
-  | UpdateStudentMemoAction;
+  | UpdateStudentMemoAction
+  | UpdateTuitionAction
+  | CreateMakeupAction;
 
 // =====================================================================
 // tool 정의
@@ -243,6 +263,32 @@ const TOOL_DECLARATIONS = [
         date: { type: 'STRING', description: '날짜 YYYY-MM-DD. 생략 시 오늘' },
       },
       required: ['studentName', 'logType', 'title', 'content'],
+    },
+  },
+  {
+    name: 'propose_tuition_override',
+    description: '특정 학생의 수강료를 반 기본 원비와 다르게 개별 설정할 것을 제안한다. 실제 DB를 변경하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 학생별 수강료 변경 요청 시 반드시 이 도구를 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색 가능)' },
+        className: { type: 'STRING', description: '수강료를 변경할 반 이름(부분 검색 가능)' },
+        newAmount: { type: 'NUMBER', description: '새로 설정할 월 수강료(원 단위)' },
+      },
+      required: ['studentName', 'className', 'newAmount'],
+    },
+  },
+  {
+    name: 'propose_makeup',
+    description: '학생의 보강 일정을 등록할 것을 제안한다. 실제 DB를 변경하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 보강 등록 요청 시 반드시 이 도구를 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색 가능)' },
+        makeupDate: { type: 'STRING', description: '보강 수업을 진행할 날짜 YYYY-MM-DD. 생략 시 오늘' },
+        originalDate: { type: 'STRING', description: '보강이 연결될 원래 결석 날짜 YYYY-MM-DD(선택)' },
+      },
+      required: ['studentName'],
     },
   },
   {
@@ -792,6 +838,69 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    case 'propose_tuition_override': {
+      const studentName = (args.studentName as string) ?? '';
+      const className = (args.className as string) ?? '';
+      const newAmount = args.newAmount as number;
+      if (!studentName || !className || typeof newAmount !== 'number') return { error: '학생 이름·반 이름·새 수강료는 필수입니다.' };
+
+      const [students, classesRes] = await Promise.all([fetchStudents(sb), sb.from('growing_classes').select('*')]);
+      if (classesRes.error) throw classesRes.error;
+
+      const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+      if (matched.length === 0) return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+      if (matched.length > 1) return { found: false, message: `'${studentName}'로 여러 학생이 검색됩니다: ${matched.map((s: Json) => s.name).join(', ')}.` };
+      const student = matched[0] as Json;
+
+      const cls = (classesRes.data ?? []).find((c: Json) =>
+        matchName(norm(c.name), className) && ((c.student_ids as string[]) ?? []).includes(student.id as string)
+      );
+      if (!cls) return { found: false, message: `${student.name} 학생이 수강 중인 반 중 '${className}'과 일치하는 반을 찾지 못했습니다.` };
+
+      const overrides = (cls.tuition_overrides as Record<string, number>) ?? {};
+      const oldAmount = overrides[student.id as string] ?? (cls.tuition_fee as number);
+
+      return {
+        action_proposed: true,
+        action: {
+          type: 'update_tuition',
+          student_id: student.id as string,
+          student_name: norm(student.name),
+          class_id: cls.id as string,
+          class_name: norm(cls.name),
+          old_amount: oldAmount,
+          new_amount: newAmount,
+        } satisfies UpdateTuitionAction,
+        summary: `${student.name} 학생의 [${cls.name}] 수강료를 ${formatWon(oldAmount)} → ${formatWon(newAmount)}으로 변경합니다.`,
+      };
+    }
+
+    case 'propose_makeup': {
+      const studentName = (args.studentName as string) ?? '';
+      const makeupDate = (args.makeupDate as string) || kstToday();
+      const originalDate = (args.originalDate as string) || '';
+      if (!studentName) return { error: '학생 이름은 필수입니다.' };
+
+      const students = await fetchStudents(sb);
+      const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+      if (matched.length === 0) return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+      if (matched.length > 1) return { found: false, message: `'${studentName}'로 여러 학생이 검색됩니다: ${matched.map((s: Json) => s.name).join(', ')}.` };
+      const student = matched[0] as Json;
+
+      const origDesc = originalDate ? ` (원래 결석일: ${originalDate})` : '';
+      return {
+        action_proposed: true,
+        action: {
+          type: 'create_makeup',
+          student_id: student.id as string,
+          student_name: norm(student.name),
+          makeup_date: makeupDate,
+          original_date: originalDate,
+        } satisfies CreateMakeupAction,
+        summary: `${student.name} 학생의 ${makeupDate} 보강을 등록합니다${origDesc}.`,
+      };
+    }
+
     case 'list_data_sources': {
       const { data, error } = await sb.rpc('growing_list_tables');
       if (error) throw error;
@@ -970,6 +1079,27 @@ async function executeAction(sb: SupabaseClient, action: PendingAction): Promise
       if (error) throw error;
       return { success: true, message: `${action.student_name} 학생의 메모를 업데이트했습니다.` };
     }
+    case 'update_tuition': {
+      const { data: cls, error: fetchErr } = await sb.from('growing_classes').select('tuition_overrides').eq('id', action.class_id).single();
+      if (fetchErr) throw fetchErr;
+      const overrides = (cls.tuition_overrides as Record<string, number>) ?? {};
+      overrides[action.student_id] = action.new_amount;
+      const { error } = await sb.from('growing_classes').update({ tuition_overrides: overrides }).eq('id', action.class_id);
+      if (error) throw error;
+      return { success: true, message: `${action.student_name} 학생의 [${action.class_name}] 수강료를 **${formatWon(action.old_amount)} → ${formatWon(action.new_amount)}**으로 변경했습니다.` };
+    }
+    case 'create_makeup': {
+      const insertData: Record<string, string> = {
+        student_id: action.student_id,
+        date: action.makeup_date,
+        status: 'makeup',
+      };
+      if (action.original_date) insertData.makeup_for_date = action.original_date;
+      const { error } = await sb.from('growing_attendance').insert(insertData);
+      if (error) throw error;
+      const origDesc = action.original_date ? ` (결석일: ${action.original_date})` : '';
+      return { success: true, message: `${action.student_name} 학생의 ${action.makeup_date} 보강을 등록했습니다${origDesc}.` };
+    }
     default:
       throw new Error('알 수 없는 action type입니다.');
   }
@@ -1012,7 +1142,7 @@ function systemPrompt(memory: string): string {
 - 사용자를 직접 부를 일이 있으면 반드시 "지선쌤"이라고 부릅니다. "원장님"은 역할 설명이 필요할 때만 쓰고, 호칭으로는 쓰지 않습니다.
 - 학원 데이터에 대한 질문은 반드시 제공된 도구로 실제 데이터를 조회한 뒤 답합니다. 절대 추측하거나 지어내지 않습니다.
 - 도구 결과가 비어 있으면 해당 데이터가 없다고 솔직히 답합니다.
-- 출결 변경·수납 처리·상담일지 작성·학생 메모 수정 같은 DB 변경 요청은 반드시 propose_attendance_change / propose_payment_change / propose_counsel_log / propose_student_memo 도구를 사용해 원장님의 승인을 구합니다. 직접 변경하지 않습니다.
+- 출결 변경·수납 처리·상담일지 작성·학생 메모 수정·수강료 변경·보강 등록 같은 DB 변경 요청은 반드시 propose_attendance_change / propose_payment_change / propose_counsel_log / propose_student_memo / propose_tuition_override / propose_makeup 도구를 사용해 원장님의 승인을 구합니다. 직접 변경하지 않습니다.
 - propose_* 도구가 action_proposed: true를 반환하면 "아래 내용으로 변경하시겠어요? 확인 버튼을 눌러 승인해 주세요."처럼 안내합니다.
 - 데이터를 근거로 답할 때는 마지막에 어떤 자료를 봤는지 한 줄로 덧붙입니다(예: "(오늘 현황·이번 달 수납 기준)"). 여러 자료가 필요하면 한 번에 여러 도구를 호출해도 됩니다.
 - 사용자에게 내부 구현명, DB 테이블명, 컬럼명, RPC 이름, 도구 이름을 그대로 노출하지 않습니다. 특히 list_data_sources 결과를 설명할 때는 "학생 정보", "출결 기록", "수납 기록"처럼 업무용 이름으로만 말합니다. 사용자가 개발자용 내부 이름을 명시적으로 요청한 경우에만 테이블명을 보여줍니다.

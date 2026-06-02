@@ -211,6 +211,46 @@ export const Payments: React.FC<PaymentsProps> = ({
     setImportResult(null);
   };
 
+  const handleExportInvoice = () => {
+    const [year, month] = selectedMonth.split('-');
+    const monthLabel = `${year}년 ${Number(month)}월`;
+    const paid = monthPayments.filter(p => p.status === 'paid');
+    const unpaid = monthPayments.filter(p => p.status === 'unpaid');
+
+    const lines: string[] = [
+      `# ${monthLabel} 수납 현황`,
+      `> 생성일: ${new Date().toLocaleDateString('ko-KR')}`,
+      '',
+      `## 요약`,
+      `- 청구: ${billingCount}건 / 완납: ${paidCount}건 / 미납: ${billingCount - paidCount}건`,
+      `- 완납 금액: ${totalPaid.toLocaleString()}원`,
+      `- 미납 금액: ${totalUnpaid.toLocaleString()}원`,
+      `- 수납률: ${paymentRate}%`,
+      '',
+      `## 완납 (${paid.length}건)`,
+      ...paid.map(p => {
+        const stu = students.find(s => s.id === p.studentId);
+        const cls = classes.filter(c => c.studentIds.includes(p.studentId)).map(c => c.name).join(', ');
+        return `- ${stu?.name ?? '(알수없음)'} | ${cls || '—'} | ${p.amount.toLocaleString()}원 | 납부일 ${p.paymentDate ?? '—'}`;
+      }),
+      '',
+      `## 미납 (${unpaid.length}건)`,
+      ...unpaid.map(p => {
+        const stu = students.find(s => s.id === p.studentId);
+        const cls = classes.filter(c => c.studentIds.includes(p.studentId)).map(c => c.name).join(', ');
+        return `- ${stu?.name ?? '(알수없음)'} | ${cls || '—'} | ${p.amount.toLocaleString()}원 | 연락처 ${stu?.parentContact || '—'}`;
+      }),
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `수납현황_${selectedMonth}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleOpenPreview = () => {
     if (students.filter(s => s.status === 'active').length === 0) {
       alert('현재 재원 중인 학생이 없습니다.');
@@ -343,6 +383,7 @@ export const Payments: React.FC<PaymentsProps> = ({
           <div className="pay-tools-right">
             <a className="pay-btn ghost" href="https://manager.payssam.kr/" target="_blank" rel="noopener noreferrer"><ExternalLink size={15} /> 결제선생 바로가기</a>
             <button className="pay-btn ghost" onClick={() => setIsManualModalOpen(true)}><Plus size={15} /> 청구서 추가</button>
+            <button className="pay-btn ghost" onClick={handleExportInvoice}><BarChart3 size={15} /> 청구서 내보내기</button>
             <button className="pay-btn ghost" onClick={() => { setIsImportOpen(true); setImportParsed(null); setImportResult(null); }}><Upload size={15} /> 결제선생</button>
             <button className="pay-btn primary" onClick={handleOpenPreview}>{monthLabel}월 청구 일괄 생성</button>
           </div>

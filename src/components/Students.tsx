@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react';
-import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
+import type { Student, Class, Attendance, Payment, CounselLog, Score, StudentStatus } from '../types';
 import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, Phone, UserX } from 'lucide-react';
 import { isAttendedStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
@@ -19,6 +19,7 @@ interface StudentsProps {
   attendance: Attendance[];
   payments: Payment[];
   counselLogs: CounselLog[];
+  scores: Score[];
   onAddStudent: (student: Omit<Student, 'id'>) => void;
   onUpdateStudent: (student: Student) => void;
   onWithdrawStudent: (id: string) => void;
@@ -26,6 +27,9 @@ interface StudentsProps {
   onRestoreStudent: (id: string) => void;
   onAddCounselLog: (log: Omit<CounselLog, 'id'>) => void;
   onUpdateCounselLog: (log: CounselLog) => void;
+  onAddScore: (score: Omit<Score, 'id'>) => void;
+  onUpdateScore: (score: Score) => void;
+  onDeleteScore: (id: string) => void;
 }
 
 export const Students: React.FC<StudentsProps> = ({
@@ -34,6 +38,7 @@ export const Students: React.FC<StudentsProps> = ({
   attendance,
   payments,
   counselLogs,
+  scores,
   onAddStudent,
   onUpdateStudent,
   onWithdrawStudent,
@@ -41,6 +46,9 @@ export const Students: React.FC<StudentsProps> = ({
   onRestoreStudent,
   onAddCounselLog,
   onUpdateCounselLog,
+  onAddScore,
+  onUpdateScore,
+  onDeleteScore,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
@@ -57,7 +65,7 @@ export const Students: React.FC<StudentsProps> = ({
 
   const [, setIsDetailOpen] = useState(false);
   const [activeDetailStudent, setActiveDetailStudent] = useState<Student | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'classes' | 'attendance' | 'payments' | 'counsel' | 'timeline' | 'analysis' | 'report' | 'report-old'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'classes' | 'attendance' | 'payments' | 'counsel' | 'scores' | 'timeline' | 'analysis' | 'report' | 'report-old'>('info');
 
   // Form Fields
   const [formName, setFormName] = useState('');
@@ -74,6 +82,16 @@ export const Students: React.FC<StudentsProps> = ({
   const [logContent, setLogContent] = useState('');
   const [logType, setLogType] = useState<'counsel' | 'progress' | 'test'>('counsel');
   const [logScore, setLogScore] = useState('');
+
+  // Score Form
+  const [showScoreForm, setShowScoreForm] = useState(false);
+  const [editingScore, setEditingScore] = useState<Score | null>(null);
+  const [scoreSubject, setScoreSubject] = useState('');
+  const [scoreTestName, setScoreTestName] = useState('');
+  const [scoreValue, setScoreValue] = useState('');
+  const [scoreMax, setScoreMax] = useState('100');
+  const [scoreDate, setScoreDate] = useState(new Date().toISOString().split('T')[0]);
+  const [scoreMemo, setScoreMemo] = useState('');
 
 
   // Grades list
@@ -272,6 +290,52 @@ export const Students: React.FC<StudentsProps> = ({
     return counselLogs.filter(c => c.studentId === studentId);
   };
 
+  const getStudentScores = (studentId: string) => {
+    return scores.filter(s => s.studentId === studentId);
+  };
+
+  const handleScoreFormOpen = (score?: Score) => {
+    if (score) {
+      setEditingScore(score);
+      setScoreSubject(score.subject);
+      setScoreTestName(score.testName);
+      setScoreValue(String(score.score));
+      setScoreMax(String(score.maxScore));
+      setScoreDate(score.testDate);
+      setScoreMemo(score.memo);
+    } else {
+      setEditingScore(null);
+      setScoreSubject('');
+      setScoreTestName('');
+      setScoreValue('');
+      setScoreMax('100');
+      setScoreDate(new Date().toISOString().split('T')[0]);
+      setScoreMemo('');
+    }
+    setShowScoreForm(true);
+  };
+
+  const handleScoreFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeDetailStudent) return;
+    const data = {
+      studentId: activeDetailStudent.id,
+      subject: scoreSubject.trim(),
+      testName: scoreTestName.trim(),
+      score: parseFloat(scoreValue),
+      maxScore: parseFloat(scoreMax) || 100,
+      testDate: scoreDate,
+      memo: scoreMemo.trim(),
+    };
+    if (editingScore) {
+      onUpdateScore({ ...data, id: editingScore.id });
+    } else {
+      onAddScore(data);
+    }
+    setShowScoreForm(false);
+    setEditingScore(null);
+  };
+
   const calculateAttendanceRate = (studentId: string) => {
     const records = getStudentAttendance(studentId);
     if (records.length === 0) return 0;
@@ -417,9 +481,9 @@ export const Students: React.FC<StudentsProps> = ({
 
               {/* 탭 */}
               <div className="st-tabs">
-                {(['timeline', 'info', 'attendance', 'counsel', 'report'] as const).map((tab, i) => (
+                {(['timeline', 'info', 'attendance', 'counsel', 'scores', 'report'] as const).map((tab, i) => (
                   <button key={tab} className={`st-tab ${detailTab === tab ? 'on' : ''}`} onClick={() => setDetailTab(tab)}>
-                    {['타임라인', '기본 정보', '출결·수납', '상담 일지', '리포트'][i]}
+                    {['타임라인', '기본 정보', '출결·수납', '상담 일지', '성적', '리포트'][i]}
                   </button>
                 ))}
               </div>
@@ -594,6 +658,81 @@ export const Students: React.FC<StudentsProps> = ({
                             {log.score && <span className="st-log-score">🎯 {log.score}</span>}
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 성적 관리 */}
+                {detailTab === 'scores' && (
+                  <div>
+                    <div className="st-counsel-head">
+                      <h4 style={{ fontWeight: 800, color: 'var(--color-primary-dark)', fontSize: '0.92rem' }}>시험 성적</h4>
+                      <button className="at-act" onClick={() => handleScoreFormOpen()}><PlusCircle size={13} /> 성적 추가</button>
+                    </div>
+                    {showScoreForm && (
+                      <form onSubmit={handleScoreFormSubmit} style={{ marginBottom: '1rem', padding: '0.85rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: '#fafcfb' }}>
+                        <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <div className="form-group">
+                            <label>과목</label>
+                            <input type="text" className="form-control" placeholder="예: 영어" value={scoreSubject} onChange={e => setScoreSubject(e.target.value)} required />
+                          </div>
+                          <div className="form-group">
+                            <label>시험명 (선택)</label>
+                            <input type="text" className="form-control" placeholder="예: 6월 모의고사" value={scoreTestName} onChange={e => setScoreTestName(e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label>점수</label>
+                            <input type="number" className="form-control" placeholder="예: 85" min={0} value={scoreValue} onChange={e => setScoreValue(e.target.value)} required />
+                          </div>
+                          <div className="form-group">
+                            <label>만점</label>
+                            <input type="number" className="form-control" placeholder="100" min={1} value={scoreMax} onChange={e => setScoreMax(e.target.value)} required />
+                          </div>
+                        </div>
+                        <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <div className="form-group">
+                            <label>날짜</label>
+                            <input type="date" className="form-control" value={scoreDate} onChange={e => setScoreDate(e.target.value)} required />
+                          </div>
+                          <div className="form-group">
+                            <label>메모 (선택)</label>
+                            <input type="text" className="form-control" value={scoreMemo} onChange={e => setScoreMemo(e.target.value)} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                          <button type="button" className="at-act" onClick={() => setShowScoreForm(false)}>취소</button>
+                          <button type="submit" className="at-act primary">{editingScore ? '수정' : '저장'}</button>
+                        </div>
+                      </form>
+                    )}
+                    {getStudentScores(activeDetailStudent.id).length === 0 ? (
+                      <p className="st-empty-line">등록된 성적이 없습니다.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
+                        {getStudentScores(activeDetailStudent.id).map(s => {
+                          const pct = Math.round((s.score / s.maxScore) * 100);
+                          return (
+                            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.8rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: '#fbfcfb' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--color-primary-dark)' }}>{s.subject}</span>
+                                  {s.testName && <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>{s.testName}</span>}
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginLeft: 'auto' }}>{s.testDate}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                                  <span style={{ fontWeight: 800, fontSize: '1rem', color: pct >= 80 ? '#0c7a55' : pct >= 60 ? 'var(--color-warning)' : 'var(--color-danger)' }}>{s.score}<span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>/{s.maxScore}</span></span>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{pct}%</span>
+                                  {s.memo && <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.memo}</span>}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.3rem', flexShrink: 0 }}>
+                                <button className="at-act" style={{ padding: '0.25rem 0.5rem', fontSize: '0.74rem' }} onClick={() => handleScoreFormOpen(s)}>수정</button>
+                                <button className="at-act" style={{ padding: '0.25rem 0.5rem', fontSize: '0.74rem', color: 'var(--color-danger)' }} onClick={() => { if (confirm('성적을 삭제하시겠습니까?')) onDeleteScore(s.id); }}>삭제</button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
