@@ -35,30 +35,37 @@
 - **친절한 에러 메시지 + "다시 시도" 버튼**(네트워크/401/과부하/키 미설정 매핑)
 
 ### 상담일지
-- **내보내기(마크다운 다운로드)** — `CounselLogs.tsx` `handleExport` (✅ 방금 완료)
+- **내보내기(마크다운 다운로드)** — `CounselLogs.tsx` `handleExport`
 
 ### 운영 분석
 - **출결 통계 최근 3개월 추세 카드** — 선택 월 포함 3개월 출석률/기록 건수 표시
 - **출결+미납 우선 관리 대상 카드** — 출석률 80% 미만·결석 3회 이상·해당 월 미납 학생 통합 표시
 - **반별 수강료 분석 카드** — 재원생 기준 반별 인원과 개별 원비 반영 월 예상 수강료 집계
 
+### 메시지 · UI
+- **메시지 템플릿 설정화** — `src/lib/messageTemplates.ts` + Backup.tsx 편집 UI + Attendance/Messaging 사용 완료
+- **출결 캘린더 뷰** — `AttendanceCalendar.tsx` 구현 후 `Attendance.tsx`에 연결 완료
+- **Aligo 알림톡 API 준비** — `send-alimtalk` Edge Function + `growing_message_logs` 마이그레이션 + `ALIGO_SETUP_GUIDE.md` 작성
+- **모바일/태블릿 UI 이슈 수정 (PR #30, 2026-06-02)**
+  - 출결 로스터 테이블 overflow-x 컨테이너 (#4)
+  - 월간 통계 테이블 모바일 열 축소 (#11)
+  - 알림장 템플릿 버튼 단일 열 (#9)
+  - 극소형 화면 숙제 세그먼트·시간 입력 스택 (#5)
+
 ---
 
 ## ⏳ 진행 예정 (다음 세션에서 이어서)
 
-순서대로 진행. 빌드는 `npm run verify`.
+순서대로 진행. 빌드는 `npm run build`.
 
-### 1) 메시지 템플릿 설정화 (Messaging.tsx + Attendance.tsx + Backup.tsx)
-- 목적: 등원/하원/숙제/보강/평가 알림 문구를 `growing_settings.message_templates`에서 관리.
-- 현재 일부 기본 구조는 있음. 하드코딩된 문구가 남아 있는지 검색 후 설정값 우선 사용으로 정리.
+### 1) 잔여 UI 이슈 (docs/ui-issues.md 미수정 항목)
+- **#15** `Dashboard.tsx` 미납 카드 flex 레이아웃 모바일 줄바꿈 미처리
+- **#16** `Students.tsx` 상세 탭 9개 모바일 수평 스크롤 확인/처리
+- **#10** `index.css` `@media (max-width: 1024px)` 순서가 768px 뒤에 위치 (비논리적)
+- **#12/13/14** CSS 중복·상충 정리 (tabs-header, modal-content, notice-text-box)
 - 외부 API 불필요, 엣지 함수 재배포 불필요.
 
-### 2) 출결 캘린더 뷰
-- 기존 출결 데이터를 월간 달력 그리드로 시각화.
-- 날짜 클릭 시 해당 날짜 기록 확인/관리 흐름으로 점프.
-- 신규 DB 테이블 없이 프론트엔드 전용으로 시작 가능.
-
-### 3) C — 의미검색 RAG (보류, 별도 세션 권장)
+### 2) 의미검색 RAG (보류, 별도 세션 권장)
 - 위험·대규모: pgvector 확장 + 임베딩 컬럼 + 기존 행 백필(Gemini 임베딩 API) +
   엣지 벡터검색 RPC + 신규 일지/노트 저장 시 임베딩 생성.
 - 동작 중인 아이비 회귀 위험이 커서 단독으로 신중히 진행할 것.
