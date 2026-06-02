@@ -391,9 +391,8 @@ function AcademyApp({ session }: { session: Session }) {
                   kioskStyle={item.kind === 'kiosk'}
                 />
               ))}
-              </div>
-            );
-          })}
+            </div>
+          ))}
         </nav>
 
         <div className="side-foot">
