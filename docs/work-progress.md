@@ -67,12 +67,13 @@
 
 순서대로 진행. 빌드는 `npm run build`.
 
-### 1) 잔여 UI 이슈 (docs/ui-issues.md 미수정 항목)
-- **#12/13/14** CSS 중복·상충 정리 (tabs-header, modal-content, notice-text-box)
-- 외부 API 불필요, 엣지 함수 재배포 불필요.
-- **#15** ✅ 완료 — `@media (max-width: 480px) { .gd-pay-row: flex-wrap:wrap }` 추가
-- **#16** ✅ 완료 — `.st-tabs` overflow-x:auto 이미 적용되어 있음 (확인만)
-- **#10** — 기능상 무해, 별도 CSS 리팩터링 세션에서 처리 권장
+### 1) 잔여 UI 이슈 — **모두 완료** ✅
+- **#12** ✅ — `.tabs-header` / `.tab-btn` 각 1회 정의, 중복 없음 확인
+- **#13** ✅ — `.modal-content` `!important` 이미 제거됨, 정상 base+모바일 override 구조 확인
+- **#14** ✅ — `.notice-text-box` `break-all` → `break-word` 이미 수정됨 확인
+- **#15** ✅ — `@media (max-width: 480px) { .gd-pay-row: flex-wrap:wrap }` 추가 완료
+- **#16** ✅ — `.st-tabs` overflow-x:auto 이미 적용되어 있음 확인
+- **#10** — 기능상 무해(base styles 이후에 위치해야 작동하므로 현재 위치 정상), 보류
 
 ---
 

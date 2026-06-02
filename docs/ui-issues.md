@@ -33,9 +33,9 @@
 
 | # | 파일 | 위치 | 문제 | 상태 |
 |---|------|------|------|------|
-| 12 | `index.css` | `.tabs-header` / `.tab-btn` L1645-1658 | 규칙 중복 정의 | 미수정 |
-| 13 | `index.css` | `.modal-content` L964 vs L1865 | `width: 90%` / `width: 95%!important` 중복 | 미수정 |
-| 14 | `index.css` | `.notice-text-box` L1479 | `white-space: pre-wrap` + `word-break: break-all` 상충 | 미수정 |
+| 12 | `index.css` | `.tabs-header` / `.tab-btn` L1645-1658 | 규칙 중복 정의 | ✅ 현재 각 1회 정의, 중복 없음 |
+| 13 | `index.css` | `.modal-content` L964 vs L1865 | `width: 90%` / `width: 95%!important` 중복 | ✅ `!important` 제거됨, base+모바일 override 정상 구조 |
+| 14 | `index.css` | `.notice-text-box` L1479 | `white-space: pre-wrap` + `word-break: break-all` 상충 | ✅ `break-all` → `break-word` 수정 완료 |
 | 15 | `Dashboard.tsx` | L365-413 미납 카드 | flex 레이아웃 모바일 줄바꿈 미처리 | ✅ 수정됨 |
 | 16 | `Students.tsx` | 상세 모달 탭 | 다중 탭(9개) 모바일 수평 스크롤 필요 여부 미확인 | ✅ `.st-tabs` overflow-x:auto 이미 적용됨 |
 
