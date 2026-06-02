@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import type { Student, Class, Attendance, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
-import { MessageSquare, Copy, Check, Send, Bell, Trash2, Sparkles, Smartphone, CheckSquare, Square } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Student, Class, Attendance, KioskAlert, HomeworkAlert, HomeworkStatus, MessageLog } from '../types';
+import { MessageSquare, Copy, Check, Send, Bell, Trash2, Sparkles, Smartphone, CheckSquare, Square, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 import { sendAlimtalk, type AlimtalkAlertType } from '../lib/alimtalk';
+import { api } from '../lib/api';
 
 interface MessagingProps {
   students: Student[];
@@ -62,6 +63,17 @@ const HOMEWORK_LABEL: Record<Exclude<HomeworkStatus, ''>, string> = {
 
 // Map the existing badge class names to the new `at-pill` colour variants
 // without touching the data-layer `badgeClass` field.
+const MSG_LOG_TYPE_LABEL: Record<string, string> = {
+  check_in: '등원',
+  check_out: '하원',
+  homework_done: '숙제완료',
+  homework_incomplete: '숙제미흡',
+  homework_undone: '숙제미제출',
+  payment_request: '수납 안내',
+  payment_paid: '수납 완료',
+  custom: '직접 작성',
+};
+
 const PILL_VARIANT: Record<string, string> = {
   'badge-present': 'ok',
   'badge-makeup': 'info',
@@ -127,6 +139,12 @@ export const Messaging: React.FC<MessagingProps> = ({
   const [paramScore, setParamScore] = useState('95/100');
 
   const [isCopied, setIsCopied] = useState(false);
+  const [messageLogs, setMessageLogs] = useState<MessageLog[]>([]);
+  const [logsOpen, setLogsOpen] = useState(false);
+
+  useEffect(() => {
+    api.getMessageLogs(50).then(setMessageLogs).catch(() => {});
+  }, []);
 
   // Find active students
   const activeStudents = students
@@ -676,6 +694,66 @@ export const Messaging: React.FC<MessagingProps> = ({
           )}
         </section>
       </div>
+
+      {/* 발송 기록 */}
+      <section className="gd-card" style={{ marginTop: '1.15rem' }}>
+        <button
+          className="msg-log-toggle"
+          onClick={() => setLogsOpen(o => !o)}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Clock size={16} /> 알림톡 발송 기록
+            {messageLogs.length > 0 && <span className="cl-count">{messageLogs.length}건</span>}
+          </span>
+          {logsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {logsOpen && (
+          messageLogs.length === 0 ? (
+            <div className="gd-empty" style={{ padding: '1.5rem 0' }}>
+              <span>발송 기록이 없습니다. Aligo Secrets 설정 후 알림톡을 보내면 여기에 기록됩니다.</span>
+            </div>
+          ) : (
+            <div className="table-wrapper" style={{ marginTop: '0.75rem' }}>
+              <table className="custom-table" style={{ fontSize: '0.82rem' }}>
+                <thead>
+                  <tr>
+                    <th>날짜/시간</th>
+                    <th>수신자</th>
+                    <th>유형</th>
+                    <th>상태</th>
+                    <th>내용</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {messageLogs.map(log => (
+                    <tr key={log.id}>
+                      <td style={{ whiteSpace: 'nowrap', color: 'var(--color-text-secondary)' }}>
+                        {log.createdAt.slice(0, 16).replace('T', ' ')}
+                      </td>
+                      <td>{log.recipientName ?? log.recipientPhone}</td>
+                      <td>{MSG_LOG_TYPE_LABEL[log.alertType] ?? log.alertType}</td>
+                      <td>
+                        <span className={`at-pill ${log.status === 'sent' ? 'ok' : log.status === 'failed' ? 'danger' : 'warn'}`}>
+                          {log.status === 'sent' ? '발송' : log.status === 'failed' ? '실패' : '대기'}
+                        </span>
+                        {log.status === 'failed' && log.errorMessage && (
+                          <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--color-danger)', marginTop: '0.15rem' }}>
+                            {log.errorMessage}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-secondary)' }}>
+                        {log.message}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+      </section>
     </div>
   );
 };
