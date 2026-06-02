@@ -4,10 +4,13 @@ import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, Phone, Use
 import { isAttendedStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
 import { getStudentClassTuition } from '../lib/classTuition';
-import { getStudentTagMap, type StudentTagKey } from '../lib/studentTags';
+import { getStudentTagMap, type StudentTagKey, type StudentTagSeverity } from '../lib/studentTags';
 import { StudentTagBadges } from './StudentTagBadges';
 import { StudentTimeline } from './StudentTimeline';
 import { StudentReportPreview } from './StudentReportPreview';
+
+// 태그 severity → CSS 클래스 매핑 (index.css는 .danger/.warn/.info 사용)
+const TAG_SEV: Record<StudentTagSeverity, string> = { danger: 'danger', warning: 'warn', info: 'info' };
 
 interface StudentsProps {
   students: Student[];
@@ -206,12 +209,11 @@ export const Students: React.FC<StudentsProps> = ({
     () => getStudentTagMap(students, classes, attendance, payments, counselLogs),
     [students, classes, attendance, payments, counselLogs]
   );
+  // 레퍼런스 칩 필터 바 (growing-students.jsx TAG_FILTERS)
   const tagFilterOptions: { value: StudentTagKey | 'all' | 'has-tags'; label: string }[] = [
-    { value: 'all', label: '전체 태그' },
-    { value: 'has-tags', label: '주의 태그 있음' },
+    { value: 'all', label: '전체' },
+    { value: 'has-tags', label: '주의 태그' },
     { value: 'unpaid', label: '미납' },
-    { value: 'missing-parent-contact', label: '연락처 없음' },
-    { value: 'no-class', label: '반 미배정' },
     { value: 'frequent-absence', label: '결석 잦음' },
     { value: 'homework-followup', label: '숙제 미흡' },
     { value: 'needs-counsel', label: '상담 필요' },
@@ -266,24 +268,17 @@ export const Students: React.FC<StudentsProps> = ({
 
   return (
     <div className="gd-root">
-      {/* ── 필터 바 ── */}
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-        <div className="pay-search" style={{ flex: 1, maxWidth: 320 }}>
-          <Search size={15} />
-          <input placeholder="학생 이름, 학교, 연락처…" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <select className="form-control" style={{ width: '120px', padding: '0.45rem 0.7rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value as StudentStatus | 'all')}>
+      {/* ── 상단 툴바: 컴팩트 상태/반 필터 + 학생 등록 ── */}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+        <select className="form-control" style={{ width: '116px', padding: '0.4rem 0.65rem', fontSize: '0.82rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value as StudentStatus | 'all')}>
           <option value="active">재원생</option>
           <option value="paused">휴원생</option>
           <option value="inactive">퇴원생</option>
           <option value="all">전체 상태</option>
         </select>
-        <select className="form-control" style={{ width: '130px', padding: '0.45rem 0.7rem' }} value={classFilter} onChange={e => setClassFilter(e.target.value)}>
+        <select className="form-control" style={{ width: '128px', padding: '0.4rem 0.65rem', fontSize: '0.82rem' }} value={classFilter} onChange={e => setClassFilter(e.target.value)}>
           <option value="all">전체 반</option>
           {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select className="form-control" style={{ width: '140px', padding: '0.45rem 0.7rem' }} value={tagFilter} onChange={e => setTagFilter(e.target.value as StudentTagKey | 'all' | 'has-tags')}>
-          {tagFilterOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <button className={`at-chip ${unpaidOnly ? 'on' : ''}`} onClick={() => setUnpaidOnly(v => !v)}>미납자만</button>
         <button className="pay-btn primary" style={{ marginLeft: 'auto' }} onClick={handleOpenAdd}><UserPlus size={15} /> 학생 등록</button>
@@ -293,12 +288,33 @@ export const Students: React.FC<StudentsProps> = ({
       <div className={`st-shell${activeDetailStudent ? ' has-detail' : ''}`}>
         {/* 좌: 학생 목록 */}
         <div className="gd-card st-card-list">
-          <div className="st-list">
-            {filteredStudents.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-                🌱 조건에 맞는 학생이 없습니다.
+          <div className="st-list-pane">
+            {/* 검색 */}
+            <div className="st-listbar">
+              <div className="pay-search">
+                <Search size={15} />
+                <input placeholder="학생 이름·학교 검색…" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-            ) : (
+            </div>
+            {/* 주의 태그 칩 필터 */}
+            <div className="st-chips">
+              {tagFilterOptions.map(o => (
+                <button
+                  key={o.value}
+                  className={`at-chip ${tagFilter === o.value ? 'on' : ''}`}
+                  onClick={() => setTagFilter(o.value)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <div className="st-list">
+              {filteredStudents.length === 0 ? (
+                <div className="gd-empty">
+                  <User size={26} />
+                  <span>조건에 맞는 학생이 없어요</span>
+                </div>
+              ) : (
               filteredStudents.map(student => {
                 const attRate = calculateAttendanceRate(student.id);
                 const tags = studentTagMap.get(student.id) ?? [];
@@ -315,7 +331,7 @@ export const Students: React.FC<StudentsProps> = ({
                       {tags.length > 0 && (
                         <div className="st-mini-tags">
                           {tags.slice(0, 3).map(tag => (
-                            <span key={tag.key} className={`st-dot ${tag.severity}`} title={tag.label} />
+                            <span key={tag.key} className={`st-dot ${TAG_SEV[tag.severity]}`} title={`${tag.label} · ${tag.reason}`} />
                           ))}
                           {tags.length > 3 && <span className="st-more">+{tags.length - 3}</span>}
                         </div>
@@ -323,12 +339,13 @@ export const Students: React.FC<StudentsProps> = ({
                     </div>
                     <div className="st-item-rate">
                       <b>{attRate}%</b>
-                      <span>출석률</span>
+                      <span>출석</span>
                     </div>
                   </button>
                 );
               })
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -370,17 +387,19 @@ export const Students: React.FC<StudentsProps> = ({
                   </div>
                   <div className="st-drate">
                     <div className="st-drate-v">{calculateAttendanceRate(activeDetailStudent.id)}<em>%</em></div>
-                    <span className="st-drate-l">출석률</span>
+                    <span className="st-drate-l">평균 출석</span>
                   </div>
                 </div>
-                {/* 주의 태그 */}
-                {(studentTagMap.get(activeDetailStudent.id) ?? []).length > 0 && (
-                  <div className="st-tags">
-                    {(studentTagMap.get(activeDetailStudent.id) ?? []).map(tag => (
-                      <span key={tag.key} className={`st-tag ${tag.severity}`}>{tag.label}</span>
-                    ))}
-                  </div>
-                )}
+                {/* 주의 태그 (사유 호버) */}
+                <div className="st-tags">
+                  {(() => {
+                    const detailTags = studentTagMap.get(activeDetailStudent.id) ?? [];
+                    if (detailTags.length === 0) return <span className="st-tag none">주의 태그 없음</span>;
+                    return detailTags.map(tag => (
+                      <span key={tag.key} className={`st-tag ${TAG_SEV[tag.severity]}`} title={tag.reason}>{tag.label}</span>
+                    ));
+                  })()}
+                </div>
               </div>
 
               {/* 탭 */}
