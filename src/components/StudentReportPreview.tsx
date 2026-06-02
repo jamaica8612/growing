@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Clipboard, FileText, Printer, Save, Wand2 } from 'lucide-react';
+import { BookOpen, Check, Copy, Printer, Save, Wand2 } from 'lucide-react';
 import type { Attendance, Class, CounselLog, Payment, Student } from '../types';
 import { getStudentReportSummary } from '../lib/reportSummary';
-import { StudentTagBadges } from './StudentTagBadges';
+import { AttendanceCalendar } from './AttendanceCalendar';
 
 interface StudentReportPreviewProps {
   student: Student;
@@ -16,6 +16,14 @@ interface StudentReportPreviewProps {
 
 const today = () => new Date().toISOString().split('T')[0];
 
+// 담쟁이 아이콘 (인라인 SVG)
+const IvyIcon = ({ size = 22 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7 20h10M10 20c5.5-2.5.8-6.4 5-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6c-.6 1.4-.5 2.6-.4 4 1.7-.4 3-1 4-2.2 1-1.3 1.3-3 1.4-4.8-2.4.6-3.9 1.5-4.7 3z" />
+  </svg>
+);
+
 export function StudentReportPreview({
   student,
   classes,
@@ -26,18 +34,32 @@ export function StudentReportPreview({
   onUpdateCounselLog,
 }: StudentReportPreviewProps) {
   const [month, setMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [toast, setToast] = useState<string | null>(null);
+
   const existingLog = counselLogs.find(
-    log => log.studentId === student.id && log.type === 'progress' && log.title.includes(`${month} 월간 학습 리포트`)
+    log =>
+      log.studentId === student.id &&
+      log.type === 'progress' &&
+      log.title.includes(`${month} 월간 학습 리포트`),
   );
+
   const [syncKey, setSyncKey] = useState(`${student.id}|${month}`);
   const [comment, setComment] = useState(existingLog?.content ?? '');
-  const summary = getStudentReportSummary({ student, classes, attendance, payments, counselLogs, month });
+
+  const summary = getStudentReportSummary({
+    student, classes, attendance, payments, counselLogs, month,
+  });
 
   const nextSyncKey = `${student.id}|${month}`;
   if (syncKey !== nextSyncKey) {
     setSyncKey(nextSyncKey);
     setComment(existingLog?.content ?? '');
   }
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  };
 
   const handleSave = () => {
     const content = comment.trim();
@@ -56,7 +78,7 @@ export function StudentReportPreview({
         type: 'progress',
       });
     }
-    alert('월간 리포트 의견을 저장했습니다.');
+    flash('진도 일지로 저장했어요');
   };
 
   const reportText = [
@@ -72,99 +94,187 @@ export function StudentReportPreview({
   ].join('\n');
 
   const handleCopy = () => {
-    void navigator.clipboard.writeText(reportText).then(() => alert('리포트 내용을 복사했습니다.'));
+    void navigator.clipboard.writeText(reportText).then(() => flash('리포트 본문을 복사했어요'));
   };
 
+  // 숙제 수행률
+  const hwTotal = summary.homework.done + summary.homework.incomplete + summary.homework.undone;
+  const hwRate = hwTotal > 0 ? Math.round((summary.homework.done / hwTotal) * 100) : 0;
+
+  // 이번 달 평가·진도 일지
+  const testLogs = summary.logs.filter(l => l.type === 'test');
+  const progressLogs = summary.logs.filter(
+    l => l.type === 'progress' && !l.title.includes('월간 학습 리포트'),
+  );
+
+  // 학생 달력용 출결 (이 학생 + 이 월 필터)
+  const studentMonthAttendance = attendance.filter(
+    a => a.studentId === student.id && a.date.startsWith(month),
+  );
+
+  // 발행일 및 대상월 표시
+  const [yyyy, mm] = month.split('-');
+  const monthLabel = `${yyyy}년 ${mm}월 학습 리포트`;
+  const issueDate = today();
+
   return (
-    <div className="student-report-preview">
-      <div className="student-report-toolbar">
-        <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
-          월간 학습 리포트
-        </h4>
-        <div className="student-report-actions">
+    <div className="rp-root">
+      {/* ── 툴바 (인쇄 영역 밖) ── */}
+      <div className="rp-toolbar">
+        <div className="rp-tool-left">
+          <span className="rp-tool-title">
+            <BookOpen size={16} /> 월간 학습 리포트
+          </span>
           <input
             type="month"
-            className="form-control"
+            className={`msg-select rp-month`}
             value={month}
-            onChange={event => setMonth(event.target.value)}
+            onChange={e => setMonth(e.target.value)}
           />
-          <button type="button" className="btn btn-secondary" onClick={() => setComment(summary.draft)}>
-            <Wand2 size={15} /> 초안 자동 작성
+        </div>
+        <div className="rp-tool-btns">
+          <button type="button" className="pay-btn ghost" onClick={() => setComment(summary.draft)}>
+            <Wand2 size={14} /> 초안 자동 작성
           </button>
-          <button type="button" className="btn btn-primary" onClick={handleSave}>
-            <Save size={15} /> 저장
+          <button type="button" className="pay-btn ghost" onClick={handleCopy}>
+            <Copy size={14} /> 복사
           </button>
-          <button type="button" className="btn btn-secondary" onClick={handleCopy}>
-            <Clipboard size={15} /> 복사
+          <button type="button" className="pay-btn ghost" onClick={handleSave}>
+            <Save size={14} /> 일지 저장
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
-            <Printer size={15} /> 인쇄/PDF
+          <button type="button" className="pay-btn primary" onClick={() => window.print()}>
+            <Printer size={14} /> 인쇄
           </button>
         </div>
       </div>
 
-      <div className="student-report-metrics">
-        <div className="card metric-card accent-mint">
-          <div className="metric-label">출석률</div>
-          <div className="metric-value">{summary.attendance.rate}%</div>
-        </div>
-        <div className="card metric-card warning">
-          <div className="metric-label">숙제 미흡/미완료</div>
-          <div className="metric-value">{summary.homework.incomplete + summary.homework.undone}회</div>
-        </div>
-        <div className="card metric-card danger">
-          <div className="metric-label">수납 상태</div>
-          <div className="metric-value" style={{ fontSize: '1.05rem' }}>
-            {summary.payment ? (summary.payment.status === 'paid' ? '완료' : '미납') : '없음'}
+      {/* ── 인쇄 문서 (.rp-doc) ── */}
+      <div className="rp-doc">
+        {/* 브랜드 헤더 */}
+        <div className="rp-doc-head">
+          <div className="rp-doc-brand">
+            <span className="rp-doc-ic">
+              <IvyIcon size={22} />
+            </span>
+            <div>
+              <b>그로잉영어 교습소</b>
+              <span>GROWING ENGLISH</span>
+            </div>
           </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ boxShadow: 'none', padding: '1rem' }}>
-        <label style={{ display: 'block', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '0.5rem' }}>
-          원장 종합 의견
-        </label>
-        <textarea
-          className="form-control"
-          rows={5}
-          value={comment}
-          onChange={event => setComment(event.target.value)}
-          placeholder="초안 자동 작성 버튼을 누르거나 직접 의견을 입력해 주세요."
-        />
-      </div>
-
-      <div className="print-report-card">
-        <div className="print-report-header">
-          <div>
-            <div style={{ color: 'var(--color-primary)', fontWeight: 900, fontSize: '0.78rem' }}>GROWING ENGLISH</div>
-            <h2 style={{ margin: '0.2rem 0 0', color: 'var(--color-primary-dark)' }}>월간 학습 리포트</h2>
-          </div>
-          <FileText size={30} color="var(--color-primary)" />
-        </div>
-
-        <div className="print-report-info">
-          <div><strong>학생</strong> {student.name} ({student.school || '-'} / {student.grade})</div>
-          <div><strong>대상월</strong> {month}</div>
-          <div style={{ gridColumn: '1 / -1' }}><strong>수강반</strong> {summary.classNames}</div>
-        </div>
-
-        <div className="print-report-stats">
-          <div><strong>출석</strong><br />{summary.attendance.present}회</div>
-          <div><strong>결석</strong><br />{summary.attendance.absent}회</div>
-          <div><strong>보강</strong><br />{summary.attendance.makeup}회</div>
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <strong>주요 태그</strong>
-          <div style={{ marginTop: '0.35rem' }}>
-            <StudentTagBadges tags={summary.tags.slice(0, 4)} showReasons />
+          <div className="rp-doc-meta">
+            <b>{monthLabel}</b>
+            <span>발행일 {issueDate}</span>
           </div>
         </div>
 
-        <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.65, border: '1px dashed var(--color-primary-light)', borderRadius: 6, padding: '1rem' }}>
-          {comment.trim() || summary.draft}
+        {/* 학생 프로필 + 출석률 */}
+        <div className="rp-student">
+          <div className="rp-student-av">{student.name[0]}</div>
+          <div className="rp-student-id">
+            <b>{student.name}</b>
+            <span>
+              {student.school || '학교 미기재'}
+              {student.grade ? ` · ${student.grade}` : ''}
+              {summary.classNames ? ` · ${summary.classNames}` : ''}
+            </span>
+          </div>
+          <div className="rp-student-rate">
+            <span className="rp-rate-v">{summary.attendance.rate}%</span>
+            <span className="rp-rate-l">{mm}월 출석률</span>
+          </div>
+        </div>
+
+        {/* 통계 4개 */}
+        <div className="rp-stats">
+          <div className="rp-stat ok">
+            <span className="rp-stat-l">출석</span>
+            <span className="rp-stat-v">{summary.attendance.present}</span>
+            <span className="rp-stat-s">총 {summary.attendance.total}회 중</span>
+          </div>
+          <div className="rp-stat info">
+            <span className="rp-stat-l">보강</span>
+            <span className="rp-stat-v">{summary.attendance.makeup}</span>
+            <span className="rp-stat-s">출석 인정</span>
+          </div>
+          <div className={`rp-stat${summary.attendance.absent > 0 ? ' warn' : ''}`}>
+            <span className="rp-stat-l">결석</span>
+            <span className="rp-stat-v">{summary.attendance.absent}</span>
+            <span className="rp-stat-s">{summary.attendance.absent > 0 ? '보강 확인' : '없음'}</span>
+          </div>
+          <div className="rp-stat ok">
+            <span className="rp-stat-l">숙제 수행</span>
+            <span className="rp-stat-v">{hwRate}%</span>
+            <span className="rp-stat-s">{summary.homework.done}/{hwTotal}회 완료</span>
+          </div>
+        </div>
+
+        {/* 2단: 출결 달력 + 평가·진도 */}
+        <div className="rp-2col">
+          <div className="rp-section">
+            <h4 className="rp-h">📅 {mm}월 출결 달력</h4>
+            <AttendanceCalendar
+              attendance={studentMonthAttendance}
+              month={month}
+              compact
+            />
+          </div>
+
+          <div className="rp-section">
+            <h4 className="rp-h">🎯 평가 · 진도</h4>
+            {testLogs.length === 0 && progressLogs.length === 0 ? (
+              <p style={{ fontSize: '0.84rem', color: 'var(--color-text-muted)' }}>
+                이번 달 평가·진도 기록이 없습니다.
+              </p>
+            ) : (
+              <div className="rp-records">
+                {testLogs.map(log => (
+                  <div key={log.id} className="rp-rec">
+                    <span className="rp-rec-badge test">평가</span>
+                    <div className="rp-rec-body">
+                      <b>{log.title}</b>
+                      <span>{log.content}</span>
+                    </div>
+                    {log.score && <span className="rp-rec-score">{log.score}</span>}
+                  </div>
+                ))}
+                {progressLogs.map(log => (
+                  <div key={log.id} className="rp-rec">
+                    <span className="rp-rec-badge prog">진도</span>
+                    <div className="rp-rec-body">
+                      <b>{log.title}</b>
+                      <span>{log.content}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 선생님 종합 의견 */}
+        <div className="rp-section" style={{ marginBottom: '1.4rem' }}>
+          <h4 className="rp-h">✍️ 선생님 종합 의견</h4>
+          <textarea
+            className="rp-comment"
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder="초안 자동 작성 버튼을 누르거나 직접 의견을 입력해 주세요."
+          />
+        </div>
+
+        {/* 문서 푸터 */}
+        <div className="rp-doc-foot">
+          <span>그로잉영어 교습소 · 담당 선생님</span>
+          <span>본 리포트는 {student.name} 학부모님께 발송됩니다.</span>
         </div>
       </div>
+
+      {/* 토스트 */}
+      {toast && (
+        <div className="gd-toast">
+          <Check size={14} /> {toast}
+        </div>
+      )}
     </div>
   );
 }
