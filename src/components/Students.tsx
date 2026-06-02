@@ -7,6 +7,7 @@ import { getStudentClassTuition } from '../lib/classTuition';
 import { getStudentTagMap, type StudentTagKey } from '../lib/studentTags';
 import { StudentTagBadges } from './StudentTagBadges';
 import { StudentTimeline } from './StudentTimeline';
+import { StudentReportPreview } from './StudentReportPreview';
 
 interface StudentsProps {
   students: Student[];
@@ -35,6 +36,7 @@ export const Students: React.FC<StudentsProps> = ({
   onPauseStudent,
   onRestoreStudent,
   onAddCounselLog,
+  onUpdateCounselLog,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('active');
@@ -383,9 +385,9 @@ export const Students: React.FC<StudentsProps> = ({
 
               {/* 탭 */}
               <div className="st-tabs">
-                {(['timeline', 'info', 'attendance', 'counsel'] as const).map((tab, i) => (
+                {(['timeline', 'info', 'attendance', 'counsel', 'report'] as const).map((tab, i) => (
                   <button key={tab} className={`st-tab ${detailTab === tab ? 'on' : ''}`} onClick={() => setDetailTab(tab)}>
-                    {['타임라인', '기본 정보', '출결·수납', '상담 일지'][i]}
+                    {['타임라인', '기본 정보', '출결·수납', '상담 일지', '리포트'][i]}
                   </button>
                 ))}
               </div>
@@ -533,6 +535,19 @@ export const Students: React.FC<StudentsProps> = ({
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* 월간 학습 리포트 */}
+                {detailTab === 'report' && (
+                  <StudentReportPreview
+                    student={activeDetailStudent}
+                    classes={classes}
+                    attendance={attendance}
+                    payments={payments}
+                    counselLogs={counselLogs}
+                    onAddCounselLog={onAddCounselLog}
+                    onUpdateCounselLog={onUpdateCounselLog}
+                  />
                 )}
               </div>
             </div>

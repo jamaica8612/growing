@@ -82,10 +82,9 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
             <button
               key={date}
               type="button"
-              className={`cal-cell${hasData ? ' has' : ''}${isSelected ? ' selected' : ''}`}
+              className={`cal-cell${hasData ? ' has' : ''}${isSelected ? ' selected' : ''}${onSelectDate ? ' cal-actionable' : ''}`}
               onClick={() => onSelectDate?.(date)}
               title={date}
-              style={{ cursor: onSelectDate ? 'pointer' : 'default', border: 'none', font: 'inherit', padding: 0 }}
             >
               <span className="cal-d">{dayNum}</span>
               {hasData && (
