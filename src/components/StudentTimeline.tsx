@@ -61,63 +61,30 @@ export function StudentTimeline({ student, classes, attendance, payments, counse
       {filteredEvents.length === 0 ? (
         <div className="mobile-empty-card">표시할 기록이 없습니다.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="st-timeline">
           {filteredEvents.map(event => {
             const Icon = ICONS[event.type];
             const tone = EVENT_STYLE[event.severity ?? 'info'];
+            const label = FILTERS.find(item => item.key === event.type)?.label ?? '';
             return (
-              <div
-                key={event.id}
-                className="mobile-data-card"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr',
-                  gap: '0.8rem',
-                  alignItems: 'start',
-                  cursor: 'default',
-                }}
-              >
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: tone.color,
-                    backgroundColor: tone.background,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Icon size={17} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <strong style={{ color: 'var(--color-primary-dark)' }}>{event.title}</strong>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>
-                      {event.date}
-                    </span>
+              <div key={event.id} className="st-tl-item">
+                <div className="st-tl-rail">
+                  <div className="st-tl-node" style={{ backgroundColor: tone.color }}>
+                    <Icon size={15} />
                   </div>
-                  <p
-                    style={{
-                      margin: '0.25rem 0 0',
-                      color: 'var(--color-text-secondary)',
-                      fontSize: '0.84rem',
-                      lineHeight: 1.5,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {event.detail || '-'}
-                  </p>
-                  {event.meta ? (
-                    <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                      {event.meta}
-                    </div>
-                  ) : null}
+                </div>
+                <div className="st-tl-card">
+                  <div className="st-tl-head">
+                    {label ? (
+                      <span className="st-tl-type" style={{ color: tone.color }}>
+                        {label}
+                      </span>
+                    ) : null}
+                    <span className="st-tl-title">{event.title}</span>
+                    <span className="st-tl-date">{event.date}</span>
+                  </div>
+                  <p className="st-tl-detail">{event.detail || '-'}</p>
+                  {event.meta ? <span className="st-tl-meta">{event.meta}</span> : null}
                 </div>
               </div>
             );

@@ -138,8 +138,10 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendance, selectedDate, targetClasses, activeStudentIds]);
 
+  const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'] as const;
   const d = new Date(`${selectedDate}T00:00:00`);
-  const dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]})`;
+  const selectedDay = WEEKDAY_KO[d.getDay()];
 
   // 월간 통계 데이터
   const getMonthlyReportData = () => {
@@ -200,11 +202,16 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       ) : (
         targetClasses.map(cls => {
           const activeMembers = cls.studentIds.filter(id => activeStudentIds.has(id));
+          const sched = cls.schedules?.find(s => s.day === selectedDay);
+          const startTime = sched?.startTime ?? cls.startTime;
+          const endTime = sched?.endTime ?? cls.endTime;
+          const classTime = startTime && endTime ? `${startTime}–${endTime}` : '';
           return (
             <section className="gd-card" key={cls.id}>
               <div className="at-class-head">
                 <span className="gd-class-bar" style={{ background: cls.color }} />
                 <span className="gd-class-name">{cls.name}</span>
+                {classTime && <span className="gd-class-time">{classTime}</span>}
                 <span className="gd-class-count">재원 {activeMembers.length}명</span>
               </div>
 
@@ -347,9 +354,9 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       )}
 
       {/* ── 월간 출결 캘린더 ── */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h3 className="card-title" style={{ marginBottom: 0 }}><Calendar size={20} /> 월간 출결 캘린더</h3>
+      <div className="gd-card">
+        <div className="gd-card-head" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+          <h3 className="gd-card-title"><Calendar size={20} /> 월간 출결 캘린더</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>조회 연월:</span>
             <input type="month" className="form-control" style={{ width: '160px', padding: '0.35rem 0.65rem' }} value={reportMonth} onChange={e => setReportMonth(e.target.value)} />
@@ -360,9 +367,9 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       </div>
 
       {/* ── 월간 출결 통계 ── */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h3 className="card-title" style={{ marginBottom: 0 }}><Clock size={20} /> 월간 출결 통계</h3>
+      <div className="gd-card">
+        <div className="gd-card-head" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+          <h3 className="gd-card-title"><Clock size={20} /> 월간 출결 통계</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>조회 연월:</span>
             <input type="month" className="form-control" style={{ width: '160px', padding: '0.35rem 0.65rem' }} value={reportMonth} onChange={e => setReportMonth(e.target.value)} />

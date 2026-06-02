@@ -475,11 +475,12 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
               </span>
               {!loading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
                 <button
-                  className="btn btn-secondary"
-                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', minWidth: 'auto', flexShrink: 0 }}
+                  type="button"
+                  className="ivy-act"
+                  style={{ flexShrink: 0 }}
                   onClick={() => void handleRetry()}
                 >
-                  다시 시도
+                  <RefreshCw size={12} /> 다시 시도
                 </button>
               )}
             </div>

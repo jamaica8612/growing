@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Student, Class, Attendance, KioskAlert, HomeworkAlert, HomeworkStatus } from '../types';
-import { MessageSquare, Copy, Check, Send, User, Bell, Trash2, Sparkles, Filter, CheckSquare, Square } from 'lucide-react';
+import { MessageSquare, Copy, Check, Send, Bell, Trash2, Sparkles, Smartphone, CheckSquare, Square } from 'lucide-react';
 import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
 import { sendAlimtalk, type AlimtalkAlertType } from '../lib/alimtalk';
 
@@ -60,6 +60,15 @@ const HOMEWORK_LABEL: Record<Exclude<HomeworkStatus, ''>, string> = {
   undone: '안함',
 };
 
+// Map the existing badge class names to the new `at-pill` colour variants
+// without touching the data-layer `badgeClass` field.
+const PILL_VARIANT: Record<string, string> = {
+  'badge-present': 'ok',
+  'badge-makeup': 'info',
+  'badge-late': 'warn',
+  'badge-absent': 'danger',
+};
+
 const buildHomeworkMessage = (templates: MessageTemplates, studentName: string, status: Exclude<HomeworkStatus, ''>) =>
   renderTemplate(templates[HOMEWORK_TEMPLATE_KEY[status]], { 학생명: studentName });
 
@@ -104,7 +113,7 @@ export const Messaging: React.FC<MessagingProps> = ({
   const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>([]);
   const [bulkCopied, setBulkCopied] = useState(false);
   const [sendingAlimtalkId, setSendingAlimtalkId] = useState<string | null>(null);
-  
+
   // Dynamic parameters for templates (defaults computed once on mount)
   const [paramTime, setParamTime] = useState(() =>
     new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -198,9 +207,11 @@ export const Messaging: React.FC<MessagingProps> = ({
     }
   }, [selectedStudentId, selectedTemplate, customMessage, paramTime, paramDate, paramTestName, paramScore, students, messageTemplates, todaySummary]);
 
+  const isPlaceholder = compiledMessage.includes('학생을 선택하시면');
+
   // Clipboard copy helper
   const handleCopy = () => {
-    if (!compiledMessage || compiledMessage.includes('학생을 선택하시면')) return;
+    if (!compiledMessage || isPlaceholder) return;
     navigator.clipboard.writeText(compiledMessage).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
@@ -349,169 +360,143 @@ export const Messaging: React.FC<MessagingProps> = ({
   const currentStudent = students.find(s => s.id === selectedStudentId);
   const draftMatchedStudent = assistantDraft?.content ? students.find(s => s.id === findDraftStudentId(students, assistantDraft.content)) : null;
 
+  const TEMPLATE_BUTTONS: Array<{ value: TemplateType; label: string }> = [
+    { value: 'in', label: '등원 완료 🌱' },
+    { value: 'out', label: '하원 완료 🏡' },
+    { value: 'homework', label: '과제 미제출 📝' },
+    { value: 'makeup', label: '보강 안내 🕒' },
+    { value: 'test', label: '평가 결과 🎯' },
+    { value: 'daily', label: '종합 알림장 📋' },
+  ];
+
   return (
-    <div>
+    <div className="gd-root">
+      {/* 발송 대기 큐 */}
       {pendingRows.length > 0 && (
-        <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--color-warning)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <h3 className="card-title" style={{ margin: 0 }}>
-              <Bell size={20} className="text-secondary" /> 알림장 발송 대기 ({pendingRows.length}건)
-            </h3>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <section className="gd-card msg-queue" style={{ marginBottom: '1.15rem' }}>
+          <div className="gd-card-head">
+            <h2 className="gd-card-title">
+              <Bell size={18} /> 알림장 발송 대기 <span className="cl-count">{pendingRows.length}건</span>
+            </h2>
+            <div className="msg-q-actions">
               <button
-                className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
+                className="pay-btn ghost sm"
                 onClick={handleCopySelectedAlerts}
                 disabled={selectedAlertIds.length === 0}
               >
-                {bulkCopied ? <><Check size={14} className="text-success" /> 선택 복사됨</> : <><Copy size={14} /> 선택 복사</>}
+                {bulkCopied ? <><Check size={13} /> 선택 복사됨</> : <><Copy size={13} /> 선택 복사</>}
               </button>
               <button
-                className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
+                className="pay-btn ghost sm"
                 onClick={handleDismissSelectedAlerts}
                 disabled={selectedAlertIds.length === 0}
               >
-                <Check size={14} /> 선택 완료
+                <Check size={13} /> 선택 완료
               </button>
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', gap: '0.3rem' }}
-                onClick={handleClearPendingAlerts}
-              >
-                <Trash2 size={14} /> 전체 비우기
+              <button className="pay-btn ghost sm" onClick={handleClearPendingAlerts}>
+                <Trash2 size={13} /> 전체 비우기
               </button>
             </div>
           </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-            키오스크 등·하원 알림과 출결 관리의 숙제 알림을 한곳에 모았습니다. 알리고 설정이 끝나면 알림톡으로 바로 발송할 수 있습니다.
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
-            <Filter size={15} className="text-secondary" />
-            {[
+
+          <div className="msg-filters">
+            {([
               ['all', `전체 ${pendingRows.length}`],
               ['in', `등원 ${pendingRows.filter(row => row.type === 'in').length}`],
               ['out', `하원 ${pendingRows.filter(row => row.type === 'out').length}`],
               ['homework', `숙제 ${pendingRows.filter(row => row.type === 'homework').length}`],
               ['missing-contact', `연락처 없음 ${pendingRows.filter(row => !row.contact).length}`],
-            ].map(([value, label]) => (
+            ] as Array<[AlertFilter, string]>).map(([value, label]) => (
               <button
                 key={value}
-                className={`btn ${alertFilter === value ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem' }}
-                onClick={() => setAlertFilter(value as AlertFilter)}
+                className={`at-chip ${alertFilter === value ? 'on' : ''}`}
+                onClick={() => setAlertFilter(value)}
               >
                 {label}
               </button>
             ))}
             <button
-              className="btn btn-secondary"
-              style={{ marginLeft: 'auto', fontSize: '0.76rem', padding: '0.35rem 0.65rem', gap: '0.25rem' }}
+              className="at-chip"
+              style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
               onClick={toggleAllVisibleAlerts}
               disabled={visibleAlertIds.length === 0}
             >
-              {hasAllVisibleSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+              {hasAllVisibleSelected ? <CheckSquare size={13} /> : <Square size={13} />}
               보이는 알림 선택
             </button>
           </div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
+
+          <div className="msg-q-empty" style={{ border: 'none', background: 'none', padding: '0 0 0.6rem', textAlign: 'left' }}>
             현재 {filteredAlertRows.length}건 표시 · {selectedVisibleAlertIds.length}건 선택됨
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto' }}>
-            {filteredAlertRows.length === 0 && (
-              <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', backgroundColor: '#fafcfb', border: '1px dashed var(--color-border)', color: 'var(--color-text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
-                이 필터에 해당하는 대기 알림이 없습니다.
-              </div>
-            )}
-            {filteredAlertRows.map(row => {
-              const selected = selectedAlertIds.includes(row.id);
-              return (
-                <div
-                  key={row.id}
-                  className="pending-alert-card"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.85rem 1rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: selected ? '1px solid var(--color-accent-mint)' : '1px solid var(--color-border)',
-                    backgroundColor: selected ? 'var(--color-accent-mint-light, #d1fae5)' : '#fafcfb',
-                  }}
-                >
-                  <button
-                    type="button"
-                    aria-label={`${row.name} 알림 선택`}
-                    onClick={() => toggleAlertSelection(row.id)}
-                    style={{ background: 'none', border: 'none', color: selected ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', padding: 0 }}
-                  >
-                    {selected ? <CheckSquare size={20} /> : <Square size={20} />}
-                  </button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
-                    <span className={`badge ${row.badgeClass}`} style={{ fontSize: '0.72rem' }}>
-                      {row.label}
-                    </span>
-                    <strong style={{ color: 'var(--color-primary-dark)' }}>{row.name}</strong>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>{row.time ?? row.date}</span>
-                    <span style={{ fontSize: '0.78rem', color: row.contact ? 'var(--color-text-muted)' : 'var(--color-danger)' }}>
+
+          <div className="msg-qlist">
+            {filteredAlertRows.length === 0 ? (
+              <div className="msg-q-empty">이 필터에 해당하는 대기 알림이 없습니다.</div>
+            ) : (
+              filteredAlertRows.map(row => {
+                const selected = selectedAlertIds.includes(row.id);
+                return (
+                  <div className={`msg-qrow ${selected ? 'sel' : ''}`} key={row.id}>
+                    <button
+                      className="msg-check"
+                      onClick={() => toggleAlertSelection(row.id)}
+                      aria-label={`${row.name} 알림 선택`}
+                    >
+                      <span className={`msg-box ${selected ? 'on' : ''}`}>{selected && <Check size={12} />}</span>
+                    </button>
+                    <span className={`at-pill ${PILL_VARIANT[row.badgeClass] ?? 'info'}`}>{row.label}</span>
+                    <span className="msg-qname">{row.name}</span>
+                    <span className="msg-qtime">{row.time ?? row.date}</span>
+                    <span className={`msg-qcontact ${row.contact ? '' : 'none'}`}>
                       {row.contact ? `📞 ${row.contact}` : '연락처 없음'}
                     </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
-                      onClick={() => handleCopyAlert(row.id, row.message)}
-                    >
-                      {copiedAlertId === row.id ? <><Check size={13} className="text-success" /> 복사됨</> : <><Copy size={13} /> 복사</>}
-                    </button>
-                    {row.contact && (
+                    <div className="msg-qbtns">
                       <button
-                        type="button"
-                        className="btn btn-primary"
-                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem' }}
-                        onClick={() => void handleSendAlimtalk(row)}
-                        disabled={sendingAlimtalkId === row.id}
+                        className={`at-act ${copiedAlertId === row.id ? 'done' : ''}`}
+                        onClick={() => handleCopyAlert(row.id, row.message)}
                       >
-                        <Send size={13} /> {sendingAlimtalkId === row.id ? '발송중' : '알림톡'}
+                        {copiedAlertId === row.id ? <><Check size={12} /> 복사됨</> : <><Copy size={12} /> 복사</>}
                       </button>
-                    )}
-                    {row.contact && (
-                      <a
-                        href={buildSMSLink(row.contact, row.message)}
-                        className="btn btn-secondary"
-                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', gap: '0.25rem', textDecoration: 'none' }}
-                      >
-                        문자
-                      </a>
-                    )}
-                    <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
-                      onClick={() => dismissPendingRow(row)}
-                    >
-                      완료
-                    </button>
+                      {row.contact && (
+                        <button
+                          className="at-act primary"
+                          onClick={() => void handleSendAlimtalk(row)}
+                          disabled={sendingAlimtalkId === row.id}
+                        >
+                          <Send size={12} /> {sendingAlimtalkId === row.id ? '발송중' : '알림톡'}
+                        </button>
+                      )}
+                      {row.contact && (
+                        <a
+                          href={buildSMSLink(row.contact, row.message)}
+                          className="at-act"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          문자
+                        </a>
+                      )}
+                      <button className="at-act" onClick={() => dismissPendingRow(row)}>완료</button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="grid-container cols-2-1">
-      {/* Left Column: Form & Template Controls */}
-      <div className="card">
-        <h3 className="card-title">
-          <MessageSquare size={20} className="text-primary" /> 알림장 조립기
-        </h3>
+      {/* 조립기 + 카카오톡 미리보기 */}
+      <div className="msg-main">
+        {/* 좌: 조립기 */}
+        <section className="gd-card">
+          <h2 className="gd-card-title" style={{ marginBottom: '1rem' }}>
+            <MessageSquare size={18} /> 알림장 조립기
+          </h2>
 
-        <div className="form-group">
-          <label>대상 원생 선택 *</label>
+          <label className="msg-label">대상 원생 *</label>
           <select
-            className="form-control"
+            className="msg-select"
             value={selectedStudentId}
             onChange={e => setSelectedStudentId(e.target.value)}
           >
@@ -526,138 +511,69 @@ export const Messaging: React.FC<MessagingProps> = ({
               </optgroup>
             ))}
           </select>
-        </div>
 
-        {currentStudent && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: '#f0f7f3',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-accent-mint-light)',
-              fontSize: '0.85rem',
-              marginBottom: '0.75rem',
-            }}
-          >
-            📞 <strong>학부모 연락처:</strong> {currentStudent.parentContact || '연락처가 등록되지 않았습니다.'}
-          </div>
-        )}
+          {currentStudent && (
+            <div className="msg-today">
+              <div><b>✅ 등원</b> {todaySummary.checkIn}</div>
+              <div><b>🏡 하원</b> {todaySummary.checkOut}</div>
+              <div><b>📝 숙제</b> {todaySummary.hwLabel}</div>
+              <div><b>🔄 보강</b> {todaySummary.makeupLabel}</div>
+              {!todaySummary.hasTodayRecord && (
+                <div style={{ gridColumn: 'span 2', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
+                  오늘 출결 기록이 없습니다.
+                </div>
+              )}
+            </div>
+          )}
 
-        {currentStudent && (
-          <div
-            style={{
-              padding: '0.85rem 1rem',
-              backgroundColor: todaySummary.hasTodayRecord ? '#f0f7f3' : '#fafbfc',
-              borderRadius: 'var(--radius-md)',
-              border: `1px solid ${todaySummary.hasTodayRecord ? 'var(--color-accent-mint-light)' : 'var(--color-border)'}`,
-              fontSize: '0.83rem',
-              marginBottom: '1.25rem',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.5rem 1rem',
-            }}
-          >
-            <div><strong>✅ 등원</strong> {todaySummary.checkIn}</div>
-            <div><strong>🏡 하원</strong> {todaySummary.checkOut}</div>
-            <div><strong>📝 숙제</strong> {todaySummary.hwLabel}</div>
-            <div><strong>🔄 보강</strong> {todaySummary.makeupLabel}</div>
-            {!todaySummary.hasTodayRecord && (
-              <div style={{ gridColumn: 'span 2', color: 'var(--color-text-muted)', fontSize: '0.78rem', marginTop: '0.15rem' }}>
-                오늘 출결 기록이 없습니다.
+          {assistantDraft?.content && (
+            <div
+              className="msg-today"
+              style={{
+                gridTemplateColumns: '1fr',
+                background: draftMatchedStudent ? '#f0f6f2' : '#fef3c7',
+                borderColor: draftMatchedStudent ? '#d9e9e1' : 'var(--color-warning)',
+                color: 'var(--color-primary-dark)',
+              }}
+            >
+              <div>
+                <b><Sparkles size={13} style={{ verticalAlign: '-2px' }} /> 아이비 초안</b>{' '}
+                {draftMatchedStudent
+                  ? `에서 ${draftMatchedStudent.name} 학생을 자동 선택했습니다.`
+                  : '에서 학생 이름을 하나로 확정하지 못했습니다. 대상 원생을 직접 선택해 주세요.'}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {assistantDraft?.content && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: draftMatchedStudent ? 'var(--color-accent-mint-light, #d1fae5)' : 'var(--color-warning-light, #fef3c7)',
-              borderRadius: 'var(--radius-md)',
-              border: `1px solid ${draftMatchedStudent ? 'var(--color-accent-mint, #10b981)' : 'var(--color-warning, #f59e0b)'}`,
-              fontSize: '0.82rem',
-              color: 'var(--color-primary-dark)',
-              marginBottom: '1.5rem',
-            }}
-          >
-            <strong>아이비 초안</strong>
-            {draftMatchedStudent
-              ? `에서 ${draftMatchedStudent.name} 학생을 자동 선택했습니다.`
-              : '에서 학생 이름을 하나로 확정하지 못했습니다. 대상 원생을 직접 선택해 주세요.'}
-          </div>
-        )}
-
-        <div className="form-group">
-          <label>템플릿 유형 선택</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem', marginTop: '0.35rem' }}>
-            <button
-              className={`btn ${selectedTemplate === 'in' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
-              onClick={() => setSelectedTemplate('in')}
-            >
-              등원 완료 🌱
-            </button>
-            <button
-              className={`btn ${selectedTemplate === 'out' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
-              onClick={() => setSelectedTemplate('out')}
-            >
-              하원 완료 🏡
-            </button>
-            <button
-              className={`btn ${selectedTemplate === 'homework' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
-              onClick={() => setSelectedTemplate('homework')}
-            >
-              과제 미제출 📝
-            </button>
-            <button
-              className={`btn ${selectedTemplate === 'makeup' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
-              onClick={() => setSelectedTemplate('makeup')}
-            >
-              보강 안내 🕒
-            </button>
-            <button
-              className={`btn ${selectedTemplate === 'test' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setSelectedTemplate('test')}
-              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
-            >
-              평가 결과 통보 🎯
-            </button>
-            <button
-              className={`btn ${selectedTemplate === 'daily' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setSelectedTemplate('daily')}
-              style={{ fontSize: '0.85rem', padding: '0.5rem' }}
-            >
-              종합 알림장 📋
-            </button>
+          <label className="msg-label">템플릿 유형</label>
+          <div className="msg-tpls">
+            {TEMPLATE_BUTTONS.map(t => (
+              <button
+                key={t.value}
+                className={`msg-tpl ${selectedTemplate === t.value ? 'on' : ''}`}
+                onClick={() => setSelectedTemplate(t.value)}
+              >
+                {t.label}
+              </button>
+            ))}
             {customMessage && (
               <button
-                className={`btn ${selectedTemplate === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`msg-tpl ${selectedTemplate === 'custom' ? 'on' : ''}`}
+                style={{ gridColumn: 'span 2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                 onClick={() => setSelectedTemplate('custom')}
-                style={{ gridColumn: 'span 2', fontSize: '0.85rem', padding: '0.5rem', gap: '0.35rem' }}
               >
                 <Sparkles size={15} /> 아이비 초안
               </button>
             )}
           </div>
-        </div>
 
-        {/* Dynamic Parameter Settings */}
-        {selectedTemplate !== 'custom' ? (
-        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
-          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '0.75rem' }}>
-            메시지 세부 변수 조정
-          </h4>
-
+          {/* 세부 변수 조정 */}
           {(selectedTemplate === 'in' || selectedTemplate === 'out' || selectedTemplate === 'makeup') && (
-            <div className="form-group">
-              <label>시간 설정</label>
+            <div className="msg-params">
+              <label className="msg-label">시간 설정</label>
               <input
                 type="time"
-                className="form-control"
+                className="msg-select"
                 value={paramTime}
                 onChange={e => setParamTime(e.target.value)}
               />
@@ -665,11 +581,11 @@ export const Messaging: React.FC<MessagingProps> = ({
           )}
 
           {selectedTemplate === 'makeup' && (
-            <div className="form-group">
-              <label>보강 날짜</label>
+            <div className="msg-params">
+              <label className="msg-label">보강 날짜</label>
               <input
                 type="date"
-                className="form-control"
+                className="msg-select"
                 value={paramDate}
                 onChange={e => setParamDate(e.target.value)}
               />
@@ -677,106 +593,87 @@ export const Messaging: React.FC<MessagingProps> = ({
           )}
 
           {selectedTemplate === 'test' && (
-            <div className="form-row">
-              <div className="form-group">
-                <label>테스트명</label>
+            <div className="msg-params msg-params2">
+              <div>
+                <label className="msg-label">평가명</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="msg-select"
                   value={paramTestName}
                   onChange={e => setParamTestName(e.target.value)}
                 />
               </div>
-              <div className="form-group">
-                <label>득점/결과</label>
+              <div>
+                <label className="msg-label">득점/결과</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="msg-select"
                   value={paramScore}
                   onChange={e => setParamScore(e.target.value)}
                 />
               </div>
             </div>
           )}
-        </div>
-        ) : (
-          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Sparkles size={15} /> 아이비 초안 편집
-            </h4>
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-              아래 미리보기에서 내용을 직접 다듬은 뒤 복사하거나 학생 연락처를 선택해 문자로 보낼 수 있습니다.
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* Right Column: Compiled Message Preview & Send Actions */}
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <div>
-          <h3 className="card-title">
-            <User size={18} className="text-secondary" /> 알림장 미리보기
-          </h3>
-
-          <textarea
-            className="form-control message-preview-textarea"
-            rows={6}
-            readOnly={selectedTemplate !== 'custom'}
-            style={{
-              fontFamily: 'inherit',
-              backgroundColor: '#fafcfb',
-              cursor: selectedTemplate === 'custom' ? 'text' : 'default',
-              border: '1px solid var(--color-border)',
-              resize: 'none',
-            }}
-            value={compiledMessage}
-            onChange={e => setCustomMessage(e.target.value)}
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={handleCopy}
-            disabled={!compiledMessage || compiledMessage.includes('학생을 선택하시면')}
-            style={{ width: '100%', gap: '0.5rem' }}
-          >
-            {isCopied ? (
-              <>
-                <Check size={16} className="text-success" /> 클립보드 복사 완료
-              </>
-            ) : (
-              <>
-                <Copy size={16} /> 카카오톡용 본문 복사
-              </>
-            )}
-          </button>
-
-          {currentStudent?.parentContact ? (
-            <a
-              href={getSMSDeepLink()}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                textDecoration: 'none',
-                gap: '0.5rem',
-                pointerEvents: selectedStudentId ? 'auto' : 'none',
-                opacity: selectedStudentId ? 1 : 0.6,
-              }}
-            >
-              <Send size={16} /> 학부모 문자(SMS) 바로 전송
-            </a>
-          ) : (
-            <button
-              className="btn btn-primary"
-              disabled
-              style={{ width: '100%', gap: '0.5rem', opacity: 0.6 }}
-            >
-              <Send size={16} /> 문자 전송 (연락처 필요)
-            </button>
+          {selectedTemplate === 'custom' && (
+            <div className="msg-params">
+              <label className="msg-label">
+                <Sparkles size={13} style={{ verticalAlign: '-2px' }} /> 아이비 초안 편집
+              </label>
+              <textarea
+                className="msg-select message-preview-textarea"
+                style={{ resize: 'none' }}
+                value={compiledMessage}
+                onChange={e => setCustomMessage(e.target.value)}
+              />
+            </div>
           )}
-        </div>
-      </div>
+        </section>
+
+        {/* 우: 카카오톡 말풍선 미리보기 */}
+        <section className="gd-card msg-preview">
+          <h2 className="gd-card-title" style={{ marginBottom: '0.85rem' }}>
+            <Smartphone size={18} /> 미리보기
+          </h2>
+
+          <div className="msg-bubble-wrap">
+            <div className="msg-bubble">{compiledMessage}</div>
+          </div>
+
+          <div className="msg-send">
+            <button
+              className={`pay-btn ghost ${isCopied ? 'cdone' : ''}`}
+              onClick={handleCopy}
+              disabled={!compiledMessage || isPlaceholder}
+            >
+              {isCopied ? <><Check size={15} /> 복사 완료</> : <><Copy size={15} /> 카카오톡 본문 복사</>}
+            </button>
+
+            {currentStudent?.parentContact ? (
+              <a
+                href={getSMSDeepLink()}
+                className="pay-btn primary"
+                style={{
+                  textDecoration: 'none',
+                  pointerEvents: selectedStudentId ? 'auto' : 'none',
+                  opacity: selectedStudentId ? 1 : 0.5,
+                }}
+              >
+                <Send size={15} /> 학부모 문자 전송
+              </a>
+            ) : (
+              <button className="pay-btn primary" disabled>
+                <Send size={15} /> 문자 전송 (연락처 필요)
+              </button>
+            )}
+          </div>
+
+          {currentStudent && (
+            <p className="msg-contact">
+              📞 학부모 연락처: {currentStudent.parentContact || '등록되지 않음'}
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );
