@@ -2573,6 +2573,7 @@ textarea.form-control {
 .msg-send { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem; }
 .msg-send .pay-btn { width: 100%; justify-content: center; }
 .msg-contact { font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 0.7rem; }
+.msg-log-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: var(--color-text-primary); cursor: pointer; padding: 0; font-family: inherit; }
 @media (max-width: 768px) {
   .msg-main { grid-template-columns: 1fr; }
   .msg-qrow { grid-template-columns: auto auto 1fr; row-gap: 0.5rem; }

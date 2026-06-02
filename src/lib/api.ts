@@ -14,6 +14,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
   CounselLogType,
+  MessageLog,
 } from '../types';
 import { type MessageTemplates, mergeTemplates } from './messageTemplates';
 import { deriveLegacyClassScheduleFields } from './classSchedules';
@@ -515,6 +516,29 @@ export const api = {
   async deleteAssistantNote(id: string): Promise<void> {
     const { error } = await supabase.from('growing_assistant_notes').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  // ---- Message logs ----
+  async getMessageLogs(limit = 50): Promise<MessageLog[]> {
+    const { data, error } = await supabase
+      .from('growing_message_logs')
+      .select('id, student_id, alert_type, recipient_phone, recipient_name, subject, message, status, error_message, created_at, sent_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map(r => ({
+      id: s(r.id),
+      studentId: r.student_id ? s(r.student_id) : null,
+      alertType: s(r.alert_type) as MessageLog['alertType'],
+      recipientPhone: s(r.recipient_phone),
+      recipientName: r.recipient_name ? s(r.recipient_name) : null,
+      subject: s(r.subject),
+      message: s(r.message),
+      status: s(r.status) as MessageLog['status'],
+      errorMessage: r.error_message ? s(r.error_message) : null,
+      createdAt: s(r.created_at),
+      sentAt: r.sent_at ? s(r.sent_at) : null,
+    }));
   },
 
   // ---- Bulk: delete all of the signed-in owner's academy rows (RLS-scoped) ----

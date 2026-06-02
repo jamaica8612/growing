@@ -82,6 +82,26 @@ export interface HomeworkAlert {
   createdAt: number;
 }
 
+export type MessageLogStatus = 'queued' | 'sent' | 'failed';
+export type MessageLogAlertType =
+  | 'check_in' | 'check_out'
+  | 'homework_done' | 'homework_incomplete' | 'homework_undone'
+  | 'payment_request' | 'payment_paid' | 'custom';
+
+export interface MessageLog {
+  id: string;
+  studentId: string | null;
+  alertType: MessageLogAlertType;
+  recipientPhone: string;
+  recipientName: string | null;
+  subject: string;
+  message: string;
+  status: MessageLogStatus;
+  errorMessage: string | null;
+  createdAt: string; // ISO timestamp
+  sentAt: string | null;
+}
+
 export type CounselLogType = 'counsel' | 'progress' | 'test';
 
 export interface CounselLog {
