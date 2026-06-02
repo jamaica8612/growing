@@ -2203,6 +2203,11 @@ textarea.form-control {
   .gd-brief-list li { font-size: 0.82rem; }
   .gd-toast { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 }
+/* 좁은 화면(≤480px): 미납 카드 이름+버튼 줄바꿈 */
+@media (max-width: 480px) {
+  .gd-pay-row { flex-wrap: wrap; }
+  .gd-copy { margin-left: auto; }
+}
 /* 아주 좁은 화면(≤380px): 숙제 세그먼트 버튼 & 시간 입력 압축 */
 @media (max-width: 380px) {
   .gd-seg-b { font-size: 0.68rem; }

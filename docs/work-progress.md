@@ -51,6 +51,15 @@
   - 월간 통계 테이블 모바일 열 축소 (#11)
   - 알림장 템플릿 버튼 단일 열 (#9)
   - 극소형 화면 숙제 세그먼트·시간 입력 스택 (#5)
+- **UI 이슈 추가 수정 (2026-06-02)**
+  - #15 대시보드 미납 카드 480px 이하 flex-wrap (#15)
+  - #16 학생 상세 탭 overflow-x:auto 확인 완료 (이미 적용됨)
+
+### 아이비 — RAG 의미검색 (엣지 함수 v23)
+- **pgvector 의미검색**: `growing_counsel_logs` + `growing_assistant_notes` 임베딩 컬럼(vector 768)
+- Gemini `text-embedding-004` 임베딩, IVFFlat 인덱스, 코사인 거리 RPC(`search_counsel_logs`, `search_assistant_notes`)
+- `semantic_search` 도구: 질의 임베딩 → RPC 병렬 조회 → 유사도 정렬 반환
+- `backfill_embeddings` 도구: 임베딩 없는 기존 행 최대 50건 백필
 
 ---
 
@@ -59,17 +68,11 @@
 순서대로 진행. 빌드는 `npm run build`.
 
 ### 1) 잔여 UI 이슈 (docs/ui-issues.md 미수정 항목)
-- **#15** `Dashboard.tsx` 미납 카드 flex 레이아웃 모바일 줄바꿈 미처리
-- **#16** `Students.tsx` 상세 탭 9개 모바일 수평 스크롤 확인/처리
-- **#10** `index.css` `@media (max-width: 1024px)` 순서가 768px 뒤에 위치 (비논리적)
 - **#12/13/14** CSS 중복·상충 정리 (tabs-header, modal-content, notice-text-box)
 - 외부 API 불필요, 엣지 함수 재배포 불필요.
-
-### 2) 의미검색 RAG (보류, 별도 세션 권장)
-- 위험·대규모: pgvector 확장 + 임베딩 컬럼 + 기존 행 백필(Gemini 임베딩 API) +
-  엣지 벡터검색 RPC + 신규 일지/노트 저장 시 임베딩 생성.
-- 동작 중인 아이비 회귀 위험이 커서 단독으로 신중히 진행할 것.
-- 대안(경량): 현재 substring 검색을 다중 필드/키워드 확장으로 보강.
+- **#15** ✅ 완료 — `@media (max-width: 480px) { .gd-pay-row: flex-wrap:wrap }` 추가
+- **#16** ✅ 완료 — `.st-tabs` overflow-x:auto 이미 적용되어 있음 (확인만)
+- **#10** — 기능상 무해, 별도 CSS 리팩터링 세션에서 처리 권장
 
 ---
 
