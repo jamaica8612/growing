@@ -2573,7 +2573,7 @@ textarea.form-control {
 }
 
 /* ── 키오스크 ── */
-.kk-root { height: 100%; background: #0a2318; color: #fff; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.kk-root { height: 100vh; height: 100dvh; background: #0a2318; color: #fff; display: flex; flex-direction: column; overflow: hidden; position: fixed; inset: 0; z-index: 9998; }
 .kk-head { display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.6rem; background: #0c2e20; border-bottom: 1px solid rgba(255,255,255,0.07); }
 .kk-logo { display: flex; align-items: center; gap: 0.7rem; }
 .kk-logo-ic { background: var(--color-accent-mint); color: #0c2e20; padding: 0.45rem; border-radius: 9px; display: flex; }
