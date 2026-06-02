@@ -1512,7 +1512,7 @@ textarea.form-control {
   font-family: monospace;
   font-size: 0.85rem;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
   max-height: 200px;
   overflow-y: auto;
   margin-bottom: 1rem;
@@ -1677,10 +1677,6 @@ textarea.form-control {
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0.25rem;
   }
-}
-
-.tab-btn {
-  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
@@ -1885,9 +1881,9 @@ textarea.form-control {
 
   /* Optimize modal popup spacing */
   .modal-content {
-    width: 95% !important;
-    margin: 10px !important;
-    max-height: 95vh !important;
+    width: 95%;
+    margin: 10px;
+    max-height: 95vh;
   }
 
   .modal-body {
@@ -2161,14 +2157,15 @@ textarea.form-control {
 .gd-pay-item { border: 1px solid #f3dada; border-radius: var(--radius-md); padding: 0.8rem 0.9rem; background: #fffcfc; }
 .gd-pay-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .gd-pay-who { min-width: 0; }
-.gd-pay-name { font-size: 0.92rem; font-weight: 800; color: var(--color-text-primary); display: block; }
+.gd-pay-name { font-size: 0.92rem; font-weight: 800; color: var(--color-text-primary); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-pay-phone { display: flex; align-items: center; gap: 0.25rem; font-size: 0.74rem; color: var(--color-text-secondary); margin-top: 0.18rem; }
 .gd-copy { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.7rem; font-size: 0.76rem; font-weight: 700; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: #fff; color: var(--color-primary); flex-shrink: 0; transition: all 0.15s; cursor: pointer; font-family: inherit; }
 .gd-copy:hover:not(:disabled) { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 .gd-copy.done { background: #e3f6ed; color: #0c7a55; border-color: #bfe5d3; }
 .gd-copy:disabled { opacity: 0.45; cursor: not-allowed; }
-.gd-pay-foot { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--color-text-secondary); border-top: 1px dashed #f3dada; margin-top: 0.65rem; padding-top: 0.55rem; }
-.gd-pay-foot b { color: var(--color-danger); font-weight: 800; font-size: 0.92rem; }
+.gd-pay-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.2rem 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary); border-top: 1px dashed #f3dada; margin-top: 0.65rem; padding-top: 0.55rem; }
+.gd-pay-foot > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.gd-pay-foot b { color: var(--color-danger); font-weight: 800; font-size: 0.92rem; flex-shrink: 0; }
 .gd-empty { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; padding: 2.5rem 1rem; color: var(--color-accent-mint); font-weight: 700; font-size: 0.9rem; }
 
 /* 모바일 전용 날짜 선택 바 (히어로 아래) */
@@ -2400,7 +2397,8 @@ textarea.form-control {
 .st-tag.warn { color: #b4710a; background: #fef3c7; }
 .st-tag.info { color: var(--color-info); background: #e7f0fb; }
 .st-tag.none { color: var(--color-text-muted); background: #f3f5f3; }
-.st-tabs { display: flex; gap: 0.25rem; padding: 0.6rem 1rem 0; border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+.st-tabs { display: flex; gap: 0.25rem; padding: 0.6rem 1rem 0; border-bottom: 1px solid var(--color-border); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.st-tabs::-webkit-scrollbar { display: none; }
 .st-tab { border: none; background: none; font-size: 0.84rem; font-weight: 700; color: var(--color-text-secondary); padding: 0.55rem 0.7rem; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.13s; cursor: pointer; font-family: inherit; flex-shrink: 0; }
 .st-tab:hover { color: var(--color-primary); }
 .st-tab.on { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); }
