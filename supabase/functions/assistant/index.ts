@@ -277,6 +277,37 @@ const TOOL_DECLARATIONS = [
       required: ['table'],
     },
   },
+  {
+    name: 'semantic_search',
+    description: '상담 일지·아이비 메모에서 의미(내용)로 검색한다. 키워드 검색이 어려울 때, 또는 "~한 학생 있어?", "~관련 일지 찾아줘" 같은 자연어 질문에 유용하다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: '자연어 검색 질문(예: "수학 기초가 부족한 학생", "결석이 잦아 상담한 내용")' },
+        sources: {
+          type: 'STRING',
+          enum: ['counsel_logs', 'assistant_notes', 'all'],
+          description: '검색 대상: counsel_logs(상담일지), assistant_notes(아이비 메모), all(둘 다). 기본 all',
+        },
+        limit: { type: 'NUMBER', description: '최대 결과 수(기본 5, 최대 20)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'backfill_embeddings',
+    description: '임베딩이 없는 상담 일지와 아이비 메모에 벡터 임베딩을 생성·저장한다. semantic_search가 결과를 반환하지 않을 때 한 번 실행하면 된다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        source: {
+          type: 'STRING',
+          enum: ['counsel_logs', 'assistant_notes', 'all'],
+          description: '임베딩 생성 대상. 기본 all',
+        },
+      },
+    },
+  },
 ];
 
 // =====================================================================
@@ -799,6 +830,100 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       return { table, count: rows.length, rows };
     }
 
+    case 'semantic_search': {
+      const query = (args.query as string) ?? '';
+      const sources = (args.sources as string) ?? 'all';
+      const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
+      if (!query.trim()) return { error: '검색어가 필요합니다.' };
+
+      const apiKey = Deno.env.get('GEMINI_API_KEY');
+      if (!apiKey) return { error: 'GEMINI_API_KEY가 설정되지 않았습니다.' };
+
+      const embedding = await generateEmbedding(query, apiKey);
+
+      const results: Json[] = [];
+
+      if (sources === 'counsel_logs' || sources === 'all') {
+        const { data, error } = await sb.rpc('search_counsel_logs', {
+          query_embedding: embedding,
+          match_count: limit,
+          similarity_threshold: 0.3,
+        });
+        if (error) throw error;
+        const students = await fetchStudents(sb);
+        const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
+        for (const row of (data ?? []) as Json[]) {
+          results.push({
+            source: '상담일지',
+            studentName: nameById.get(row.student_id as string) ?? '(알수없음)',
+            date: row.date, title: row.title, content: row.content,
+            type: row.type, score: row.score,
+            similarity: Math.round((row.similarity as number) * 100) / 100,
+          });
+        }
+      }
+
+      if (sources === 'assistant_notes' || sources === 'all') {
+        const { data, error } = await sb.rpc('search_assistant_notes', {
+          query_embedding: embedding,
+          match_count: limit,
+          similarity_threshold: 0.3,
+        });
+        if (error) throw error;
+        for (const row of (data ?? []) as Json[]) {
+          results.push({
+            source: '아이비 메모',
+            content: row.content,
+            createdAt: row.created_at,
+            similarity: Math.round((row.similarity as number) * 100) / 100,
+          });
+        }
+      }
+
+      results.sort((a, b) => (b.similarity as number) - (a.similarity as number));
+      return { query, count: results.length, results: results.slice(0, limit) };
+    }
+
+    case 'backfill_embeddings': {
+      const source = (args.source as string) ?? 'all';
+      const apiKey = Deno.env.get('GEMINI_API_KEY');
+      if (!apiKey) return { error: 'GEMINI_API_KEY가 설정되지 않았습니다.' };
+
+      let counselCount = 0;
+      let notesCount = 0;
+
+      if (source === 'counsel_logs' || source === 'all') {
+        const { data, error } = await sb
+          .from('growing_counsel_logs').select('id, title, content')
+          .is('embedding', null).limit(50);
+        if (error) throw error;
+        for (const row of (data ?? []) as Json[]) {
+          const text = `${row.title}\n${row.content}`;
+          const emb = await generateEmbedding(text, apiKey);
+          await sb.from('growing_counsel_logs').update({ embedding: emb }).eq('id', row.id);
+          counselCount++;
+        }
+      }
+
+      if (source === 'assistant_notes' || source === 'all') {
+        const { data, error } = await sb
+          .from('growing_assistant_notes').select('id, content')
+          .is('embedding', null).limit(50);
+        if (error) throw error;
+        for (const row of (data ?? []) as Json[]) {
+          const emb = await generateEmbedding(row.content as string, apiKey);
+          await sb.from('growing_assistant_notes').update({ embedding: emb }).eq('id', row.id);
+          notesCount++;
+        }
+      }
+
+      return {
+        success: true,
+        message: `임베딩 생성 완료: 상담일지 ${counselCount}건, 메모 ${notesCount}건`,
+        counselCount, notesCount,
+      };
+    }
+
     default:
       return { error: `알 수 없는 도구: ${name}` };
   }
@@ -906,6 +1031,25 @@ interface GeminiPart { text?: string; functionCall?: { name: string; args: Json 
 interface GeminiContent { role: string; parts: GeminiPart[] }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: { parts: [{ text }] } }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`임베딩 생성 실패 (${res.status}): ${detail.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const values = data?.embedding?.values;
+  if (!Array.isArray(values)) throw new Error('임베딩 응답 형식 오류');
+  return values as number[];
+}
 
 async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise<GeminiContent> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
