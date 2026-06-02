@@ -357,8 +357,8 @@ body {
   .cols-2-1 { grid-template-columns: 1fr; }
 }
 
-/* 태블릿 이하(< 1024px): 사이드바 숨기고 모바일 헤더/하단탭 노출 */
-@media (max-width: 1023px) {
+/* 휴대폰 폭: 사이드바 숨기고 모바일 헤더/하단탭 노출 */
+@media (max-width: 768px) {
   .desktop-sidebar {
     display: none !important;
   }
@@ -2790,7 +2790,7 @@ textarea.form-control {
 .app-topbar p { font-size: 0.85rem; color: var(--color-text-secondary); margin-top: 0.15rem; }
 
 /* ── 모바일 헤더 ── */
-.m-header { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 1.1rem; background: var(--color-bg-sidebar); color: #fff; flex-shrink: 0; }
+.m-header { display: none; align-items: center; justify-content: space-between; padding: 0.7rem 1.1rem; background: var(--color-bg-sidebar); color: #fff; flex-shrink: 0; }
 .m-header-logo { display: flex; align-items: center; gap: 0.5rem; background: none; border: none; color: #fff; cursor: pointer; font-family: inherit; }
 .m-header-logo .side-logo-ic { width: 30px; height: 30px; border-radius: 9px; }
 .m-header-logo span { font-weight: 800; font-size: 1.08rem; letter-spacing: -0.02em; }
@@ -2799,10 +2799,15 @@ textarea.form-control {
 .m-header-btn:hover { background: rgba(255,255,255,0.2); }
 
 /* ── 모바일 하단 탭 (m-tabs / m-tab) ── */
-.m-tabs { display: flex; background: var(--color-bg-surface); border-top: 1px solid var(--color-border); flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); }
+.m-tabs { display: none; background: var(--color-bg-surface); border-top: 1px solid var(--color-border); flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); }
 .m-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.22rem; padding: 0.55rem 0.25rem 0.5rem; border: none; background: none; color: var(--color-text-muted); font-size: 0.65rem; font-weight: 600; cursor: pointer; font-family: inherit; position: relative; transition: color 0.13s; }
 .m-tab.active { color: var(--color-primary); }
 .m-tab em { position: absolute; top: 4px; right: calc(50% - 16px); min-width: 14px; height: 14px; border-radius: 7px; background: var(--color-danger); color: #fff; font-size: 0.6rem; font-style: normal; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+
+@media (max-width: 768px) {
+  .m-header { display: flex; }
+  .m-tabs { display: grid; }
+}
 
 /* ── 보강 관리 (mk-*) ── */
 .mk-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: linear-gradient(135deg,#eef6f1,#fff 70%); border: 1px solid #d9e9e1; border-radius: var(--radius-md); padding: 1rem 1.2rem; }
