@@ -362,7 +362,7 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   // 데스크탑 사이드바 + 모바일 드로어 공용 네비게이션
-  const renderNavSection = (opts: { closeOnNav: boolean; showKiosk?: boolean }) => {
+  const renderNavSection = (opts: { closeOnNav: boolean }) => {
     const go = (id: string) => {
       setActiveTab(id);
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
@@ -377,24 +377,20 @@ function AcademyApp({ session }: { session: Session }) {
     return (
       <>
         <nav style={{ flexGrow: 1 }}>
-          {NAV_GROUPS.map(group => {
-            const items = (opts.showKiosk ?? true)
-              ? group.items
-              : group.items.filter(item => item.kind !== 'kiosk');
-            return (
-              <div key={group.title} className="side-group">
-                <div className="side-group-t">{group.title}</div>
-                {items.map(item => (
-                  <NavItemButton
-                    key={item.id}
-                    active={activeTab === item.id}
-                    icon={item.icon}
-                    label={item.label}
-                    onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
-                    badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length || undefined : undefined}
-                    kioskStyle={item.kind === 'kiosk'}
-                  />
-                ))}
+          {NAV_GROUPS.map(group => (
+            <div key={group.title} className="side-group">
+              <div className="side-group-t">{group.title}</div>
+              {group.items.map(item => (
+                <NavItemButton
+                  key={item.id}
+                  active={activeTab === item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
+                  badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length || undefined : undefined}
+                  kioskStyle={item.kind === 'kiosk'}
+                />
+              ))}
               </div>
             );
           })}
@@ -446,7 +442,7 @@ function AcademyApp({ session }: { session: Session }) {
           </div>
         </button>
 
-        {renderNavSection({ closeOnNav: false, showKiosk: true })}
+        {renderNavSection({ closeOnNav: false })}
       </aside>
 
       {/* ── 모바일 상단 헤더 ── */}
@@ -493,7 +489,7 @@ function AcademyApp({ session }: { session: Session }) {
               </button>
             </div>
 
-            {renderNavSection({ closeOnNav: true, showKiosk: true })}
+            {renderNavSection({ closeOnNav: true })}
           </div>
         </div>
       )}
