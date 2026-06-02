@@ -114,16 +114,17 @@ export const Payments: React.FC<PaymentsProps> = ({
     return getPaymentMethodStats(monthPayments);
   }, [monthPayments]);
 
-  // 미납 기간 맵 (useMemo)
+  // 미납 기간 맵 (useMemo) — 연체 개월은 "선택 월"이 아니라 "오늘 월" 기준
+  const currentMonth = new Date().toISOString().substring(0, 7);
   const unpaidMonthsMap = useMemo(() => {
     const map: Record<string, ReturnType<typeof classifyUnpaidMonths>> = {};
     monthPayments.forEach(p => {
       if (p.status === 'unpaid') {
-        map[p.id] = classifyUnpaidMonths(p, selectedMonth);
+        map[p.id] = classifyUnpaidMonths(p, currentMonth);
       }
     });
     return map;
-  }, [monthPayments, selectedMonth]);
+  }, [monthPayments, currentMonth]);
 
   const revenueHistory = (() => {
     const months: string[] = [];

@@ -102,12 +102,14 @@ export function getClassPaymentStats(
 }
 
 /**
- * 미납 기간 분류 (현재 월 기준)
- * 예: selectedMonth='2026-06', payment.billingMonth='2026-05' → 1개월 연체
+ * 미납 기간 분류 (실제 오늘 월 기준)
+ * 예: currentMonth='2026-06', payment.billingMonth='2026-05' → 1개월 연체
+ * 주의: 비교 기준은 화면에서 선택한 월이 아니라 "오늘 날짜의 월"이어야 한다.
+ *       (선택 월로 비교하면 청구월===선택월이라 항상 0개월이 되어 연체가 안 보임)
  */
 export function classifyUnpaidMonths(
   payment: Payment,
-  selectedMonth: string
+  currentMonth: string
 ): UnpaidMonthsClassification {
   if (payment.status === 'paid') {
     return {
@@ -117,12 +119,12 @@ export function classifyUnpaidMonths(
     };
   }
 
-  const [selYear, selMonth] = selectedMonth.split('-').map(Number);
+  const [curYear, curMonth] = currentMonth.split('-').map(Number);
   const [payYear, payMonth] = payment.billingMonth.split('-').map(Number);
 
-  const monthsDiff = (selYear - payYear) * 12 + (selMonth - payMonth);
+  const monthsDiff = (curYear - payYear) * 12 + (curMonth - payMonth);
 
-  if (monthsDiff === 0) {
+  if (monthsDiff <= 0) {
     return {
       monthsOverdue: 0,
       severity: 'current',
