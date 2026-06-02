@@ -1673,9 +1673,10 @@ textarea.form-control {
 
   .makeup-active-toggle {
     width: 100%;
-  white-space: nowrap;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 0.25rem;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+  }
 }
 
 .tab-btn {
@@ -3354,4 +3355,47 @@ textarea.form-control {
     height: calc(100dvh - 4rem);
     border-radius: 22px 22px 0 0;
   }
+}
+
+/* ── 반별 수납 비교 ── */
+.pay-class-chart { display: flex; flex-direction: column; }
+.pay-class-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+.pay-class-item { padding: 0.9rem; background: #f9fafb; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.pay-class-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
+.pay-class-name { font-size: 0.85rem; font-weight: 700; color: var(--color-text-primary); }
+.pay-class-rate { font-size: 1.1rem; font-weight: 800; color: var(--color-primary); }
+.pay-class-bar-wrap { width: 100%; height: 8px; background: #e8edea; border-radius: 4px; overflow: hidden; margin-bottom: 0.6rem; }
+.pay-class-bar { height: 100%; background: linear-gradient(90deg, var(--color-primary), var(--color-accent-mint)); border-radius: 4px; }
+.pay-class-footer { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--color-text-muted); gap: 0.4rem; }
+
+/* ── 결제 방법별 ── */
+.pay-method-chart { display: flex; flex-direction: column; }
+.pay-method-items { display: flex; flex-direction: column; gap: 0.6rem; }
+.pay-method-item { display: flex; align-items: center; gap: 0.8rem; padding: 0.75rem 1rem; background: #f9fafb; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.pay-method-color { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
+.pay-method-content { flex: 1; min-width: 0; }
+.pay-method-label { display: block; font-size: 0.85rem; font-weight: 700; color: var(--color-text-primary); }
+.pay-method-count { display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.1rem; }
+.pay-method-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
+.pay-method-amount { font-size: 0.9rem; font-weight: 800; color: var(--color-primary-dark); }
+.pay-method-percent { font-size: 0.75rem; color: var(--color-text-muted); }
+
+/* ── 미납 기간 배지 색상 ── */
+.pay-badge.unpaid-current { color: #92400e; background: #fef3c7; }
+.pay-badge.unpaid-warning { color: #92400e; background: #fed7aa; }
+.pay-badge.unpaid-danger { color: #7f1d1d; background: #fca5a5; }
+
+/* ── 학생 상세: 수납 통계 카드 ── */
+.st-payment-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.7rem; margin-bottom: 1.2rem; }
+.stat-card { padding: 0.85rem; background: #f5f8f5; border: 1px solid var(--color-border); border-radius: var(--radius-md); text-align: center; }
+.stat-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-text-secondary); margin-bottom: 0.3rem; }
+.stat-value { display: block; font-size: 1.15rem; font-weight: 800; color: var(--color-primary-dark); }
+
+@media (max-width: 1024px) {
+  .pay-class-items { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .pay-class-items { grid-template-columns: 1fr; }
+  .st-payment-stats { grid-template-columns: repeat(2, 1fr); }
 }

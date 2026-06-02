@@ -5,6 +5,7 @@ import { isAttendedStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
 import { getStudentClassTuition } from '../lib/classTuition';
 import { getStudentTagMap, type StudentTagKey, type StudentTagSeverity } from '../lib/studentTags';
+import { getStudentPaymentStats } from '../lib/paymentStats';
 import { StudentTagBadges } from './StudentTagBadges';
 import { StudentTimeline } from './StudentTimeline';
 import { StudentReportPreview } from './StudentReportPreview';
@@ -484,6 +485,36 @@ export const Students: React.FC<StudentsProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {/* 수납 통계 카드 */}
+                    {getStudentPayments(activeDetailStudent.id).length > 0 && (() => {
+                      const stats = getStudentPaymentStats(activeDetailStudent.id, payments);
+                      return (
+                        <div className="st-payment-stats">
+                          <div className="stat-card">
+                            <span className="stat-label">누적 청구액</span>
+                            <span className="stat-value">{stats.totalBilled.toLocaleString()}원</span>
+                          </div>
+                          <div className="stat-card">
+                            <span className="stat-label">누적 수납액</span>
+                            <span className="stat-value" style={{ color: 'var(--color-accent-mint)' }}>
+                              {stats.totalPaid.toLocaleString()}원
+                            </span>
+                          </div>
+                          <div className="stat-card">
+                            <span className="stat-label">미납액</span>
+                            <span className="stat-value" style={{ color: 'var(--color-danger)' }}>
+                              {stats.unpaidAmount.toLocaleString()}원
+                            </span>
+                          </div>
+                          <div className="stat-card">
+                            <span className="stat-label">수납률</span>
+                            <span className="stat-value">{stats.rate}%</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div>
                       <h4 style={{ fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '0.6rem', fontSize: '0.92rem' }}>수납 이력</h4>
                       {getStudentPayments(activeDetailStudent.id).length === 0 ? (

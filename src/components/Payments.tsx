@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { Student, Class, Payment, PaymentMethod, PaymentStatus } from '../types';
-import { Check, CheckCircle2, Plus, Search, TrendingUp, Trash2, Upload, X } from 'lucide-react';
+import { BarChart3, Check, CheckCircle2, PieChart, Plus, Search, TrendingUp, Trash2, Upload, X } from 'lucide-react';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 import { parsePayssamExcel, type PayssamRow } from '../lib/payssam';
+import { getClassPaymentStats, getPaymentMethodStats, classifyUnpaidMonths } from '../lib/paymentStats';
 
 type MatchedRow = PayssamRow & { studentId: string };
 
@@ -98,6 +99,31 @@ export const Payments: React.FC<PaymentsProps> = ({
 
   const preview = useMemo(() => buildMonthlyBillingPreview(students, classes, payments, selectedMonth), [students, classes, payments, selectedMonth]);
   const previewCreateTotal = preview.toCreate.reduce((sum, r) => sum + r.amount, 0);
+
+  // 반별 수납 현황 (useMemo)
+  const classPaymentStatsMap = useMemo(() => {
+    const map: Record<string, ReturnType<typeof getClassPaymentStats>> = {};
+    classes.forEach(cls => {
+      map[cls.id] = getClassPaymentStats(cls.id, monthPayments, classes);
+    });
+    return map;
+  }, [classes, monthPayments]);
+
+  // 결제 방법별 통계 (useMemo)
+  const methodStats = useMemo(() => {
+    return getPaymentMethodStats(monthPayments);
+  }, [monthPayments]);
+
+  // 미납 기간 맵 (useMemo)
+  const unpaidMonthsMap = useMemo(() => {
+    const map: Record<string, ReturnType<typeof classifyUnpaidMonths>> = {};
+    monthPayments.forEach(p => {
+      if (p.status === 'unpaid') {
+        map[p.id] = classifyUnpaidMonths(p, selectedMonth);
+      }
+    });
+    return map;
+  }, [monthPayments, selectedMonth]);
 
   const revenueHistory = (() => {
     const months: string[] = [];
@@ -235,6 +261,68 @@ export const Payments: React.FC<PaymentsProps> = ({
             ))}
           </div>
         </section>
+
+        {/* 반별 수납 비교 차트 */}
+        {classes.length > 0 && (
+          <section className="gd-card pay-class-chart">
+            <h2 className="gd-card-title"><BarChart3 size={18} /> 반별 수납 비교</h2>
+            <div className="pay-class-items">
+              {classes.slice(0, 8).map(cls => {
+                const stats = classPaymentStatsMap[cls.id];
+                return (
+                  <div className="pay-class-item" key={cls.id}>
+                    <div className="pay-class-header">
+                      <span className="pay-class-name">{cls.name}</span>
+                      <span className="pay-class-rate">{stats.rate}%</span>
+                    </div>
+                    <div className="pay-class-bar-wrap">
+                      <div
+                        className="pay-class-bar"
+                        style={{ width: `${stats.rate}%` }}
+                      />
+                    </div>
+                    <div className="pay-class-footer">
+                      <span>{stats.studentCount}명</span>
+                      <span>{(stats.totalPaid / 10000).toLocaleString()}만원</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* 결제 방법별 통계 */}
+        {methodStats.length > 0 && (
+          <section className="gd-card pay-method-chart">
+            <h2 className="gd-card-title"><PieChart size={18} /> 결제 방법별 현황</h2>
+            <div className="pay-method-items">
+              {methodStats.map(stat => {
+                const getMethodColor = (): string => {
+                  switch (stat.method) {
+                    case 'card': return 'color-info';
+                    case 'cash': return 'color-warning';
+                    case 'transfer': return 'color-success';
+                    default: return 'color-text-muted';
+                  }
+                };
+                return (
+                  <div className="pay-method-item" key={stat.method}>
+                    <div className="pay-method-color" style={{ backgroundColor: `var(--${getMethodColor()})` }} />
+                    <div className="pay-method-content">
+                      <span className="pay-method-label">{stat.label}</span>
+                      <span className="pay-method-count">{stat.count}건</span>
+                    </div>
+                    <div className="pay-method-right">
+                      <span className="pay-method-amount">{(stat.amount / 10000).toLocaleString()}만</span>
+                      <span className="pay-method-percent">{stat.percentage}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
 
       <section className="gd-card">
@@ -283,7 +371,15 @@ export const Payments: React.FC<PaymentsProps> = ({
                   <div className="pay-c pay-cls">{classNamesStr}</div>
                   <div className="pay-c pay-amt">{pay.amount.toLocaleString()}원</div>
                   <div className="pay-c">
-                    <span className={`pay-badge ${pay.status}`}>{pay.status === 'paid' ? '완납' : '미납'}</span>
+                    {pay.status === 'paid' ? (
+                      <span className="pay-badge paid">완납</span>
+                    ) : unpaidMonthsMap[pay.id] ? (
+                      <span className={`pay-badge unpaid unpaid-${unpaidMonthsMap[pay.id].severity}`}>
+                        {unpaidMonthsMap[pay.id].label}
+                      </span>
+                    ) : (
+                      <span className="pay-badge unpaid">미납</span>
+                    )}
                   </div>
                   <div className="pay-c pay-date">{pay.paymentDate || '-'}</div>
                   <div className="pay-c pay-method">{pay.paymentMethod ? METHOD_LABEL[pay.paymentMethod] ?? '-' : '-'}</div>
