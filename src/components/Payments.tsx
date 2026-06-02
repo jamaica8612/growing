@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { Student, Class, Payment, PaymentMethod, PaymentStatus } from '../types';
-import { BarChart3, Check, CheckCircle2, PieChart, Plus, Search, TrendingUp, Trash2, Upload, X } from 'lucide-react';
+import { BarChart3, Check, CheckCircle2, ExternalLink, PieChart, Plus, Search, TrendingUp, Trash2, Upload, X } from 'lucide-react';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 import { parsePayssamExcel, type PayssamRow } from '../lib/payssam';
 import { getClassPaymentStats, getPaymentMethodStats, classifyUnpaidMonths } from '../lib/paymentStats';
@@ -341,6 +341,7 @@ export const Payments: React.FC<PaymentsProps> = ({
             </div>
           </div>
           <div className="pay-tools-right">
+            <a className="pay-btn ghost" href="https://manager.payssam.kr/" target="_blank" rel="noopener noreferrer"><ExternalLink size={15} /> 결제선생 바로가기</a>
             <button className="pay-btn ghost" onClick={() => setIsManualModalOpen(true)}><Plus size={15} /> 청구서 추가</button>
             <button className="pay-btn ghost" onClick={() => { setIsImportOpen(true); setImportParsed(null); setImportResult(null); }}><Upload size={15} /> 결제선생</button>
             <button className="pay-btn primary" onClick={handleOpenPreview}>{monthLabel}월 청구 일괄 생성</button>
