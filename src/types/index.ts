@@ -113,3 +113,50 @@ export interface CounselLog {
   type: CounselLogType;
   score?: string; // For test scores, e.g. "95/100" or "A+"
 }
+
+export type KakaoParentLinkStatus = 'verified' | 'blocked';
+
+export interface KakaoParentLink {
+  id: string;
+  studentId: string;
+  kakaoUserKey: string;
+  plusfriendUserKey: string;
+  parentPhone: string;
+  verifiedAt: string;
+  consentAt?: string;
+  blockedAt?: string;
+}
+
+export type KakaoParentRequestType = 'attendance' | 'homework' | 'counsel' | 'connect';
+export type KakaoParentRequestStatus = 'pending' | 'drafted' | 'resolved' | 'dismissed';
+
+export interface KakaoParentRequest {
+  id: string;
+  studentId?: string;
+  kakaoUserKey: string;
+  requestType: KakaoParentRequestType;
+  message: string;
+  status: KakaoParentRequestStatus;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface KakaoEventLog {
+  id: string;
+  kakaoUserKey: string;
+  plusfriendUserKey?: string;
+  eventType: string;
+  intent?: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface KakaoChannelConfig {
+  id: string;
+  channelName: string;
+  skillSecret: string;
+  eventSecret?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

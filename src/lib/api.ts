@@ -8,6 +8,11 @@ import type {
   CounselLog,
   KioskAlert,
   HomeworkAlert,
+  KakaoParentLink,
+  KakaoParentRequest,
+  KakaoParentRequestStatus,
+  KakaoEventLog,
+  KakaoChannelConfig,
   StudentStatus,
   AttendanceStatus,
   HomeworkStatus,
@@ -130,6 +135,48 @@ const toHomeworkAlert = (r: Row): HomeworkAlert => ({
   createdAt: r.created_at ? new Date(r.created_at as string).getTime() : Date.now(),
 });
 
+const toKakaoParentLink = (r: Row): KakaoParentLink => ({
+  id: r.id as string,
+  studentId: r.student_id as string,
+  kakaoUserKey: s(r.kakao_user_key),
+  plusfriendUserKey: s(r.plusfriend_user_key),
+  parentPhone: s(r.parent_phone),
+  verifiedAt: s(r.verified_at),
+  consentAt: (r.consent_at as string) ?? undefined,
+  blockedAt: (r.blocked_at as string) ?? undefined,
+});
+
+const toKakaoParentRequest = (r: Row): KakaoParentRequest => ({
+  id: r.id as string,
+  studentId: (r.student_id as string) ?? undefined,
+  kakaoUserKey: s(r.kakao_user_key),
+  requestType: r.request_type as KakaoParentRequest['requestType'],
+  message: s(r.message),
+  status: r.status as KakaoParentRequestStatus,
+  createdAt: s(r.created_at),
+  resolvedAt: (r.resolved_at as string) ?? undefined,
+});
+
+const toKakaoEventLog = (r: Row): KakaoEventLog => ({
+  id: r.id as string,
+  kakaoUserKey: s(r.kakao_user_key),
+  plusfriendUserKey: (r.plusfriend_user_key as string) ?? undefined,
+  eventType: s(r.event_type),
+  intent: (r.intent as string) ?? undefined,
+  status: s(r.status),
+  createdAt: s(r.created_at),
+});
+
+const toKakaoChannelConfig = (r: Row): KakaoChannelConfig => ({
+  id: r.id as string,
+  channelName: s(r.channel_name),
+  skillSecret: s(r.skill_secret),
+  eventSecret: (r.event_secret as string) ?? undefined,
+  enabled: Boolean(r.enabled),
+  createdAt: s(r.created_at),
+  updatedAt: s(r.updated_at),
+});
+
 export interface AcademySnapshot {
   students: Student[];
   classes: Class[];
@@ -138,13 +185,30 @@ export interface AcademySnapshot {
   counselLogs: CounselLog[];
   kioskAlerts: KioskAlert[];
   homeworkAlerts: HomeworkAlert[];
+  kakaoParentLinks: KakaoParentLink[];
+  kakaoParentRequests: KakaoParentRequest[];
+  kakaoEventLogs: KakaoEventLog[];
+  kakaoChannels: KakaoChannelConfig[];
   kioskPin: string;
   messageTemplates: MessageTemplates;
 }
 
 export const api = {
   async loadAll(): Promise<AcademySnapshot> {
-    const [students, classes, attendance, payments, counselLogs, kioskAlerts, homeworkAlerts, settings] = await Promise.all([
+    const [
+      students,
+      classes,
+      attendance,
+      payments,
+      counselLogs,
+      kioskAlerts,
+      homeworkAlerts,
+      kakaoParentLinks,
+      kakaoParentRequests,
+      kakaoEventLogs,
+      kakaoChannels,
+      settings,
+    ] = await Promise.all([
       supabase.from('growing_students').select('*').order('created_at'),
       supabase.from('growing_classes').select('*').order('created_at'),
       supabase.from('growing_attendance').select('*'),
@@ -152,11 +216,16 @@ export const api = {
       supabase.from('growing_counsel_logs').select('*'),
       supabase.from('growing_kiosk_alerts').select('*').order('created_at'),
       supabase.from('growing_homework_alerts').select('*').order('created_at'),
+      supabase.from('growing_kakao_parent_links').select('*').order('verified_at', { ascending: false }),
+      supabase.from('growing_parent_requests').select('*').order('created_at', { ascending: false }),
+      supabase.from('growing_kakao_events').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('growing_kakao_channels').select('*').order('created_at', { ascending: false }),
       supabase.from('growing_settings').select('*').maybeSingle(),
     ]);
     const error =
       students.error || classes.error || attendance.error || payments.error ||
-      counselLogs.error || kioskAlerts.error || homeworkAlerts.error || settings.error;
+      counselLogs.error || kioskAlerts.error || homeworkAlerts.error ||
+      kakaoParentLinks.error || kakaoParentRequests.error || kakaoEventLogs.error || kakaoChannels.error || settings.error;
     if (error) throw error;
 
     return {
@@ -167,6 +236,10 @@ export const api = {
       counselLogs: (counselLogs.data ?? []).map(toCounselLog),
       kioskAlerts: (kioskAlerts.data ?? []).map(toKioskAlert),
       homeworkAlerts: (homeworkAlerts.data ?? []).map(toHomeworkAlert),
+      kakaoParentLinks: (kakaoParentLinks.data ?? []).map(toKakaoParentLink),
+      kakaoParentRequests: (kakaoParentRequests.data ?? []).map(toKakaoParentRequest),
+      kakaoEventLogs: (kakaoEventLogs.data ?? []).map(toKakaoEventLog),
+      kakaoChannels: (kakaoChannels.data ?? []).map(toKakaoChannelConfig),
       kioskPin: (settings.data?.kiosk_pin as string) ?? '1234',
       messageTemplates: mergeTemplates(settings.data?.message_templates as Partial<MessageTemplates> | null),
     };
@@ -460,6 +533,39 @@ export const api = {
     if (ids.length === 0) return;
     const { error } = await supabase.from('growing_homework_alerts').delete().in('id', ids);
     if (error) throw error;
+  },
+
+  // ---- Kakao channel bot prep ----
+  async updateKakaoParentRequestStatus(id: string, status: KakaoParentRequestStatus): Promise<KakaoParentRequest> {
+    const resolvedAt = status === 'resolved' || status === 'dismissed' ? new Date().toISOString() : null;
+    const { data: row, error } = await supabase
+      .from('growing_parent_requests')
+      .update({ status, resolved_at: resolvedAt })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return toKakaoParentRequest(row);
+  },
+
+  async saveKakaoChannelConfig(
+    ownerId: string,
+    config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean }
+  ): Promise<KakaoChannelConfig> {
+    const payload = {
+      owner_id: ownerId,
+      channel_name: config.channelName,
+      skill_secret: config.skillSecret,
+      event_secret: config.eventSecret || null,
+      enabled: config.enabled,
+      updated_at: new Date().toISOString(),
+    };
+    const query = config.id
+      ? supabase.from('growing_kakao_channels').update(payload).eq('id', config.id)
+      : supabase.from('growing_kakao_channels').insert(payload);
+    const { data: row, error } = await query.select().single();
+    if (error) throw error;
+    return toKakaoChannelConfig(row);
   },
 
   // ---- Settings ----

@@ -79,16 +79,21 @@ export const Payments: React.FC<PaymentsProps> = ({
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('card');
 
-  const monthPayments = payments.filter(p => p.billingMonth === selectedMonth);
-  const filteredPayments = monthPayments
-    .filter(p => {
+  const monthPayments = useMemo(
+    () => payments.filter(p => p.billingMonth === selectedMonth),
+    [payments, selectedMonth]
+  );
+  const filteredPayments = useMemo(
+    () => monthPayments.filter(p => {
       const student = students.find(s => s.id === p.studentId);
       if (!student) return false;
       const keyword = search.trim().toLowerCase();
       const matchesSearch = !keyword || student.name.toLowerCase().includes(keyword) || student.school.toLowerCase().includes(keyword);
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       return matchesSearch && matchesStatus;
-    });
+    }),
+    [monthPayments, search, statusFilter, students]
+  );
 
   const totalPaid = monthPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
   const totalUnpaid = monthPayments.filter(p => p.status === 'unpaid').reduce((sum, p) => sum + p.amount, 0);

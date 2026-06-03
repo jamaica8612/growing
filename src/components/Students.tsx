@@ -1,11 +1,12 @@
 ﻿import React, { useMemo, useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
-import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, Phone, UserX } from 'lucide-react';
+import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, Phone, UserX, ClipboardList } from 'lucide-react';
 import { isAttendedStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
 import { getStudentClassTuition } from '../lib/classTuition';
 import { getStudentTagMap, type StudentTagKey, type StudentTagSeverity } from '../lib/studentTags';
 import { getStudentPaymentStats } from '../lib/paymentStats';
+import { getCounselBriefing } from '../lib/operationInsights';
 import { StudentTagBadges } from './StudentTagBadges';
 import { StudentTimeline } from './StudentTimeline';
 import { StudentReportPreview } from './StudentReportPreview';
@@ -543,6 +544,48 @@ export const Students: React.FC<StudentsProps> = ({
                 {/* 상담 일지 */}
                 {detailTab === 'counsel' && (
                   <div>
+                    {(() => {
+                      const briefing = getCounselBriefing(activeDetailStudent, classes, attendance, payments, counselLogs);
+                      return (
+                        <section className="st-briefing">
+                          <div className="st-briefing-head">
+                            <div>
+                              <span>상담 전 30초 요약</span>
+                              <h4>{briefing.headline}</h4>
+                            </div>
+                            <ClipboardList size={20} />
+                          </div>
+                          <div className="st-briefing-stats">
+                            <div><span>최근 출석률</span><b>{briefing.stats.attendanceRate || 0}%</b></div>
+                            <div><span>결석</span><b>{briefing.stats.absentCount}회</b></div>
+                            <div><span>숙제 이슈</span><b>{briefing.stats.homeworkIssueCount}회</b></div>
+                            <div><span>이번 달 미납</span><b>{briefing.stats.unpaidAmount.toLocaleString()}원</b></div>
+                          </div>
+                          <div className="st-briefing-grid">
+                            <div>
+                              <strong>오늘 볼 포인트</strong>
+                              {briefing.focus.length === 0 ? (
+                                <p>특별한 위험 신호는 없습니다.</p>
+                              ) : (
+                                <ul>{briefing.focus.map(item => <li key={item}>{item}</li>)}</ul>
+                              )}
+                            </div>
+                            <div>
+                              <strong>바로 물어볼 질문</strong>
+                              <ul>{briefing.questions.map(item => <li key={item}>{item}</li>)}</ul>
+                            </div>
+                          </div>
+                          {briefing.recentLogs.length > 0 && (
+                            <div className="st-briefing-logs">
+                              <strong>최근 기록</strong>
+                              {briefing.recentLogs.map(log => (
+                                <span key={log.id}>{log.date} · {log.title}{log.score ? ` · ${log.score}` : ''}</span>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })()}
                     <div className="st-counsel-head">
                       <h4 style={{ fontWeight: 800, color: 'var(--color-primary-dark)', fontSize: '0.92rem' }}>상담 · 진도 일지</h4>
                       <button className="at-act" onClick={() => setShowLogForm(!showLogForm)}><PlusCircle size={13} /> 일지 작성</button>

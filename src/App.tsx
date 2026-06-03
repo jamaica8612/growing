@@ -18,6 +18,7 @@ import { Messaging } from './components/Messaging';
 import { Assistant } from './components/Assistant';
 import { DataQuality } from './components/DataQuality';
 import { MakeupManager } from './components/MakeupManager';
+import { KakaoManager } from './components/KakaoManager';
 
 // Import Icons
 import {
@@ -31,6 +32,7 @@ import {
   Menu,
   X,
   Smartphone,
+  MessageCircle,
   Monitor,
   BarChart3,
   LogOut,
@@ -72,6 +74,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: '기록 · 분석',
     items: [
       { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
+      { id: 'kakao', label: '카카오 관리', icon: MessageCircle },
       { id: 'stats', label: '출결 통계', icon: BarChart3 },
       { id: 'data-quality', label: '\uB370\uC774\uD130 \uC810\uAC80', icon: ShieldCheck },
     ],
@@ -89,6 +92,7 @@ const TAB_TITLES: Record<string, string> = {
   'data-quality': '\uB370\uC774\uD130 \uC810\uAC80',
   payments: '교육비 수납 장부',
   counsel: '상담 및 학습/성적 일지',
+  kakao: '카카오 채널봇 관리',
   messaging: '알림장 발송 도우미',
   kiosk: '자율 등하원 키오스크',
   backup: 'AI·알림·백업 설정',
@@ -181,6 +185,9 @@ function AcademyApp({ session }: { session: Session }) {
     counselLogs,
     kioskAlerts,
     homeworkAlerts,
+    kakaoParentLinks,
+    kakaoParentRequests,
+    kakaoEventLogs,
     kioskPin,
     messageTemplates,
   } = data;
@@ -331,6 +338,18 @@ function AcademyApp({ session }: { session: Session }) {
             onClearHomeworkAlerts={data.handleClearHomeworkAlerts}
             assistantDraft={assistantDraft}
             messageTemplates={messageTemplates}
+          />
+        );
+      case 'kakao':
+        return (
+          <KakaoManager
+            students={students}
+            channels={data.kakaoChannels}
+            links={kakaoParentLinks}
+            requests={kakaoParentRequests}
+            events={kakaoEventLogs}
+            onUpdateRequestStatus={data.handleKakaoRequestStatus}
+            onSaveChannel={data.handleSaveKakaoChannel}
           />
         );
       case 'kiosk':

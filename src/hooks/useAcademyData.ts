@@ -1,5 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Student, Class, Attendance, Payment, CounselLog, KioskAlert, HomeworkAlert, HomeworkStatus, PaymentMethod } from '../types';
+import type {
+  Student,
+  Class,
+  Attendance,
+  Payment,
+  CounselLog,
+  KioskAlert,
+  HomeworkAlert,
+  HomeworkStatus,
+  PaymentMethod,
+  KakaoParentLink,
+  KakaoParentRequest,
+  KakaoParentRequestStatus,
+  KakaoEventLog,
+  KakaoChannelConfig,
+} from '../types';
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
@@ -17,6 +32,10 @@ export function useAcademyData(userId: string) {
   const [counselLogs, setCounselLogs] = useState<CounselLog[]>([]);
   const [kioskAlerts, setKioskAlerts] = useState<KioskAlert[]>([]);
   const [homeworkAlerts, setHomeworkAlerts] = useState<HomeworkAlert[]>([]);
+  const [kakaoParentLinks, setKakaoParentLinks] = useState<KakaoParentLink[]>([]);
+  const [kakaoParentRequests, setKakaoParentRequests] = useState<KakaoParentRequest[]>([]);
+  const [kakaoEventLogs, setKakaoEventLogs] = useState<KakaoEventLog[]>([]);
+  const [kakaoChannels, setKakaoChannels] = useState<KakaoChannelConfig[]>([]);
   const [kioskPin, setKioskPin] = useState('1234');
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplates>(DEFAULT_TEMPLATES);
   const [loading, setLoading] = useState(true);
@@ -34,6 +53,10 @@ export function useAcademyData(userId: string) {
       setCounselLogs(snap.counselLogs);
       setKioskAlerts(snap.kioskAlerts);
       setHomeworkAlerts(snap.homeworkAlerts);
+      setKakaoParentLinks(snap.kakaoParentLinks);
+      setKakaoParentRequests(snap.kakaoParentRequests);
+      setKakaoEventLogs(snap.kakaoEventLogs);
+      setKakaoChannels(snap.kakaoChannels);
       setKioskPin(snap.kioskPin);
       setMessageTemplates(snap.messageTemplates);
     } catch (e) {
@@ -325,6 +348,21 @@ export function useAcademyData(userId: string) {
       setHomeworkAlerts([]);
     });
 
+  const handleKakaoRequestStatus = (id: string, status: KakaoParentRequestStatus) =>
+    guard(async () => {
+      const updated = await api.updateKakaoParentRequestStatus(id, status);
+      setKakaoParentRequests(prev => prev.map(req => (req.id === updated.id ? updated : req)));
+    });
+
+  const handleSaveKakaoChannel = (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean }) =>
+    guard(async () => {
+      const saved = await api.saveKakaoChannelConfig(userId, config);
+      setKakaoChannels(prev => {
+        const exists = prev.some(channel => channel.id === saved.id);
+        return exists ? prev.map(channel => (channel.id === saved.id ? saved : channel)) : [saved, ...prev];
+      });
+    });
+
   // ---- Settings ----
   const handleChangeKioskPin = (newPin: string) =>
     guard(async () => {
@@ -425,6 +463,10 @@ export function useAcademyData(userId: string) {
     counselLogs,
     kioskAlerts,
     homeworkAlerts,
+    kakaoParentLinks,
+    kakaoParentRequests,
+    kakaoEventLogs,
+    kakaoChannels,
     kioskPin,
     messageTemplates,
     handleAddStudent,
@@ -451,6 +493,8 @@ export function useAcademyData(userId: string) {
     handleQueueHomeworkAlert,
     handleDismissHomeworkAlert,
     handleClearHomeworkAlerts,
+    handleKakaoRequestStatus,
+    handleSaveKakaoChannel,
     handleChangeKioskPin,
     handleSaveMessageTemplates,
     getAllData,

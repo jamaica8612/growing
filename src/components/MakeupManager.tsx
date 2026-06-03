@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { CalendarCheck, CheckCircle2, RefreshCw, Search, X } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, Lightbulb, RefreshCw, Search, X } from 'lucide-react';
 import type { Attendance, Class, Student } from '../types';
 import { getMakeupSummary, hasMakeupForAbsence, type MakeupNeededItem } from '../lib/makeupUtils';
+import { getMakeupRecommendations } from '../lib/operationInsights';
 
 interface MakeupManagerProps {
   students: Student[];
@@ -46,9 +47,10 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
   });
 
   const openProcessModal = (item: MakeupNeededItem) => {
+    const [firstRecommendation] = getMakeupRecommendations(item.student, item.absentRecord, classes, attendance);
     setProcessingItem(item);
-    setMakeupDate(new Date().toISOString().split('T')[0]);
-    setMakeupClassId(item.absentRecord.classId || item.class?.id || '');
+    setMakeupDate(firstRecommendation?.date ?? new Date().toISOString().split('T')[0]);
+    setMakeupClassId(firstRecommendation?.classId ?? item.absentRecord.classId ?? item.class?.id ?? '');
   };
 
   const handleProcess = () => {
@@ -147,6 +149,28 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
                       <b>{item.absentRecord.memo || '—'}</b>
                     </div>
                   </div>
+                  {(() => {
+                    const recommendations = getMakeupRecommendations(item.student, item.absentRecord, classes, attendance);
+                    if (recommendations.length === 0) return null;
+                    return (
+                      <div className="mk-recs">
+                        <span><Lightbulb size={13} /> 추천 보강 후보</span>
+                        {recommendations.map(rec => (
+                          <button
+                            key={rec.id}
+                            type="button"
+                            onClick={() => {
+                              setProcessingItem(item);
+                              setMakeupDate(rec.date);
+                              setMakeupClassId(rec.classId);
+                            }}
+                          >
+                            {rec.date} {rec.time} · {rec.className}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <button
                     type="button"
                     className="pay-btn primary sm mk-btn"
@@ -219,6 +243,26 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
                 <b>{processingItem.absentRecord.date}</b> 결석분을 보강 기록으로 연결합니다.
               </p>
             </div>
+
+            {getMakeupRecommendations(processingItem.student, processingItem.absentRecord, classes, attendance).length > 0 && (
+              <div className="mk-modal-recs">
+                <span><Lightbulb size={14} /> 추천 후보</span>
+                <div>
+                  {getMakeupRecommendations(processingItem.student, processingItem.absentRecord, classes, attendance).map(rec => (
+                    <button
+                      key={rec.id}
+                      type="button"
+                      onClick={() => {
+                        setMakeupDate(rec.date);
+                        setMakeupClassId(rec.classId);
+                      }}
+                    >
+                      {rec.date} {rec.time}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <label className="msg-label">보강 날짜</label>
             <input
