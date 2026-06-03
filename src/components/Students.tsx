@@ -1,12 +1,13 @@
 ﻿import React, { useMemo, useState } from 'react';
 import type { Student, Class, Attendance, Payment, CounselLog, StudentStatus } from '../types';
-import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, Phone, UserX, ClipboardList } from 'lucide-react';
+import { UserPlus, Search, Edit2, Eye, X, PlusCircle, Calendar, User, Phone, UserX, Sparkles } from 'lucide-react';
 import { isAttendedStatus } from '../lib/attendanceStatus';
 import { getClassScheduleLabel } from '../lib/classSchedules';
 import { getStudentClassTuition } from '../lib/classTuition';
 import { getStudentTagMap, type StudentTagKey, type StudentTagSeverity } from '../lib/studentTags';
 import { getStudentPaymentStats } from '../lib/paymentStats';
 import { getCounselBriefing } from '../lib/operationInsights';
+import { generateCounselBriefing } from '../lib/assistant';
 import { StudentTagBadges } from './StudentTagBadges';
 import { StudentTimeline } from './StudentTimeline';
 import { StudentReportPreview } from './StudentReportPreview';
@@ -75,6 +76,9 @@ export const Students: React.FC<StudentsProps> = ({
   const [logContent, setLogContent] = useState('');
   const [logType, setLogType] = useState<'counsel' | 'progress' | 'test'>('counsel');
   const [logScore, setLogScore] = useState('');
+  const [aiBriefings, setAiBriefings] = useState<Record<string, string>>({});
+  const [aiBriefingLoadingId, setAiBriefingLoadingId] = useState<string | null>(null);
+  const [aiBriefingError, setAiBriefingError] = useState<{ studentId: string; message: string } | null>(null);
 
 
   // Grades list
@@ -169,6 +173,45 @@ export const Students: React.FC<StudentsProps> = ({
       setShowLogForm(false);
     } finally {
       setIsSubmittingLog(false);
+    }
+  };
+
+  const handleGenerateAiBriefing = async (student: Student) => {
+    const briefing = getCounselBriefing(student, classes, attendance, payments, counselLogs);
+    const recentLogs = briefing.recentLogs
+      .map(log => `- ${log.date} ${log.title}: ${log.content}${log.score ? ` (${log.score})` : ''}`)
+      .join('\n') || '- 최근 상담/진도/시험 기록 없음';
+    const prompt = [
+      `${student.name} 학생 상담 전 30초 요약을 작성해줘.`,
+      '자동 저장이나 DB 변경은 하지 말고, 원장님이 상담 전에 읽을 요약만 작성해.',
+      '형식은 다음 4개 섹션으로 짧게:',
+      '1. 한줄 결론',
+      '2. 최근 변화',
+      '3. 상담 때 물어볼 질문 3개',
+      '4. 학부모에게 조심스럽게 말할 표현',
+      '',
+      `규칙 기반 포인트: ${briefing.focus.join(' / ') || '특별한 위험 신호 없음'}`,
+      `최근 출석률: ${briefing.stats.attendanceRate}%`,
+      `최근 결석: ${briefing.stats.absentCount}회`,
+      `숙제 이슈: ${briefing.stats.homeworkIssueCount}회`,
+      `이번 달 미납: ${briefing.stats.unpaidAmount.toLocaleString()}원`,
+      `학생 메모: ${student.memo || '없음'}`,
+      '최근 기록:',
+      recentLogs,
+    ].join('\n');
+
+    setAiBriefingError(null);
+    setAiBriefingLoadingId(student.id);
+    try {
+      const reply = await generateCounselBriefing(prompt);
+      setAiBriefings(prev => ({ ...prev, [student.id]: reply }));
+    } catch (error) {
+      setAiBriefingError({
+        studentId: student.id,
+        message: error instanceof Error ? error.message : 'AI 요약 생성에 실패했습니다.',
+      });
+    } finally {
+      setAiBriefingLoadingId(null);
     }
   };
 
@@ -553,7 +596,16 @@ export const Students: React.FC<StudentsProps> = ({
                               <span>상담 전 30초 요약</span>
                               <h4>{briefing.headline}</h4>
                             </div>
-                            <ClipboardList size={20} />
+                            <button
+                              type="button"
+                              className="ai-mark-btn"
+                              disabled={aiBriefingLoadingId === activeDetailStudent.id}
+                              onClick={() => void handleGenerateAiBriefing(activeDetailStudent)}
+                              title="아이비가 상담 요약을 자연어로 정리합니다"
+                            >
+                              <Sparkles size={14} />
+                              {aiBriefingLoadingId === activeDetailStudent.id ? 'AI 작성 중' : 'AI 요약'}
+                            </button>
                           </div>
                           <div className="st-briefing-stats">
                             <div><span>최근 출석률</span><b>{briefing.stats.attendanceRate || 0}%</b></div>
@@ -581,6 +633,17 @@ export const Students: React.FC<StudentsProps> = ({
                               {briefing.recentLogs.map(log => (
                                 <span key={log.id}>{log.date} · {log.title}{log.score ? ` · ${log.score}` : ''}</span>
                               ))}
+                            </div>
+                          )}
+                          {aiBriefingError?.studentId === activeDetailStudent.id && (
+                            <div className="st-ai-briefing error">{aiBriefingError.message}</div>
+                          )}
+                          {aiBriefings[activeDetailStudent.id] && (
+                            <div className="st-ai-briefing">
+                              <div className="st-ai-briefing-title">
+                                <Sparkles size={14} /> 아이비 상담 요약
+                              </div>
+                              <p>{aiBriefings[activeDetailStudent.id]}</p>
                             </div>
                           )}
                         </section>

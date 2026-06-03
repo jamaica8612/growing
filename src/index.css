@@ -334,6 +334,57 @@
   color: var(--color-primary-dark);
 }
 
+.ai-mark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid #c8e8d8;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f1fbf6 0%, #ffffff 100%);
+  color: var(--color-primary-dark);
+  font-size: 0.76rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(38, 95, 66, 0.1);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.ai-mark-btn svg {
+  color: var(--color-accent-mint);
+}
+
+.ai-mark-btn::after {
+  content: "AI";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.ai-mark-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--color-accent-mint);
+  box-shadow: 0 8px 20px rgba(38, 95, 66, 0.16);
+}
+
+.ai-mark-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}
+
 .st-briefing-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -405,6 +456,43 @@
   color: var(--color-text-secondary);
 }
 
+.st-ai-briefing {
+  padding: 0.75rem 0.8rem;
+  border: 1px solid #c8e8d8;
+  border-radius: var(--radius-md);
+  background: #f4fbf7;
+  color: var(--color-text-secondary);
+}
+
+.st-ai-briefing.error {
+  border-color: #f3c4c4;
+  background: #fff7f7;
+  color: var(--color-danger);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.st-ai-briefing-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.45rem;
+  color: var(--color-primary-dark);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.st-ai-briefing-title svg {
+  color: var(--color-accent-mint);
+}
+
+.st-ai-briefing p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
 .kakao-log-table {
   display: flex;
   flex-direction: column;
@@ -460,6 +548,15 @@
   .st-briefing-stats,
   .st-briefing-grid {
     grid-template-columns: 1fr;
+  }
+
+  .st-briefing-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-mark-btn {
+    width: fit-content;
   }
 }
 

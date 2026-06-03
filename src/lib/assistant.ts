@@ -116,6 +116,11 @@ export async function sendAssistantMessage(
   };
 }
 
+export async function generateCounselBriefing(prompt: string): Promise<string> {
+  const { reply } = await sendAssistantMessage([{ role: 'user', content: prompt }]);
+  return reply;
+}
+
 export async function executeAction(
   action: PendingAction
 ): Promise<{ success: boolean; message: string }> {
