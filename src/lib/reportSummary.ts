@@ -9,6 +9,7 @@ export interface StudentReportSummary {
     present: number;
     absent: number;
     makeup: number;
+    supplement: number;
     rate: number;
   };
   homework: {
@@ -78,8 +79,9 @@ export const getStudentReportSummary = ({
   const present = normalized.filter(status => status === 'present').length;
   const absent = normalized.filter(status => status === 'absent').length;
   const makeup = normalized.filter(status => status === 'makeup').length;
+  const supplement = normalized.filter(status => status === 'supplement').length;
   const total = monthAttendance.length;
-  const rate = total > 0 ? Math.round(((present + makeup) / total) * 100) : 100;
+  const rate = total > 0 ? Math.round(((present + makeup + supplement) / total) * 100) : 100;
   const homework = summarizeHomework(monthAttendance);
   const logs = counselLogs
     .filter(log => log.studentId === student.id && log.date.startsWith(month))
@@ -87,7 +89,7 @@ export const getStudentReportSummary = ({
   const payment = payments.find(payment => payment.studentId === student.id && payment.billingMonth === month);
   const studentClasses = classes.filter(cls => cls.studentIds.includes(student.id));
   const tags = getStudentTags({ student, classes, attendance, payments, counselLogs });
-  const attendanceSummary = { total, present, absent, makeup, rate };
+  const attendanceSummary = { total, present, absent, makeup, supplement, rate };
 
   return {
     month,

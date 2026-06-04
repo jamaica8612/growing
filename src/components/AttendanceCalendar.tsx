@@ -22,10 +22,10 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
 }) => {
   // 날짜(YYYY-MM-DD) → 상태별 건수 집계
   const countsByDate = useMemo(() => {
-    const map: Record<string, { present: number; absent: number; makeup: number }> = {};
+    const map: Record<string, { present: number; absent: number; makeup: number; supplement: number }> = {};
     for (const a of attendance) {
       if (!a.date.startsWith(month)) continue;
-      const day = (map[a.date] ??= { present: 0, absent: 0, makeup: 0 });
+      const day = (map[a.date] ??= { present: 0, absent: 0, makeup: 0, supplement: 0 });
       day[normalizeAttendanceStatus(a.status)]++;
     }
     return map;
@@ -47,11 +47,12 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
 
   // 월 합계
   const monthTotal = useMemo(() => {
-    const total = { present: 0, absent: 0, makeup: 0 };
+    const total = { present: 0, absent: 0, makeup: 0, supplement: 0 };
     for (const c of Object.values(countsByDate)) {
       total.present += c.present;
       total.absent += c.absent;
       total.makeup += c.makeup;
+      total.supplement += c.supplement;
     }
     return total;
   }, [countsByDate]);
@@ -91,6 +92,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
                 <div className="cal-dots">
                   {c.present > 0 && <span className="cal-dot present" title={`출석 ${c.present}`} />}
                   {c.makeup > 0 && <span className="cal-dot makeup" title={`보강 ${c.makeup}`} />}
+                  {c.supplement > 0 && <span className="cal-dot supplement" title={`보충 ${c.supplement}`} />}
                   {c.absent > 0 && <span className="cal-dot absent" title={`결석 ${c.absent}`} />}
                 </div>
               )}
@@ -103,6 +105,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
       <div className="cal-legend">
         <span><i className="cal-dot present" /> 출석 {monthTotal.present}</span>
         <span><i className="cal-dot makeup" /> 보강 {monthTotal.makeup}</span>
+        <span><i className="cal-dot supplement" /> 보충 {monthTotal.supplement}</span>
         <span><i className="cal-dot absent" /> 결석 {monthTotal.absent}</span>
       </div>
     </div>

@@ -521,7 +521,7 @@ export const Students: React.FC<StudentsProps> = ({
                                 <tr key={att.id}>
                                   <td>{att.date}</td>
                                   <td>{classes.find(c => c.id === att.classId)?.name || '—'}</td>
-                                  <td><span className={`at-pill ${att.status === 'present' ? 'ok' : att.status === 'absent' ? 'danger' : 'info'}`}>{att.status === 'present' ? '출석' : att.status === 'absent' ? '결석' : '보강'}</span></td>
+                                  <td><span className={`at-pill ${att.status === 'present' ? 'ok' : att.status === 'absent' ? 'danger' : att.status === 'supplement' ? 'warn' : 'info'}`}>{att.status === 'present' ? '출석' : att.status === 'absent' ? '결석' : att.status === 'supplement' ? '보충' : '보강'}</span></td>
                                 </tr>
                               ))}
                             </tbody>

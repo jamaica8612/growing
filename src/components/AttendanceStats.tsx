@@ -20,6 +20,7 @@ interface StudentRow {
   present: number;
   absent: number;
   makeup: number;
+  supplement: number;
   total: number;
   rate: number; // 0-100, "출석 인정"(present+makeup) / total
 }
@@ -28,6 +29,7 @@ const STATUS_META: Record<EditableAttendanceStatus, { label: string; badge: stri
   present: { label: '출석', badge: 'badge-present', color: 'var(--color-success)' },
   absent: { label: '결석', badge: 'badge-absent', color: 'var(--color-danger)' },
   makeup: { label: '보강', badge: 'badge-makeup', color: 'var(--color-info, #3b82f6)' },
+  supplement: { label: '보충', badge: 'badge-late', color: 'var(--color-warning)' },
 };
 
 // Colour the attendance-rate bar by how concerning it is.
@@ -59,12 +61,12 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
 
   // Overall status totals for the selected month.
   const totals = useMemo(() => {
-    const t = { present: 0, absent: 0, makeup: 0 };
+    const t = { present: 0, absent: 0, makeup: 0, supplement: 0 };
     monthRecords.forEach(r => {
       t[normalizeAttendanceStatus(r.status)] += 1;
     });
-    const total = t.present + t.absent + t.makeup;
-    const attended = t.present + t.makeup;
+    const total = t.present + t.absent + t.makeup + t.supplement;
+    const attended = t.present + t.makeup + t.supplement;
     return { ...t, total, rate: total > 0 ? Math.round((attended / total) * 100) : 0 };
   }, [monthRecords]);
 
@@ -79,8 +81,9 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
         const present = normalized.filter(status => status === 'present').length;
         const absent = normalized.filter(status => status === 'absent').length;
         const makeup = normalized.filter(status => status === 'makeup').length;
+        const supplement = normalized.filter(status => status === 'supplement').length;
         const total = records.length;
-        const attended = present + makeup;
+        const attended = present + makeup + supplement;
         return {
           studentId: s.id,
           name: s.name,
@@ -90,6 +93,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           present,
           absent,
           makeup,
+          supplement,
           total,
           rate: total > 0 ? Math.round((attended / total) * 100) : -1, // -1 = no record
         };
@@ -146,7 +150,7 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
 
   const monthNum = Number(selectedMonth.split('-')[1]);
   const monthLabel = `${selectedMonth.split('-')[0]}년 ${monthNum}월`;
-  const orderedStatuses: EditableAttendanceStatus[] = ['present', 'absent', 'makeup'];
+  const orderedStatuses: EditableAttendanceStatus[] = ['present', 'absent', 'makeup', 'supplement'];
 
   // Build a parent-facing attendance summary message for one student. The
   // closing line softens or congratulates depending on the attendance level.

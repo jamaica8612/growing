@@ -3407,6 +3407,7 @@ textarea.form-control {
 .cal-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .cal-dot.present { background: var(--color-accent-mint); }
 .cal-dot.makeup { background: var(--color-info); }
+.cal-dot.supplement { background: var(--color-warning); }
 .cal-dot.absent { background: var(--color-danger); }
 .cal-legend { display: flex; gap: 1rem; margin-top: 0.7rem; }
 .cal-legend span { display: flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--color-text-secondary); }

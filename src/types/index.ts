@@ -33,7 +33,7 @@ export interface ClassSchedule {
   endTime: string;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'makeup';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'makeup' | 'supplement';
 export type EditableAttendanceStatus = Exclude<AttendanceStatus, 'late'>;
 export type HomeworkStatus = 'done' | 'incomplete' | 'undone' | '';
 

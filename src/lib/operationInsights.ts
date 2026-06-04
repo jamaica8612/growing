@@ -82,7 +82,7 @@ export function getCounselBriefing(
 ): CounselBriefing {
   const cutoff = new Date(today.getTime() - 30 * MS_PER_DAY).toISOString().slice(0, 10);
   const recentAttendance = attendance.filter(record => record.studentId === student.id && record.date >= cutoff);
-  const presentCount = recentAttendance.filter(record => record.status === 'present' || record.status === 'makeup').length;
+  const presentCount = recentAttendance.filter(record => record.status === 'present' || record.status === 'makeup' || record.status === 'supplement').length;
   const absentCount = recentAttendance.filter(record => record.status === 'absent').length;
   const attendanceRate = recentAttendance.length > 0 ? Math.round((presentCount / recentAttendance.length) * 100) : 0;
   const homeworkIssueCount = recentAttendance.filter(

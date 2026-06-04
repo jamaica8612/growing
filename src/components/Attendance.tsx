@@ -21,6 +21,20 @@ const HOMEWORK_TEMPLATE_KEY: Record<HomeworkStatus, keyof MessageTemplates | ''>
   '': '',
 };
 
+const ATTENDANCE_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [
+  { value: 'present', label: '출석', tone: 'ok' },
+  { value: 'absent', label: '결석', tone: 'danger' },
+  { value: 'makeup', label: '보강', tone: 'info' },
+  { value: 'supplement', label: '보충', tone: 'warn' },
+];
+
+const SUPPLEMENT_TIME_OPTIONS = Array.from({ length: 18 * 6 }, (_, index) => {
+  const totalMinutes = 6 * 60 + index * 10;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+});
+
 export const AttendanceManager: React.FC<AttendanceProps> = ({
   attendance,
   students,
@@ -77,6 +91,13 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const getCurrentTimeStr = (): string =>
     new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+  const getCurrentTenMinuteTimeStr = (): string => {
+    const now = new Date();
+    const roundedMinutes = Math.round(now.getMinutes() / 10) * 10;
+    now.setMinutes(roundedMinutes, 0, 0);
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+
   const handleArrival = (studentId: string, classId: string) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
     onSaveAttendance({ studentId, classId, date: selectedDate, status: 'present', memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '', checkInTime: getCurrentTimeStr() });
@@ -92,7 +113,35 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
     const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
     const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
     const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
-    onSaveAttendance({ studentId, classId, date: selectedDate, status, memo: currentMemo, makeupForDate: makeupForDate || undefined, ...(shouldStampCheckIn ? { checkInTime: getCurrentTimeStr() } : {}) });
+    const checkInTime =
+      status === 'absent'
+        ? ''
+        : status === 'supplement'
+          ? (record?.checkInTime || getCurrentTenMinuteTimeStr())
+          : shouldStampCheckIn
+            ? getCurrentTimeStr()
+            : undefined;
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status,
+      memo: currentMemo,
+      makeupForDate: makeupForDate || undefined,
+      ...(checkInTime !== undefined ? { checkInTime } : {}),
+    });
+  };
+
+  const handleSupplementTimeChange = (studentId: string, classId: string, time: string) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: 'supplement',
+      memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '',
+      checkInTime: time,
+    });
   };
 
   const handleHomeworkChange = (studentId: string, classId: string, homeworkStatus: HomeworkStatus) => {
@@ -123,13 +172,14 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   // 일자 요약
   const summary = useMemo(() => {
-    const s = { present: 0, late: 0, absent: 0, makeup: 0, unchecked: 0 };
+    const s = { present: 0, late: 0, absent: 0, makeup: 0, supplement: 0, unchecked: 0 };
     targetClasses.forEach(cls => {
       cls.studentIds.filter(id => activeStudentIds.has(id)).forEach(id => {
         const r = getAttendanceRecord(id, cls.id, selectedDate);
-        if (!r || (!r.checkInTime && r.status !== 'absent' && r.status !== 'makeup')) s.unchecked++;
+        if (!r || (!r.checkInTime && r.status !== 'absent' && r.status !== 'makeup' && r.status !== 'supplement')) s.unchecked++;
         else if (r.status === 'absent') s.absent++;
         else if (r.status === 'makeup') s.makeup++;
+        else if (r.status === 'supplement') s.supplement++;
         else if (r.status === 'late') s.late++;
         else s.present++;
       });
@@ -145,9 +195,9 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   // 월간 통계 데이터
   const getMonthlyReportData = () => {
-    const reportData: Record<string, { id: string; name: string; school: string; grade: string; isPaused: boolean; present: number; absent: number; makeup: number; total: number }> = {};
+    const reportData: Record<string, { id: string; name: string; school: string; grade: string; isPaused: boolean; present: number; absent: number; makeup: number; supplement: number; total: number }> = {};
     students.filter(s => s.status !== 'inactive').forEach(s => {
-      reportData[s.id] = { id: s.id, name: s.name, school: s.school, grade: s.grade, isPaused: s.status === 'paused', present: 0, absent: 0, makeup: 0, total: 0 };
+      reportData[s.id] = { id: s.id, name: s.name, school: s.school, grade: s.grade, isPaused: s.status === 'paused', present: 0, absent: 0, makeup: 0, supplement: 0, total: 0 };
     });
     attendance.filter(a => a.date.startsWith(reportMonth)).forEach(a => {
       if (reportData[a.studentId]) {
@@ -190,6 +240,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           <span className="at-sum warn">지각 <b>{summary.late}</b></span>
           <span className="at-sum danger">결석 <b>{summary.absent}</b></span>
           <span className="at-sum info">보강 <b>{summary.makeup}</b></span>
+          <span className="at-sum warn">보충 <b>{summary.supplement}</b></span>
           <span className="at-sum muted">미체크 <b>{summary.unchecked}</b></span>
         </div>
       </div>
@@ -237,7 +288,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                       const currentStatus = record ? normalizeAttendanceStatus(record.status) : undefined;
                       const hw = record?.homeworkStatus ?? '';
                       const memoKey = `${studentId}-${cls.id}`;
-                      const isDone = !!(record?.checkInTime || record?.status === 'absent' || record?.status === 'makeup');
+                      const isDone = !!(record?.checkInTime || record?.status === 'absent' || record?.status === 'makeup' || record?.status === 'supplement');
 
                       return (
                         <div key={studentId} className={`at-row ${isDone ? 'done' : ''}`}>
@@ -247,7 +298,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               {student.name}
                               {currentStatus && (
                                 <span className={`at-pill ${currentStatus === 'present' ? 'ok' : currentStatus === 'absent' ? 'danger' : currentStatus === 'makeup' ? 'info' : 'warn'}`}>
-                                  {currentStatus === 'present' ? '출석' : currentStatus === 'absent' ? '결석' : currentStatus === 'makeup' ? '보강' : '지각'}
+                                  {currentStatus === 'present' ? '출석' : currentStatus === 'absent' ? '결석' : currentStatus === 'makeup' ? '보강' : currentStatus === 'supplement' ? '보충' : '지각'}
                                 </span>
                               )}
                             </span>
@@ -270,12 +321,28 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                           <div className="at-cell">
                             <span className="at-clabel">출결</span>
                             <div className="gd-seg at-seg">
-                              {(['present', 'absent', 'makeup'] as EditableAttendanceStatus[]).map((s, i) => (
-                                <button key={s} className={`gd-seg-b ${currentStatus === s ? 'sel ' + (['ok', 'danger', 'info'][i]) : ''}`} onClick={() => handleStatusChange(studentId, cls.id, s)}>
-                                  {['출석', '결석', '보강'][i]}
+                              {ATTENDANCE_STATUS_OPTIONS.map(option => (
+                                <button key={option.value} className={`gd-seg-b ${currentStatus === option.value ? 'sel ' + option.tone : ''}`} onClick={() => handleStatusChange(studentId, cls.id, option.value)}>
+                                  {option.label}
                                 </button>
                               ))}
                             </div>
+                            {currentStatus === 'supplement' && (
+                              <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.73rem' }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>보충 시간</span>
+                                <select
+                                  className="form-control"
+                                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '96px' }}
+                                  value={record?.checkInTime || ''}
+                                  onChange={e => handleSupplementTimeChange(studentId, cls.id, e.target.value)}
+                                >
+                                  <option value="">시간 선택</option>
+                                  {SUPPLEMENT_TIME_OPTIONS.map(time => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
                             {currentStatus === 'makeup' && (() => {
                               const linkedDate = makeupForDates[`${studentId}-${cls.id}`] ?? record?.makeupForDate ?? '';
                               const hasAbsence = !!linkedDate && attendance.some(a => a.studentId === studentId && a.date === linkedDate && a.status === 'absent');
@@ -392,7 +459,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>등록된 재원생이 없습니다.</td></tr>
               ) : (
                 monthlyReport.map(row => {
-                  const attended = row.present + row.makeup;
+                  const attended = row.present + row.makeup + row.supplement;
                   const rate = row.total > 0 ? Math.round((attended / row.total) * 100) : 100;
                   return (
                     <tr key={row.id}>

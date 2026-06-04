@@ -338,7 +338,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
     const { students, classes, attendance } = getAllData();
     const studentMap = Object.fromEntries(students.map(s => [s.id, s.name]));
     const classMap = Object.fromEntries(classes.map(c => [c.id, c.name]));
-    const statusLabel: Record<string, string> = { present: '출석', absent: '결석', makeup: '보강', late: '지각' };
+    const statusLabel: Record<string, string> = { present: '출석', absent: '결석', makeup: '보강', supplement: '보충', late: '지각' };
     const hwLabel: Record<string, string> = { done: '완료', incomplete: '미흡', undone: '안함', '': '' };
     const header = ['날짜', '학생', '반', '출결', '숙제', '등원시간', '하원시간', '메모'];
     const rows = [...attendance]

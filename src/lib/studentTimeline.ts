@@ -26,6 +26,7 @@ const attendanceLabel = {
   present: '출석',
   absent: '결석',
   makeup: '보강',
+  supplement: '보충',
 } as const;
 
 const homeworkLabel = {
@@ -55,7 +56,7 @@ export const getStudentTimeline = ({
       const times = [record.checkInTime ? `등원 ${record.checkInTime}` : '', record.checkOutTime ? `하원 ${record.checkOutTime}` : '']
         .filter(Boolean)
         .join(' / ');
-      const severity: StudentTimelineSeverity = status === 'absent' ? 'danger' : status === 'makeup' ? 'info' : 'success';
+      const severity: StudentTimelineSeverity = status === 'absent' ? 'danger' : status === 'makeup' || status === 'supplement' ? 'info' : 'success';
       return {
         id: `attendance-${record.id}`,
         type: 'attendance' as const,
