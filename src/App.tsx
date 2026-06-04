@@ -57,7 +57,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
       { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
-      { id: 'makeup', label: '\uBCF4\uAC15 \uAD00\uB9AC', icon: CalendarCheck },
+      { id: 'makeup', label: '보강/보충 관리', icon: CalendarCheck },
       { id: 'messaging', label: '알림장 발송', icon: Smartphone },
       { id: 'kiosk', label: '키오스크 모드', icon: Monitor, kind: 'kiosk' },
     ],
@@ -87,7 +87,7 @@ const TAB_TITLES: Record<string, string> = {
   students: '재원생 주소록 및 관리',
   classes: '학급 개설 및 시간표',
   attendance: '출석 및 보강 관리',
-  makeup: '\uBCF4\uAC15 \uAD00\uB9AC',
+  makeup: '보강/보충 관리',
   stats: '월별 출결 통계 리포트',
   'data-quality': '\uB370\uC774\uD130 \uC810\uAC80',
   payments: '교육비 수납 장부',
@@ -263,6 +263,7 @@ function AcademyApp({ session }: { session: Session }) {
             classes={classes}
             messageTemplates={messageTemplates}
             onSaveAttendance={data.handleSaveAttendance}
+            onDeleteAttendance={data.handleDeleteAttendance}
             onQueueHomeworkAlert={data.handleQueueHomeworkAlert}
           />
         );

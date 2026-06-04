@@ -48,6 +48,7 @@ export interface Attendance {
   checkInTime?: string; // 등원 시각 "HH:MM"
   checkOutTime?: string; // 하원 시각 "HH:MM"
   makeupForDate?: string; // 보강 시 원래 결석한 날짜 YYYY-MM-DD
+  supplementMinutes?: number;
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'transfer' | '';

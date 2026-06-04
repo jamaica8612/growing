@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarCheck, CheckCircle2, Lightbulb, RefreshCw, Search, X } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, Clock, Lightbulb, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { Attendance, Class, Student } from '../types';
 import { getMakeupSummary, hasMakeupForAbsence, type MakeupNeededItem } from '../lib/makeupUtils';
 import { getMakeupRecommendations } from '../lib/operationInsights';
@@ -12,13 +12,21 @@ interface MakeupManagerProps {
 }
 
 type Filter = 'all' | 'needed' | 'completed';
+type ManagerMode = 'makeup' | 'supplement';
+
+const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
 
 export function MakeupManager({ students, classes, attendance, onSaveAttendance }: MakeupManagerProps) {
+  const [mode, setMode] = useState<ManagerMode>('makeup');
   const [filter, setFilter] = useState<Filter>('needed');
   const [search, setSearch] = useState('');
   const [processingItem, setProcessingItem] = useState<MakeupNeededItem | null>(null);
   const [makeupDate, setMakeupDate] = useState(new Date().toISOString().split('T')[0]);
   const [makeupClassId, setMakeupClassId] = useState('');
+  const [supplementDate, setSupplementDate] = useState(new Date().toISOString().split('T')[0]);
+  const [supplementStudentId, setSupplementStudentId] = useState('');
+  const [supplementClassId, setSupplementClassId] = useState('');
+  const [supplementMinutes, setSupplementMinutes] = useState(30);
 
   const summary = useMemo(
     () => getMakeupSummary(students, classes, attendance),
@@ -27,6 +35,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
 
   const normalizedSearch = search.trim().toLowerCase();
   const activeOnly = true;
+  const activeStudents = useMemo(() => students.filter(student => student.status === 'active'), [students]);
 
   const needed = summary.needed.filter(item => {
     const matchesSearch =
@@ -45,6 +54,44 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
     const matchesStatus = !activeOnly || item.student?.status === 'active';
     return matchesSearch && matchesStatus;
   });
+
+  const supplementRecords = attendance
+    .filter(record => record.status === 'supplement')
+    .map(record => ({
+      record,
+      student: students.find(student => student.id === record.studentId),
+      classInfo: classes.find(cls => cls.id === record.classId),
+    }))
+    .filter(item => {
+      const matchesSearch =
+        !normalizedSearch ||
+        (item.student?.name ?? '').toLowerCase().includes(normalizedSearch) ||
+        (item.classInfo?.name ?? '').toLowerCase().includes(normalizedSearch);
+      const matchesStatus = !activeOnly || item.student?.status === 'active';
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => b.record.date.localeCompare(a.record.date));
+
+  const supplementClassOptions = classes.filter(cls =>
+    !supplementStudentId || cls.studentIds.includes(supplementStudentId)
+  );
+
+  const handleCreateSupplement = () => {
+    if (!supplementStudentId || !supplementClassId || !supplementDate) {
+      alert('학생, 반, 날짜를 선택해 주세요.');
+      return;
+    }
+    onSaveAttendance({
+      studentId: supplementStudentId,
+      classId: supplementClassId,
+      date: supplementDate,
+      status: 'supplement',
+      memo: `보충 ${supplementMinutes}분`,
+      homeworkStatus: '',
+      checkInTime: '',
+      supplementMinutes,
+    });
+  };
 
   const openProcessModal = (item: MakeupNeededItem) => {
     const [firstRecommendation] = getMakeupRecommendations(item.student, item.absentRecord, classes, attendance);
@@ -80,6 +127,136 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+      <div className="gd-seg mk-seg mk-mode-seg" style={{ alignSelf: 'flex-start' }}>
+        <button
+          type="button"
+          className={`gd-seg-b${mode === 'makeup' ? ' sel info' : ''}`}
+          onClick={() => setMode('makeup')}
+        >
+          보강관리
+        </button>
+        <button
+          type="button"
+          className={`gd-seg-b${mode === 'supplement' ? ' sel warn' : ''}`}
+          onClick={() => setMode('supplement')}
+        >
+          보충관리
+        </button>
+      </div>
+
+      {mode === 'supplement' ? (
+        <>
+          <div className="mk-summary">
+            <div>
+              <h3>보충 현황</h3>
+              <p>정규 출결과 별도로 보충한 분량을 학생별로 기록합니다.</p>
+            </div>
+            <div className="mk-badges">
+              <span className="at-pill warn">보충 {supplementRecords.length}건</span>
+              <span className="at-pill info">총 {supplementRecords.reduce((sum, item) => sum + (item.record.supplementMinutes ?? 0), 0)}분</span>
+            </div>
+          </div>
+
+          <div className="mk-toolbar">
+            <div className="pay-search" style={{ flex: 1, minWidth: 180 }}>
+              <Search size={15} />
+              <input
+                placeholder="학생·반 검색"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <section className="gd-card">
+            <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+              <Plus size={18} /> 보충 기록 추가
+            </h2>
+            <div className="mk-grid" style={{ alignItems: 'end' }}>
+              <div>
+                <span>날짜</span>
+                <input type="date" className="msg-select" value={supplementDate} onChange={e => setSupplementDate(e.target.value)} />
+              </div>
+              <div>
+                <span>학생</span>
+                <select
+                  className="msg-select"
+                  value={supplementStudentId}
+                  onChange={e => {
+                    const nextStudentId = e.target.value;
+                    setSupplementStudentId(nextStudentId);
+                    const nextClass = classes.find(cls => cls.studentIds.includes(nextStudentId));
+                    setSupplementClassId(nextClass?.id ?? '');
+                  }}
+                >
+                  <option value="">학생 선택</option>
+                  {activeStudents.map(student => (
+                    <option key={student.id} value={student.id}>{student.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <span>반</span>
+                <select className="msg-select" value={supplementClassId} onChange={e => setSupplementClassId(e.target.value)}>
+                  <option value="">반 선택</option>
+                  {supplementClassOptions.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <span>분량</span>
+                <select className="msg-select" value={supplementMinutes} onChange={e => setSupplementMinutes(Number(e.target.value))}>
+                  {SUPPLEMENT_MINUTE_OPTIONS.map(minutes => (
+                    <option key={minutes} value={minutes}>{minutes}분</option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" className="pay-btn primary" onClick={handleCreateSupplement}>
+                저장
+              </button>
+            </div>
+          </section>
+
+          <section className="gd-card">
+            <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+              <Clock size={18} /> 보충 기록
+              <span className="cl-count">{supplementRecords.length}</span>
+            </h2>
+            {supplementRecords.length === 0 ? (
+              <div className="gd-empty">
+                <Clock size={24} />
+                <span>보충 기록이 없습니다.</span>
+              </div>
+            ) : (
+              <div className="mk-cards">
+                {supplementRecords.map(item => (
+                  <div key={item.record.id} className="mk-card done">
+                    <div className="mk-card-head">
+                      <div>
+                        <b>{item.student?.name ?? '알 수 없는 학생'}</b>
+                        <span>{item.classInfo?.name ?? '반 정보 없음'}</span>
+                      </div>
+                      <span className="at-pill warn">{item.record.supplementMinutes ?? 0}분</span>
+                    </div>
+                    <div className="mk-grid">
+                      <div>
+                        <span>보충일</span>
+                        <b>{item.record.date}</b>
+                      </div>
+                      <div>
+                        <span>메모</span>
+                        <b>{item.record.memo || '—'}</b>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <>
       {/* ── 현황 요약 배너 ── */}
       <div className="mk-summary">
         <div>
@@ -102,7 +279,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="gd-seg mk-seg">
+        <div className="gd-seg mk-seg mk-filter-seg">
           {FILTERS.map(([v, l]) => (
             <button
               key={v}
@@ -299,6 +476,8 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -175,6 +175,7 @@ export function useAcademyData(userId: string) {
           checkInTime: data.checkInTime !== undefined ? data.checkInTime : existing.checkInTime,
           checkOutTime: data.checkOutTime !== undefined ? data.checkOutTime : existing.checkOutTime,
           makeupForDate: data.status === 'makeup' ? (data.makeupForDate ?? existing.makeupForDate) : undefined,
+          supplementMinutes: data.status === 'supplement' ? (data.supplementMinutes ?? existing.supplementMinutes) : undefined,
         });
         setAttendance(prev => prev.map(a => (a.id === updated.id ? updated : a)));
       } else {
@@ -188,9 +189,16 @@ export function useAcademyData(userId: string) {
           checkInTime: data.checkInTime,
           checkOutTime: data.checkOutTime,
           makeupForDate: data.status === 'makeup' ? data.makeupForDate : undefined,
+          supplementMinutes: data.status === 'supplement' ? data.supplementMinutes : undefined,
         });
         setAttendance(prev => [...prev, created]);
       }
+    });
+
+  const handleDeleteAttendance = (attendanceId: string) =>
+    guard(async () => {
+      await api.deleteAttendance(attendanceId);
+      setAttendance(prev => prev.filter(a => a.id !== attendanceId));
     });
 
   // ---- Payments ----
@@ -424,6 +432,7 @@ export function useAcademyData(userId: string) {
           checkInTime: a.checkInTime,
           checkOutTime: a.checkOutTime,
           makeupForDate: a.makeupForDate,
+          supplementMinutes: a.supplementMinutes,
         });
       }
       for (const p of data.payments) {
@@ -478,6 +487,7 @@ export function useAcademyData(userId: string) {
     handleUpdateClass,
     handleDeleteClass,
     handleSaveAttendance,
+    handleDeleteAttendance,
     handleGenerateMonthlyBills,
     handleRecordPayment,
     handleCancelPayment,

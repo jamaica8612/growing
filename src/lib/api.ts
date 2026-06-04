@@ -96,6 +96,7 @@ const toAttendance = (r: Row): Attendance => ({
   checkInTime: (r.check_in_time as string) ?? undefined,
   checkOutTime: (r.check_out_time as string) ?? undefined,
   makeupForDate: (r.makeup_for_date as string) ?? undefined,
+  supplementMinutes: (r.supplement_minutes as number) ?? undefined,
 });
 
 const toPayment = (r: Row): Payment => ({
@@ -356,6 +357,7 @@ export const api = {
         check_in_time: orNull(a.checkInTime),
         check_out_time: orNull(a.checkOutTime),
         makeup_for_date: orNull(a.makeupForDate),
+        supplement_minutes: a.supplementMinutes ?? null,
       })
       .select()
       .single();
@@ -372,6 +374,7 @@ export const api = {
       checkInTime?: string;
       checkOutTime?: string;
       makeupForDate?: string;
+      supplementMinutes?: number;
     }
   ): Promise<Attendance> {
     const { data: row, error } = await supabase
@@ -383,12 +386,18 @@ export const api = {
         check_in_time: orNull(fields.checkInTime),
         check_out_time: orNull(fields.checkOutTime),
         makeup_for_date: orNull(fields.makeupForDate),
+        supplement_minutes: fields.supplementMinutes ?? null,
       })
       .eq('id', id)
       .select()
       .single();
     if (error) throw error;
     return toAttendance(row);
+  },
+
+  async deleteAttendance(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_attendance').delete().eq('id', id);
+    if (error) throw error;
   },
 
   // ---- Payments ----

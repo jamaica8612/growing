@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus } from '../types';
-import { Calendar, Check, Clock, MessageSquare, Send } from 'lucide-react';
-import { type MessageTemplates, renderTemplate } from '../lib/messageTemplates';
+import { Calendar, Clock } from 'lucide-react';
+import { type MessageTemplates } from '../lib/messageTemplates';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 
@@ -11,15 +11,9 @@ interface AttendanceProps {
   classes: Class[];
   messageTemplates: MessageTemplates;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
+  onDeleteAttendance: (attendanceId: string) => void;
   onQueueHomeworkAlert?: (studentId: string, date: string, homeworkStatus: Exclude<HomeworkStatus, ''>) => void;
 }
-
-const HOMEWORK_TEMPLATE_KEY: Record<HomeworkStatus, keyof MessageTemplates | ''> = {
-  done: 'homeworkDone',
-  incomplete: 'homeworkIncomplete',
-  undone: 'homeworkUndone',
-  '': '',
-};
 
 const ATTENDANCE_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [
   { value: 'present', label: '출석', tone: 'ok' },
@@ -28,60 +22,22 @@ const ATTENDANCE_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: strin
   { value: 'supplement', label: '보충', tone: 'warn' },
 ];
 
-const SUPPLEMENT_TIME_OPTIONS = Array.from({ length: 18 * 6 }, (_, index) => {
-  const totalMinutes = 6 * 60 + index * 10;
-  const hour = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-});
+const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
 
 export const AttendanceManager: React.FC<AttendanceProps> = ({
   attendance,
   students,
   classes,
-  messageTemplates,
   onSaveAttendance,
-  onQueueHomeworkAlert,
+  onDeleteAttendance,
 }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2200);
-  };
-
-  const getHomeworkMessage = (studentName: string, status: HomeworkStatus): string => {
-    const key = HOMEWORK_TEMPLATE_KEY[status];
-    if (!key) return '';
-    return renderTemplate(messageTemplates[key], { 학생명: studentName });
-  };
-
-  const handleCopyHomeworkMessage = (studentName: string, status: HomeworkStatus, key: string) => {
-    const msg = getHomeworkMessage(studentName, status);
-    if (!msg) return;
-    navigator.clipboard.writeText(msg).then(() => {
-      setCopiedKey(key);
-      showToast(`${studentName} 학부모 안내 메시지를 복사했어요`);
-      setTimeout(() => setCopiedKey(null), 1800);
-    });
-  };
-
-  const getSMSLink = (parentContact: string, studentName: string, status: HomeworkStatus): string => {
-    const msg = getHomeworkMessage(studentName, status);
-    if (!msg || !parentContact) return '#';
-    const cleanPhone = parentContact.replace(/[^0-9]/g, '');
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const encodedBody = encodeURIComponent(msg);
-    return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
-  };
 
   const getAttendanceRecord = (studentId: string, classId: string, date: string) =>
     attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === date);
@@ -90,13 +46,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const getCurrentTimeStr = (): string =>
     new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-  const getCurrentTenMinuteTimeStr = (): string => {
-    const now = new Date();
-    const roundedMinutes = Math.round(now.getMinutes() / 10) * 10;
-    now.setMinutes(roundedMinutes, 0, 0);
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  };
 
   const handleArrival = (studentId: string, classId: string) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
@@ -110,6 +59,11 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const handleStatusChange = (studentId: string, classId: string, status: EditableAttendanceStatus) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
+    const currentStatus = record ? normalizeAttendanceStatus(record.status) : undefined;
+    if (record && currentStatus === status) {
+      onDeleteAttendance(record.id);
+      return;
+    }
     const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
     const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
     const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
@@ -117,7 +71,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       status === 'absent'
         ? ''
         : status === 'supplement'
-          ? (record?.checkInTime || getCurrentTenMinuteTimeStr())
+          ? ''
           : shouldStampCheckIn
             ? getCurrentTimeStr()
             : undefined;
@@ -127,12 +81,15 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       date: selectedDate,
       status,
       memo: currentMemo,
+      homeworkStatus: record?.homeworkStatus ?? '',
       makeupForDate: makeupForDate || undefined,
+      supplementMinutes: status === 'supplement' ? (record?.supplementMinutes ?? 30) : undefined,
       ...(checkInTime !== undefined ? { checkInTime } : {}),
+      ...(status === 'absent' || status === 'supplement' ? { checkOutTime: '' } : {}),
     });
   };
 
-  const handleSupplementTimeChange = (studentId: string, classId: string, time: string) => {
+  const handleSupplementMinutesChange = (studentId: string, classId: string, minutes: number) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
     onSaveAttendance({
       studentId,
@@ -140,13 +97,15 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       date: selectedDate,
       status: 'supplement',
       memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '',
-      checkInTime: time,
+      checkInTime: '',
+      supplementMinutes: minutes,
     });
   };
 
   const handleHomeworkChange = (studentId: string, classId: string, homeworkStatus: HomeworkStatus) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
-    onSaveAttendance({ studentId, classId, date: selectedDate, status: record?.status || 'present', memo: record?.memo || '', homeworkStatus });
+    const nextHomeworkStatus = record?.homeworkStatus === homeworkStatus ? '' : homeworkStatus;
+    onSaveAttendance({ studentId, classId, date: selectedDate, status: record?.status || 'present', memo: record?.memo || '', homeworkStatus: nextHomeworkStatus });
   };
 
   const handleMakeupForDateChange = (studentId: string, classId: string, date: string) => {
@@ -159,11 +118,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const handleMemoChange = (studentId: string, classId: string, memo: string) =>
     setAttendanceMemos(prev => ({ ...prev, [`${studentId}-${classId}`]: memo }));
-
-  const handleQueueHomeworkAlert = (studentId: string, status: HomeworkStatus) => {
-    if (!status) return;
-    onQueueHomeworkAlert?.(studentId, selectedDate, status);
-  };
 
   // 표시 대상 반 목록 (selectedClassId 필터)
   const targetClasses = classes.filter(cls =>
@@ -277,7 +231,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                     <span>등 · 하원</span>
                     <span>출결</span>
                     <span>숙제</span>
-                    <span>학부모 알림</span>
                     <span>비고 메모</span>
                   </div>
                   <div className="at-rows">
@@ -320,7 +273,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                           {/* 출결 세그먼트 */}
                           <div className="at-cell">
                             <span className="at-clabel">출결</span>
-                            <div className="gd-seg at-seg">
+                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
                               {ATTENDANCE_STATUS_OPTIONS.map(option => (
                                 <button key={option.value} className={`gd-seg-b ${currentStatus === option.value ? 'sel ' + option.tone : ''}`} onClick={() => handleStatusChange(studentId, cls.id, option.value)}>
                                   {option.label}
@@ -329,16 +282,15 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             </div>
                             {currentStatus === 'supplement' && (
                               <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.73rem' }}>
-                                <span style={{ color: 'var(--color-text-muted)' }}>보충 시간</span>
+                                <span style={{ color: 'var(--color-text-muted)' }}>보충 분량</span>
                                 <select
                                   className="form-control"
                                   style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '96px' }}
-                                  value={record?.checkInTime || ''}
-                                  onChange={e => handleSupplementTimeChange(studentId, cls.id, e.target.value)}
+                                  value={record?.supplementMinutes ?? 30}
+                                  onChange={e => handleSupplementMinutesChange(studentId, cls.id, Number(e.target.value))}
                                 >
-                                  <option value="">시간 선택</option>
-                                  {SUPPLEMENT_TIME_OPTIONS.map(time => (
-                                    <option key={time} value={time}>{time}</option>
+                                  {SUPPLEMENT_MINUTE_OPTIONS.map(minutes => (
+                                    <option key={minutes} value={minutes}>{minutes}분</option>
                                   ))}
                                 </select>
                               </div>
@@ -370,32 +322,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             </div>
                           </div>
 
-                          {/* 알림 */}
-                          <div className="at-cell at-actions">
-                            <span className="at-clabel">알림</span>
-                            {hw ? (
-                              <>
-                                <button className={`at-act ${copiedKey === memoKey ? 'done' : ''}`} onClick={() => handleCopyHomeworkMessage(student.name, hw as HomeworkStatus, memoKey)} title="카톡 메시지 복사">
-                                  {copiedKey === memoKey ? <><Check size={12} /> 복사됨</> : <><MessageSquare size={12} /> 카톡</>}
-                                </button>
-                                {onQueueHomeworkAlert && (
-                                  <button className="at-act" onClick={() => handleQueueHomeworkAlert(studentId, hw as HomeworkStatus)} title="알림장 대기열 추가">
-                                    <MessageSquare size={12} /> 알림장
-                                  </button>
-                                )}
-                                {student.parentContact ? (
-                                  <a href={getSMSLink(student.parentContact, student.name, hw as HomeworkStatus)} className="at-act primary" style={{ textDecoration: 'none' }}>
-                                    <Send size={12} /> 문자
-                                  </a>
-                                ) : (
-                                  <button className="at-act primary" disabled><Send size={12} /> 문자</button>
-                                )}
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>숙제 체크 후 활성화</span>
-                            )}
-                          </div>
-
                           {/* 메모 */}
                           <div className="at-cell">
                             <span className="at-clabel">메모</span>
@@ -420,8 +346,9 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         })
       )}
 
+      <div className="at-monthly-grid">
       {/* ── 월간 출결 캘린더 ── */}
-      <div className="gd-card">
+      <div className="gd-card at-calendar-card">
         <div className="gd-card-head" style={{ flexWrap: 'wrap', gap: '1rem' }}>
           <h3 className="gd-card-title"><Calendar size={20} /> 월간 출결 캘린더</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -430,17 +357,13 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           </div>
         </div>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>날짜를 누르면 위쪽 출결 기록이 해당 날짜로 이동합니다.</p>
-        <AttendanceCalendar attendance={activeAttendance} month={reportMonth} selectedDate={selectedDate} onSelectDate={date => setSelectedDate(date)} />
+        <AttendanceCalendar attendance={activeAttendance} month={reportMonth} selectedDate={selectedDate} onSelectDate={date => setSelectedDate(date)} compact />
       </div>
 
       {/* ── 월간 출결 통계 ── */}
-      <div className="gd-card">
+      <div className="gd-card at-monthly-stat-card">
         <div className="gd-card-head" style={{ flexWrap: 'wrap', gap: '1rem' }}>
           <h3 className="gd-card-title"><Clock size={20} /> 월간 출결 통계</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>조회 연월:</span>
-            <input type="month" className="form-control" style={{ width: '160px', padding: '0.35rem 0.65rem' }} value={reportMonth} onChange={e => setReportMonth(e.target.value)} />
-          </div>
         </div>
         <div className="table-wrapper at-monthly-tbl">
           <table className="custom-table" style={{ fontSize: '0.85rem' }}>
@@ -480,8 +403,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           </table>
         </div>
       </div>
-
-      {toast && <div className="gd-toast"><Check size={15} /> {toast}</div>}
+      </div>
     </div>
   );
 };
