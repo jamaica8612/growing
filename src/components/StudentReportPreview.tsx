@@ -87,6 +87,7 @@ export function StudentReportPreview({
     `대상월: ${month}`,
     `반: ${summary.classNames}`,
     `출결: 출석 ${summary.attendance.present}회, 결석 ${summary.attendance.absent}회, 보강 ${summary.attendance.makeup}회, 출석률 ${summary.attendance.rate}%`,
+    `보충률: ${summary.attendance.supplementRate}% (다른 학생 평균 ${summary.attendance.peerSupplementRate}%, 차이 ${summary.attendance.supplementRateDelta > 0 ? '+' : ''}${summary.attendance.supplementRateDelta}%p)`,
     `숙제: 완료 ${summary.homework.done}회, 미흡 ${summary.homework.incomplete}회, 미완료 ${summary.homework.undone}회`,
     `수납: ${summary.payment ? (summary.payment.status === 'paid' ? '납부 완료' : '미납') : '청구 없음'}`,
     '',
@@ -192,9 +193,9 @@ export function StudentReportPreview({
             <span className="rp-stat-s">총 {summary.attendance.total}회 중</span>
           </div>
           <div className="rp-stat info">
-            <span className="rp-stat-l">보강</span>
-            <span className="rp-stat-v">{summary.attendance.makeup}</span>
-            <span className="rp-stat-s">출석 인정</span>
+            <span className="rp-stat-l">보충률</span>
+            <span className="rp-stat-v">{summary.attendance.supplementRate}%</span>
+            <span className="rp-stat-s">평균 {summary.attendance.peerSupplementRate}%</span>
           </div>
           <div className={`rp-stat${summary.attendance.absent > 0 ? ' warn' : ''}`}>
             <span className="rp-stat-l">결석</span>

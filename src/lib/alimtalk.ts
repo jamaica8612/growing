@@ -8,6 +8,7 @@ export type AlimtalkAlertType =
   | 'homework_undone'
   | 'payment_request'
   | 'payment_paid'
+  | 'exam_result'
   | 'custom';
 
 export interface SendAlimtalkPayload {

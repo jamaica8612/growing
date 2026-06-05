@@ -14,6 +14,7 @@ type AlertType =
   | 'homework_undone'
   | 'payment_request'
   | 'payment_paid'
+  | 'exam_result'
   | 'custom';
 
 interface SendAlimtalkRequest {

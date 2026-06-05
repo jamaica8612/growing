@@ -226,7 +226,8 @@ export const api = {
     const error =
       students.error || classes.error || attendance.error || payments.error ||
       counselLogs.error || kioskAlerts.error || homeworkAlerts.error ||
-      kakaoParentLinks.error || kakaoParentRequests.error || kakaoEventLogs.error || kakaoChannels.error || settings.error;
+      kakaoParentLinks.error || kakaoParentRequests.error || kakaoEventLogs.error || kakaoChannels.error ||
+      settings.error;
     if (error) throw error;
 
     return {

@@ -158,7 +158,7 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
           <Search size={20} />
           <input placeholder="이름을 입력하여 내 이름 찾기…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="kk-grid">
+        <div className="kk-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
           {filteredStudents.length === 0 ? (
             <div className="kk-empty">🔍 검색 결과가 없습니다. 이름을 정확히 확인해 주세요.</div>
           ) : (

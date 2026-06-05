@@ -11,6 +11,9 @@ export interface StudentReportSummary {
     makeup: number;
     supplement: number;
     rate: number;
+    supplementRate: number;
+    peerSupplementRate: number;
+    supplementRateDelta: number;
   };
   homework: {
     done: number;
@@ -47,8 +50,15 @@ const buildDraft = (
   tags: StudentTag[]
 ) => {
   const lines: string[] = [];
+  const supplementComparison =
+    attendance.supplementRateDelta > 0
+      ? `${Math.abs(attendance.supplementRateDelta)}%p 높습니다`
+      : attendance.supplementRateDelta < 0
+        ? `${Math.abs(attendance.supplementRateDelta)}%p 낮습니다`
+        : '같습니다';
   lines.push(`${student.name} 학생은 이번 달 출석률 ${attendance.rate}%로 학습 흐름을 이어가고 있습니다.`);
   if (attendance.absent > 0) lines.push(`결석 ${attendance.absent}회가 있어 보강 일정과 학습 공백을 함께 확인하면 좋겠습니다.`);
+  lines.push(`보충률은 ${attendance.supplementRate}%로 다른 학생 평균 ${attendance.peerSupplementRate}%보다 ${supplementComparison}.`);
   if (homework.undone + homework.incomplete > 0) {
     lines.push(`숙제 미완료/미흡 기록이 ${homework.undone + homework.incomplete}회 있어 가정에서 과제 루틴을 한 번 더 잡아주세요.`);
   } else if (homework.done > 0) {
@@ -82,6 +92,25 @@ export const getStudentReportSummary = ({
   const supplement = normalized.filter(status => status === 'supplement').length;
   const total = monthAttendance.length;
   const rate = total > 0 ? Math.round(((present + makeup + supplement) / total) * 100) : 100;
+  const supplementRate = total > 0 ? Math.round((supplement / total) * 100) : 0;
+  const peerAttendanceByStudent = new Map<string, Attendance[]>();
+  attendance
+    .filter(record => record.studentId !== student.id && record.date.startsWith(month))
+    .forEach(record => {
+      const rows = peerAttendanceByStudent.get(record.studentId) ?? [];
+      rows.push(record);
+      peerAttendanceByStudent.set(record.studentId, rows);
+    });
+  const peerSupplementRates = Array.from(peerAttendanceByStudent.values())
+    .filter(rows => rows.length > 0)
+    .map(rows => {
+      const peerSupplement = rows.filter(record => normalizeAttendanceStatus(record.status) === 'supplement').length;
+      return Math.round((peerSupplement / rows.length) * 100);
+    });
+  const peerSupplementRate = peerSupplementRates.length > 0
+    ? Math.round(peerSupplementRates.reduce((sum, value) => sum + value, 0) / peerSupplementRates.length)
+    : 0;
+  const supplementRateDelta = supplementRate - peerSupplementRate;
   const homework = summarizeHomework(monthAttendance);
   const logs = counselLogs
     .filter(log => log.studentId === student.id && log.date.startsWith(month))
@@ -89,7 +118,17 @@ export const getStudentReportSummary = ({
   const payment = payments.find(payment => payment.studentId === student.id && payment.billingMonth === month);
   const studentClasses = classes.filter(cls => cls.studentIds.includes(student.id));
   const tags = getStudentTags({ student, classes, attendance, payments, counselLogs });
-  const attendanceSummary = { total, present, absent, makeup, supplement, rate };
+  const attendanceSummary = {
+    total,
+    present,
+    absent,
+    makeup,
+    supplement,
+    rate,
+    supplementRate,
+    peerSupplementRate,
+    supplementRateDelta,
+  };
 
   return {
     month,

@@ -87,7 +87,7 @@ export type MessageLogStatus = 'queued' | 'sent' | 'failed';
 export type MessageLogAlertType =
   | 'check_in' | 'check_out'
   | 'homework_done' | 'homework_incomplete' | 'homework_undone'
-  | 'payment_request' | 'payment_paid' | 'custom';
+  | 'payment_request' | 'payment_paid' | 'exam_result' | 'custom';
 
 export interface MessageLog {
   id: string;
