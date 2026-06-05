@@ -19,12 +19,14 @@ import { Assistant } from './components/Assistant';
 import { DataQuality } from './components/DataQuality';
 import { MakeupManager } from './components/MakeupManager';
 import { KakaoManager } from './components/KakaoManager';
+import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
 
 // Import Icons
 import {
   LayoutDashboard,
   Users,
   BookOpen,
+  ClipboardList,
   CalendarCheck,
   CreditCard,
   MessageSquare,
@@ -98,6 +100,13 @@ const TAB_TITLES: Record<string, string> = {
   backup: 'AI·알림·백업 설정',
 };
 
+if (!NAV_GROUPS.some(group => group.items.some(item => item.id === 'exams'))) {
+  NAV_GROUPS[1]?.items.splice(2, 0, { id: 'exams', label: '평가 관리', icon: ClipboardList });
+}
+TAB_TITLES.exams = '평가 관리';
+
+const KIOSK_RELOAD_RESET_KEY = 'growing:kiosk-reload-reset';
+
 function NavItemButton({
   active,
   icon: Icon,
@@ -148,6 +157,7 @@ function FullScreen({ children }: { children: React.ReactNode }) {
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [hashRoute, setHashRoute] = useState(() => window.location.hash);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -157,6 +167,20 @@ function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const onHashChange = () => setHashRoute(window.location.hash);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  if (hashRoute.startsWith('#/exam-result/')) {
+    return <PublicResultRoute token={decodeURIComponent(hashRoute.replace('#/exam-result/', ''))} />;
+  }
+
+  if (hashRoute.startsWith('#/exam/')) {
+    return <PublicExamRoute code={decodeURIComponent(hashRoute.replace('#/exam/', ''))} />;
+  }
 
   if (!authReady) {
     return <FullScreen><IvyIcon size={28} /><div style={{ marginTop: '0.75rem', color: 'var(--color-text-secondary)' }}>불러오는 중...</div></FullScreen>;
@@ -169,7 +193,12 @@ function App() {
 
 // The signed-in application: loads data for the owner and renders the UI.
 function AcademyApp({ session }: { session: Session }) {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (sessionStorage.getItem(KIOSK_RELOAD_RESET_KEY) === '1') {
+      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+    }
+    return 'dashboard';
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [assistantDraft, setAssistantDraft] = useState<{ id: number; content: string } | null>(null);
 
@@ -196,6 +225,20 @@ function AcademyApp({ session }: { session: Session }) {
     void supabase.auth.signOut();
   };
 
+  useEffect(() => {
+    const markKioskReload = () => {
+      if (activeTab === 'kiosk') {
+        sessionStorage.setItem(KIOSK_RELOAD_RESET_KEY, '1');
+      }
+    };
+    window.addEventListener('beforeunload', markKioskReload);
+    window.addEventListener('pagehide', markKioskReload);
+    return () => {
+      window.removeEventListener('beforeunload', markKioskReload);
+      window.removeEventListener('pagehide', markKioskReload);
+    };
+  }, [activeTab]);
+
   const handleAssistantDraftToMessaging = (content: string) => {
     setAssistantDraft({ id: Date.now(), content });
     setActiveTab('messaging');
@@ -203,6 +246,7 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   const goDashboard = () => {
+    sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
     setActiveTab('dashboard');
     setIsMobileMenuOpen(false);
   };
@@ -255,6 +299,8 @@ function AcademyApp({ session }: { session: Session }) {
             onDeleteClass={data.handleDeleteClass}
           />
         );
+      case 'exams':
+        return <Exams classes={classes} students={students} onSendGuideToMessaging={handleAssistantDraftToMessaging} />;
       case 'attendance':
         return (
           <AttendanceManager
@@ -361,7 +407,7 @@ function AcademyApp({ session }: { session: Session }) {
             kioskPin={kioskPin}
             onSaveAttendance={data.handleSaveAttendance}
             onQueueAlert={data.handleQueueKioskAlert}
-            onExitKiosk={() => setActiveTab('dashboard')}
+            onExitKiosk={goDashboard}
           />
         );
       case 'backup':
@@ -384,12 +430,14 @@ function AcademyApp({ session }: { session: Session }) {
   // 데스크탑 사이드바 + 모바일 드로어 공용 네비게이션
   const renderNavSection = (opts: { closeOnNav: boolean }) => {
     const go = (id: string) => {
+      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
       setActiveTab(id);
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
     };
     const launchKiosk = () => {
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
       if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
+        sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
         setActiveTab('kiosk');
       }
     };

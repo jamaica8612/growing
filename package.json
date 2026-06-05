@@ -8,6 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "verify": "npm run lint && npm run build",
+    "verify:quiet": "node scripts/verify-quiet.mjs",
+    "deploy:exam-functions": "npx supabase functions deploy exam-public --no-verify-jwt && npx supabase functions deploy exam-generate",
+    "smoke:exam-public": "node scripts/smoke-exam-public.mjs",
+    "smoke:exam-e2e": "node scripts/smoke-exam-e2e.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
