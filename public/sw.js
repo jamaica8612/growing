@@ -1,8 +1,8 @@
-const CACHE_VERSION = 'growing-pwa-v2';
+const CACHE_VERSION = 'growing-pwa-v3';
 const APP_SHELL = [
   './',
   './manifest.webmanifest',
-  './favicon.svg',
+  './favicon.svg?v=20260607',
   './pwa-icon.svg',
 ];
 
