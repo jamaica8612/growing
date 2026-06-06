@@ -608,8 +608,8 @@ function AcademyApp({ session }: { session: Session }) {
         })}
       </nav>
 
-      {/* AI 비서 아이비 — 모든 화면 오른쪽 하단 플로팅 위젯 (키오스크 모드 제외) */}
-      <Assistant onSendToMessaging={handleAssistantDraftToMessaging} />
+      {/* AI 비서 아이비 — 평가 관리에서는 전용 AI 편집 UI와 겹치므로 숨긴다. */}
+      {activeTab !== 'exams' && <Assistant onSendToMessaging={handleAssistantDraftToMessaging} />}
     </div>
   );
 }

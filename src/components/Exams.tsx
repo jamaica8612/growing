@@ -80,6 +80,7 @@ const toSdkQuestions = (qs: Question[]): SdkQuestion[] =>
 
 interface ExamCard {
   id: string;
+  classId: string | null;
   name: string;
   target: string;
   topic: string;
@@ -88,6 +89,7 @@ interface ExamCard {
   types: QType[];
   difficulty: string;
   totalPoints: number;
+  status: ExamStatus;
 }
 
 type MaterialKind = 'text';
@@ -236,14 +238,57 @@ function Field({ icon, label, hint, children }: { icon?: React.ReactNode; label:
 // ===========================================================================
 // 화면 1: 시험 목록
 // ===========================================================================
-function SavedExamsScreen({ exams, onOpen, onNew }: { exams: ExamCard[]; onOpen: (e: ExamCard) => void; onNew: () => void }) {
+const statusMeta: Record<ExamStatus, { label: string; bg: string; color: string }> = {
+  draft: { label: '작성중', bg: '#f3f4f6', color: '#4b5563' },
+  published: { label: '응시중', bg: 'var(--mint-light)', color: 'var(--primary)' },
+  closed: { label: '마감', bg: '#fef3c7', color: '#b45309' },
+};
+
+function SavedExamsScreen({ exams, classes, onOpen, onNew }: { exams: ExamCard[]; classes: Class[]; onOpen: (e: ExamCard) => void; onNew: () => void }) {
   const empty = exams.length === 0;
+  const classById = new Map(classes.map(cls => [cls.id, cls]));
+  const classOrder = new Map(classes.map((cls, index) => [cls.id, index]));
+  const sections = Array.from(exams.reduce<Map<string, ExamCard[]>>((map, exam) => {
+    const key = exam.classId && classById.has(exam.classId) ? exam.classId : '__none';
+    const list = map.get(key) ?? [];
+    list.push(exam);
+    map.set(key, list);
+    return map;
+  }, new Map()).entries()).sort(([a], [b]) => {
+    if (a === '__none') return 1;
+    if (b === '__none') return -1;
+    return (classOrder.get(a) ?? 999) - (classOrder.get(b) ?? 999);
+  });
+
+  const renderExamCard = (e: ExamCard, i: number) => {
+    const status = statusMeta[e.status];
+    return (
+      <button key={e.id} onClick={() => onOpen(e)} className="card fade-up exam-board-card" style={{ textAlign: 'left', padding: 20, boxShadow: 'var(--shadow-sm)', cursor: 'pointer', border: '1px solid var(--border)', transition: 'transform .12s ease, box-shadow .15s ease, border-color .15s ease', animationDelay: `${i * 35}ms` }}
+        onMouseEnter={ev => { ev.currentTarget.style.transform = 'translateY(-2px)'; ev.currentTarget.style.boxShadow = 'var(--shadow-md)'; ev.currentTarget.style.borderColor = '#cfe3d8'; }}
+        onMouseLeave={ev => { ev.currentTarget.style.transform = 'none'; ev.currentTarget.style.boxShadow = 'var(--shadow-sm)'; ev.currentTarget.style.borderColor = 'var(--border)'; }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11, flexWrap: 'wrap' }}>
+          <span className="badge" style={{ background: status.bg, color: status.color }}>{status.label}</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Calendar size={13} color="var(--muted)" />{e.date}</span>
+        </div>
+        <h3 className="h-font" style={{ fontSize: 16.5, fontWeight: 700, margin: '0 0 5px', lineHeight: 1.35, color: 'var(--text)' }}>{e.name}</h3>
+        <p style={{ margin: '0 0 14px', fontSize: 13.2, color: 'var(--text-2)', minHeight: 18 }}>{e.topic || '범위 미지정'}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 13, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', minWidth: 0 }}>
+            {e.types.slice(0, 3).map(t => <span key={t} className={'badge ' + TYPE_META[t].cls} style={{ fontSize: 10.5, padding: '3px 7px' }}>{TYPE_META[t].label}</span>)}
+            {e.types.length > 3 && <span className="badge" style={{ fontSize: 10.5, padding: '3px 7px', background: '#eef3ef', color: 'var(--text-2)' }}>+{e.types.length - 3}</span>}
+          </div>
+          <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0 }}><FileText size={14} color="var(--muted)" /> {e.count}문항 · {e.totalPoints}점</span>
+        </div>
+      </button>
+    );
+  };
+
   return (
-    <div className="fade-up exam-pagepad" style={{ maxWidth: 880, margin: '0 auto', padding: '40px 44px 60px' }}>
+    <div className="fade-up exam-pagepad" style={{ maxWidth: 980, margin: '0 auto', padding: '40px 44px 60px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, marginBottom: 26, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <h1 className="h-font exam-h1" style={{ fontSize: 32, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-.02em' }}>시험 목록</h1>
-          <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 15 }}>그동안 출제한 시험을 모아 봤어요. {!empty && <b className="num-font" style={{ color: 'var(--primary)' }}>{exams.length}개</b>}</p>
+          <h1 className="h-font exam-h1" style={{ fontSize: 32, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-.02em' }}>반별 시험 게시판</h1>
+          <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 15 }}>반마다 진행 중인 시험과 최근 결과를 한곳에서 확인해요. {!empty && <b className="num-font" style={{ color: 'var(--primary)' }}>{exams.length}개</b>}</p>
         </div>
         <button className="btn btn-primary" onClick={onNew} style={{ height: 46 }}><Plus size={18} color="#fff" /> 새 시험 만들기</button>
       </div>
@@ -256,23 +301,28 @@ function SavedExamsScreen({ exams, onOpen, onNew }: { exams: ExamCard[]; onOpen:
           <button className="btn btn-primary btn-lg" onClick={onNew} style={{ margin: '0 auto' }}><Sparkles size={19} color="#fff" /> 첫 시험 만들기</button>
         </div>
       ) : (
-        <div className="exam-col2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-          {exams.map((e, i) => (
-            <button key={e.id} onClick={() => onOpen(e)} className="card fade-up" style={{ textAlign: 'left', padding: 22, boxShadow: 'var(--shadow-sm)', cursor: 'pointer', border: '1px solid var(--border)', transition: 'transform .12s ease, box-shadow .15s ease, border-color .15s ease', animationDelay: `${i * 40}ms` }}
-              onMouseEnter={ev => { ev.currentTarget.style.transform = 'translateY(-2px)'; ev.currentTarget.style.boxShadow = 'var(--shadow-md)'; ev.currentTarget.style.borderColor = '#cfe3d8'; }}
-              onMouseLeave={ev => { ev.currentTarget.style.transform = 'none'; ev.currentTarget.style.boxShadow = 'var(--shadow-sm)'; ev.currentTarget.style.borderColor = 'var(--border)'; }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                <span className="badge" style={{ background: 'var(--mint-light)', color: 'var(--primary)' }}>{e.target}</span>
-                <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Calendar size={13} color="var(--muted)" />{e.date}</span>
-              </div>
-              <h3 className="h-font" style={{ fontSize: 17, fontWeight: 700, margin: '0 0 5px', lineHeight: 1.35, color: 'var(--text)' }}>{e.name}</h3>
-              <p style={{ margin: '0 0 16px', fontSize: 13.5, color: 'var(--text-2)' }}>{e.topic}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-                {e.types.map(t => <span key={t} className={'badge ' + TYPE_META[t].cls} style={{ fontSize: 11, padding: '3px 8px' }}>{TYPE_META[t].label}</span>)}
-                <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0 }}><FileText size={14} color="var(--muted)" /> {e.count}문항 · {e.difficulty}</span>
-              </div>
-            </button>
-          ))}
+        <div style={{ display: 'grid', gap: 18 }}>
+          {sections.map(([classKey, list]) => {
+            const cls = classKey === '__none' ? null : classById.get(classKey);
+            const publishedCount = list.filter(exam => exam.status === 'published').length;
+            return (
+              <section key={classKey} className="card exam-board-section" style={{ padding: 22, boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 12, background: cls?.color ? cls.color : 'linear-gradient(150deg,#2c6f52,#10b981)', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, flexShrink: 0 }}>
+                    {cls ? cls.name.slice(0, 1) : <FileText size={19} color="#fff" />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <h2 className="h-font" style={{ margin: 0, fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>{cls?.name ?? '반 미지정'}</h2>
+                    <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 3 }}>{list.length}개 시험{publishedCount > 0 ? ` · 응시중 ${publishedCount}개` : ''}</div>
+                  </div>
+                  <span className="badge" style={{ background: '#eef3ef', color: 'var(--text-2)' }}>{cls ? `${cls.days.join('·')} ${cls.startTime}` : '게시판'}</span>
+                </div>
+                <div className="exam-board-grid">
+                  {list.map(renderExamCard)}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1632,8 +1682,8 @@ type Screen = 'list' | 'create' | 'loading' | 'preview' | 'distribute' | 'result
 const isSavedId = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : '오류가 발생했어요.');
 const toCards = (items: ExamListItem[]): ExamCard[] => items.map(it => ({
-  id: it.id, name: it.title, target: it.targetLabel, topic: it.topic, count: it.count,
-  date: it.date, types: it.types as QType[], difficulty: it.difficulty, totalPoints: it.totalPoints,
+  id: it.id, classId: it.classId, name: it.title, target: it.targetLabel, topic: it.topic, count: it.count,
+  date: it.date, types: it.types as QType[], difficulty: it.difficulty, totalPoints: it.totalPoints, status: it.status,
 }));
 
 const rosterForClass = (classes: Class[], students: Student[], classId?: string | null): RosterStudent[] => {
@@ -2122,7 +2172,7 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
               <button className="btn btn-primary" onClick={() => { setListLoading(true); void refreshList(); }}>다시 시도</button>
             </div>
           ) : (
-            <SavedExamsScreen exams={saved} onOpen={card => void openSaved(card)} onNew={() => go('create')} />
+            <SavedExamsScreen exams={saved} classes={classes} onOpen={card => void openSaved(card)} onNew={() => go('create')} />
           )
         )}
         {screen === 'create' && <CreateExam classes={classes} onGenerate={meta => void handleGenerate(meta)} />}

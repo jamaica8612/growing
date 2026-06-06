@@ -88,7 +88,7 @@ async function gradeWritingWithAi(question: Row, answer: AnswerValue): Promise<G
   const points = Number(question.points ?? 0);
   const expected = String(normalizeAnswer(question.answer)).trim();
   const prompt = `
-You are grading a Korean middle-school English academy writing answer.
+You are grading an English exam answer in Korea.
 Return ONLY valid JSON:
 {
   "gainedPoints": 0,
@@ -99,6 +99,7 @@ Return ONLY valid JSON:
 
 Rules:
 - Max points: ${points}
+- Grade according to the level implied by the exam question and model answer.
 - Award full points only when the student's answer is meaningfully equivalent to the model answer.
 - Award partial points for answers with useful correct grammar/vocabulary but missing words, wrong order, or small expression errors.
 - Award 0 for blank, unrelated, or mostly incorrect answers.

@@ -129,7 +129,7 @@ function buildPrompt(payload: {
     .map(message => `${message.role === 'teacher' ? 'Teacher' : 'AI'}: ${message.content}`)
     .join('\n') || 'No prior conversation.';
   return `
-You are an English academy exam writer for Korean middle-school students.
+You are an English exam writer in Korea.
 Return ONLY valid JSON in this shape:
 {
   "reply": "Korean one-sentence reply to the teacher about what you changed",
@@ -150,6 +150,7 @@ Return ONLY valid JSON in this shape:
 
 Rules:
 - Use ONLY the provided material. Do not invent facts, names, grammar points, or vocabulary that are not grounded in the material.
+- Set the question difficulty to match the selected class/target level first, then apply the requested difficulty setting.
 - Follow the teacher instruction flexibly unless it conflicts with the material-only rule, JSON schema, or requested question count/types.
 - Treat this as an ongoing teacher-AI conversation. Use the recent conversation for references like "아까", "그 수준", "방금", or "3번만". The latest teacher instruction has priority.
 - Every question MUST include a concrete Korean source label in "source".

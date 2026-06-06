@@ -136,6 +136,19 @@
 @keyframes exam-slideIn { from { transform: translateY(16px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
 .exam-app .slide-in { animation: exam-slideIn .4s cubic-bezier(.22,.61,.36,1); }
 
+/* ---- Exam board list ---- */
+.exam-app .exam-board-section {
+  border-radius: var(--r-lg);
+}
+.exam-app .exam-board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.exam-app .exam-board-card {
+  min-height: 168px;
+}
+
 /* ---- Upload (자료 올리기) ---- */
 .exam-app .up-tabs { display: flex; gap: 6px; background: #eef3ef; border-radius: 13px; padding: 5px; margin-bottom: 18px; }
 .exam-app .up-tab {
@@ -346,6 +359,7 @@
   .exam-app .exam-pagepad { padding-left: 16px !important; padding-right: 16px !important; }
   .exam-app .exam-toolbar { padding-left: 16px !important; padding-right: 16px !important; }
   .exam-app .exam-col2 { grid-template-columns: 1fr !important; }
+  .exam-app .exam-board-grid { grid-template-columns: 1fr !important; }
   .exam-app .exam-distgrid { grid-template-columns: 1fr !important; }
   .exam-app .exam-kpigrid { grid-template-columns: 1fr 1fr !important; }
   .exam-app .exam-h1 { font-size: 25px !important; }

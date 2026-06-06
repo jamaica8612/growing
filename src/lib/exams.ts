@@ -119,6 +119,7 @@ export interface ExamAnswer {
 
 export interface ExamListItem {
   id: string;
+  classId: string | null;
   title: string;
   targetLabel: string;
   topic: string;
@@ -160,7 +161,7 @@ export const examsApi = {
     return exams.map(e => {
       const agg = byExam.get(e.id);
       return {
-        id: e.id, title: e.title, targetLabel: e.targetLabel, topic: e.topic, date: e.date,
+        id: e.id, classId: e.classId, title: e.title, targetLabel: e.targetLabel, topic: e.topic, date: e.date,
         difficulty: e.difficulty, status: e.status, shortCode: e.shortCode,
         count: agg?.count ?? 0, types: agg ? Array.from(agg.types) : [], totalPoints: agg?.total ?? 0,
       };
