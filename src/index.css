@@ -2710,6 +2710,23 @@ textarea.form-control {
   .gd-card { padding: 1rem; border-radius: var(--radius-md); }
   .gd-students { grid-template-columns: 1fr; }
   .gd-brief-list li { font-size: 0.82rem; }
+  .gd-pay-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .gd-pay-name,
+  .gd-pay-foot > span {
+    white-space: normal;
+  }
+  .gd-copy {
+    width: 100%;
+    justify-content: center;
+    min-height: 42px;
+  }
+  .gd-pay-foot {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .gd-toast { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 }
 /* 아주 좁은 화면(≤380px): 숙제 세그먼트 버튼 & 시간 입력 압축 */
