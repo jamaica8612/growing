@@ -111,14 +111,12 @@ export const Messaging: React.FC<MessagingProps> = ({
   const [include, setInclude] = useState<NoticeIncludeState>({
     attendance: true,
     homework: true,
-    makeup: true,
-    supplementRate: true,
-    recentTest: true,
+    makeup: false,
   });
   const [message, setMessage] = useState('');
   const [batchClassId, setBatchClassId] = useState('');
   const [batchDrafts, setBatchDrafts] = useState<BatchDraft[]>([]);
-  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [noticeDate, setNoticeDate] = useState(() => todayLocal());
   const [isSending, setIsSending] = useState(false);
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('all');
@@ -131,7 +129,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     api.getMessageLogs(50).then(setMessageLogs).catch(() => {});
   }, []);
 
-  const todayStr = useMemo(() => todayLocal(), []);
+  const noticeMonth = noticeDate.slice(0, 7);
   const activeStudents = useMemo(
     () => students.filter(s => s.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     [students]
@@ -158,17 +156,15 @@ export const Messaging: React.FC<MessagingProps> = ({
       attendance,
       payments,
       counselLogs,
-      month: reportMonth,
-      today: todayStr,
+      month: noticeMonth,
+      today: noticeDate,
     });
-  }, [attendance, classes, counselLogs, currentStudent, payments, reportMonth, todayStr]);
+  }, [attendance, classes, counselLogs, currentStudent, noticeDate, noticeMonth, payments]);
 
   const includeItems: Array<{ key: NoticeIncludeKey; label: string; meta: string }> = [
-    { key: 'attendance', label: '출결 요약', meta: selectedMeta?.attendance ?? '월 출석률 기준' },
-    { key: 'homework', label: '과제 수행', meta: selectedMeta?.homework ?? '완료/부분/미제출' },
-    { key: 'makeup', label: '보강/보충 현황', meta: selectedMeta?.makeup ?? '보강·보충 횟수' },
-    { key: 'supplementRate', label: '또래 대비 보충률', meta: selectedMeta?.supplementRate ?? '월 기준 비교' },
-    { key: 'recentTest', label: '최근 평가 결과', meta: selectedMeta?.recentTest ?? '최근 평가 기록' },
+    { key: 'attendance', label: '출결', meta: selectedMeta?.attendance ?? '선택일 출결' },
+    { key: 'homework', label: '과제', meta: selectedMeta?.homework ?? '선택일 과제' },
+    { key: 'makeup', label: '보강/보충', meta: selectedMeta?.makeup ?? '수행일 선택' },
   ];
 
   const buildNoticeForStudent = (student: Student) => buildParentNoticeDraft({
@@ -177,8 +173,8 @@ export const Messaging: React.FC<MessagingProps> = ({
     attendance,
     payments,
     counselLogs,
-    month: reportMonth,
-    today: todayStr,
+    month: noticeMonth,
+    today: noticeDate,
     include,
   });
 
@@ -302,7 +298,7 @@ export const Messaging: React.FC<MessagingProps> = ({
         alertType: 'custom',
         recipientPhone: currentStudent.parentContact,
         recipientName: currentStudent.name,
-        subject: `그로잉영어 ${currentStudent.name} 학생 종합알림장`,
+        subject: `그로잉영어 ${currentStudent.name} 학생 일일 종합알림장`,
         message,
         fallbackMessage: message,
       });
@@ -328,7 +324,7 @@ export const Messaging: React.FC<MessagingProps> = ({
           alertType: 'custom',
           recipientPhone: draft.contact,
           recipientName: draft.name,
-          subject: `그로잉영어 ${draft.name} 학생 종합알림장`,
+          subject: `그로잉영어 ${draft.name} 학생 일일 종합알림장`,
           message: draft.message,
           fallbackMessage: draft.message,
         });
@@ -388,16 +384,16 @@ export const Messaging: React.FC<MessagingProps> = ({
       <section className="msg-hero">
         <div>
           <span className="msg-eyebrow">Parent Notice</span>
-          <h2>종합알림장</h2>
-          <p>출결, 과제, 보강/보충, 또래 대비 보충률, 최근 평가를 한 번에 정리해 검토 후 발송합니다.</p>
+          <h2>일일 종합알림장</h2>
+          <p>선택한 하루의 출결과 과제를 정리하고, 보강/보충은 해당 날짜에 기록이 있을 때 선택해 포함합니다.</p>
         </div>
         <div className="msg-hero-actions">
           <input
-            type="month"
+            type="date"
             className="msg-month dark"
-            value={reportMonth}
-            onChange={e => setReportMonth(e.target.value)}
-            aria-label="알림장 기준 월"
+            value={noticeDate}
+            onChange={e => setNoticeDate(e.target.value)}
+            aria-label="알림장 기준일"
           />
           <button className="pay-btn primary" disabled={mode === 'single' ? !currentStudent : batchTargets.length === 0} onClick={mode === 'single' ? handleGenerate : handleGenerateBatch}>
             <Sparkles size={15} /> 초안 만들기
@@ -449,7 +445,7 @@ export const Messaging: React.FC<MessagingProps> = ({
               <div><span>출결</span><b>{selectedMeta.attendance}</b></div>
               <div><span>과제</span><b>{selectedMeta.homework}</b></div>
               <div><span>보강/보충</span><b>{selectedMeta.makeup}</b></div>
-              <div><span>최근 평가</span><b>{selectedMeta.recentTest}</b></div>
+              <div><span>기준일</span><b>{noticeDate}</b></div>
             </div>
           )}
 
