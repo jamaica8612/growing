@@ -2987,6 +2987,13 @@ textarea.form-control {
   .st-info-grid { grid-template-columns: 1fr; }
   .st-dhead-top { flex-wrap: wrap; }
   .st-drate { margin-left: auto; }
+  .st-tabs {
+    padding-right: 1rem;
+    scroll-padding-inline: 1rem;
+  }
+  .st-tab {
+    min-height: 44px;
+  }
 }
 @media (min-width: 769px) {
   .st-back-mobile { display: none; }
