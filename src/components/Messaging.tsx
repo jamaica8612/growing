@@ -72,7 +72,7 @@ const messageLogTypeLabel: Record<string, string> = {
   payment_request: '수납 안내',
   payment_paid: '수납 완료',
   exam_result: '평가 결과',
-  custom: '종합알림장',
+  custom: '일일 종합알림장',
 };
 
 const statusLabel: Record<BatchStatus, string> = {
@@ -284,7 +284,7 @@ export const Messaging: React.FC<MessagingProps> = ({
 
   const handleSendComprehensiveAlimtalk = async () => {
     if (!currentStudent || !currentStudent.parentContact || !message.trim()) return;
-    if (!window.confirm(`${currentStudent.name} 학생 학부모님께 종합알림장을 발송할까요?`)) return;
+    if (!window.confirm(`${currentStudent.name} 학생 학부모님께 일일 종합알림장을 발송할까요?`)) return;
     setIsSending(true);
     try {
       await sendAlimtalk({
@@ -297,9 +297,9 @@ export const Messaging: React.FC<MessagingProps> = ({
         fallbackMessage: message,
       });
       await refreshLogs();
-      alert('종합알림장 발송을 요청했어요.');
+      alert('일일 종합알림장 발송을 요청했어요.');
     } catch (error) {
-      alert(error instanceof Error ? error.message : '종합알림장 발송에 실패했어요.');
+      alert(error instanceof Error ? error.message : '일일 종합알림장 발송에 실패했어요.');
     } finally {
       setIsSending(false);
     }
@@ -308,7 +308,7 @@ export const Messaging: React.FC<MessagingProps> = ({
   const handleSendSelectedBatch = async () => {
     const targets = batchDrafts.filter(draft => draft.selected && draft.contact && draft.message.trim());
     if (targets.length === 0) return;
-    if (!window.confirm(`선택한 ${targets.length}명에게 종합알림장을 발송할까요?`)) return;
+    if (!window.confirm(`선택한 ${targets.length}명에게 일일 종합알림장을 발송할까요?`)) return;
     setIsBatchSending(true);
     for (const draft of targets) {
       patchBatchDraft(draft.studentId, { status: 'sending', errorMessage: undefined });

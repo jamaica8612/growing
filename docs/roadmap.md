@@ -2,7 +2,7 @@
 
 이 문서가 프로젝트 진행 계획의 **정본**입니다. (메모리·PR 설명보다 우선)
 
-마지막 갱신: 2026-06-06
+마지막 갱신: 2026-06-07
 
 ---
 
@@ -16,9 +16,10 @@
 | — | 아이비 자가학습 노트 (`growing_assistant_notes`, remember/recall) | 추가 LLM 호출 0 |
 | — | 아이비 자가학습 노트 의미검색 RAG (`pgvector`, `gte-small`, `semantic_search_notes`) | 2026-06-06 배포 완료 |
 | — | 키오스크 자율출결 → `growing_attendance` + `growing_kiosk_alerts` | |
-| — | 알림장 발송 탭 (키오스크 대기열, 템플릿 조립기) | |
+| — | 알림장 발송 탭 (일일 종합알림장, 키오스크/과제 대기열) | Aligo `custom` 발송 준비 |
 | — | 출결 관리 탭 (출/결/지/보강 + 숙제 + 학부모 알림) | |
 | — | 숙제 알림 대기열 (`growing_homework_alerts`) + 출결관리 → 알림장 발송 연결 | |
+| — | 카카오 채널봇 webhook 준비 (`kakao-skill`, `kakao-channel-event`) | 채널 관리자 연결 대기 |
 | — | 아이비 기본 호칭: 사용자를 `지선쌤`으로 부르기 | |
 | 2 | 아이비 쓰기 + 확인 카드 (human-in-the-loop) | **[PR #15](https://github.com/jamaica8612/growing/pull/15) 머지 대기** |
 
@@ -26,7 +27,10 @@
 
 ## 🔨 지금 진행
 
-현재 외부 API 없이 바로 진행할 큰 기능 항목은 없습니다. 다음 우선순위는 실제 운영 QA와 외부 의존성 준비 상태에 따라 선택합니다.
+현재 큰 기능 항목은 Aligo 템플릿 승인과 카카오 채널 관리자 연결 상태에 맞춰 운영 QA로 이어갑니다.
+
+- Aligo: 일일 종합알림장 `custom` 템플릿 승인 후 `ALIGO_TPL_CUSTOM` Secret 등록
+- 카카오 채널봇: 관리자센터에 Skill/Event URL 연결 후 실제 요청 로그 확인
 
 ---
 
@@ -42,10 +46,10 @@
 - **방향**: 현재 수동 "수납 처리"를 외부 거래 확인으로 대체/보강. 거래번호·영수증 URL 등 필드 추가 예상.
 - **건드릴 곳**: `growing_payments` 스키마(`external_transaction_id`, `receipt_url` 등), `Payments.tsx`, `api.ts` 결제 함수, 신규 Edge Function(웹훅/조회 중계)
 
-### 3. 카카오 알림톡 연동 (자동 발송)
-- **선행 조건**: 카카오 **비즈니스 채널 + 알림톡 템플릿 사전 승인**
-- **방향**: 현재 "복사 → 수동 붙여넣기"를 API 자동 발송으로. 메시지 템플릿 설정화(위)가 그대로 알림톡 템플릿으로 매핑됨.
-- **건드릴 곳**: `growing_kiosk_alerts` 발송 상태 필드(`sent_at`, `sent_via`), `Messaging.tsx` 대기열 발송 버튼, 신규 Edge Function(알림톡 발송 중계)
+### 3. 카카오 알림톡/채널봇 운영 전환
+- **선행 조건**: Aligo 일일 종합알림장 템플릿 승인, 카카오 채널 관리자센터 webhook 연결
+- **현재 상태**: `send-alimtalk`, `kakao-skill`, `kakao-channel-event` Edge Function 준비 및 배포 완료
+- **다음 확인**: `ALIGO_TPL_CUSTOM` Secret 등록 후 일일 종합알림장 실제 발송, 채널봇 요청 로그/학부모 연결 흐름 QA
 
 ---
 

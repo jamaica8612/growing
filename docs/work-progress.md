@@ -2,14 +2,17 @@
 
 > 이어서 작업할 때 이 문서를 먼저 읽으세요. 모든 작업은 `main` 브랜치에 직접 커밋·푸시하며,
 > 푸시 시 GitHub Pages가 프론트엔드를 자동 배포합니다. Supabase 엣지 함수(`assistant`)는
-> Supabase 엣지 함수(`assistant`)는 Supabase CLI `functions deploy --use-api` 또는 MCP 도구가 노출된 환경에서는
-> MCP `deploy_edge_function`으로 수동 배포합니다.
+> Supabase CLI `functions deploy --use-api` 또는 MCP 도구가 노출된 환경에서는 MCP `deploy_edge_function`으로 수동 배포합니다.
 > 프로젝트 ref: `xrrdokcjhjqdfvwtbenl`.
 
 ## 배포 경로 메모
 - 프론트엔드: `git push origin main` → GitHub Actions(`.github/workflows/deploy.yml`) → GitHub Pages.
 - 엣지 함수: 로컬 `supabase/functions/assistant/index.ts` 수정 → `npx supabase functions deploy assistant --project-ref xrrdokcjhjqdfvwtbenl --use-api`.
   MCP 도구가 노출된 환경에서는 `deploy_edge_function`도 가능. verify_jwt=true 유지.
+- Aligo 발송 함수: `npx supabase functions deploy send-alimtalk --project-ref xrrdokcjhjqdfvwtbenl --use-api`.
+  프론트엔드 로그인 세션으로 호출하므로 기본 JWT 검증을 유지한다.
+- 카카오 채널봇 webhook 함수: `npx supabase functions deploy kakao-skill kakao-channel-event --project-ref xrrdokcjhjqdfvwtbenl --use-api --no-verify-jwt`.
+  카카오 서버가 Supabase JWT 없이 호출하므로 `--no-verify-jwt`가 필요하다.
 - DB 마이그레이션: 전체 `db push` 전에 `npx supabase migration list --linked`로 pending 범위를 확인한다.
   로컬 pending migration이 여러 개면 이번 변경 SQL만 `npx supabase db query --linked --file <migration.sql>`로 적용한다.
 
@@ -50,7 +53,8 @@
 ### 메시지 · UI
 - **메시지 템플릿 설정화** — `src/lib/messageTemplates.ts` + Backup.tsx 편집 UI + Attendance/Messaging 사용 완료
 - **출결 캘린더 뷰** — `AttendanceCalendar.tsx` 구현 후 `Attendance.tsx`에 연결 완료
-- **Aligo 알림톡 API 준비** — `send-alimtalk` Edge Function + `growing_message_logs` 마이그레이션 + `ALIGO_SETUP_GUIDE.md` 작성
+- **일일 종합알림장 Aligo 발송 준비** — `custom` 타입, `ALIGO_TPL_CUSTOM`, `send-alimtalk` Edge Function + `growing_message_logs`
+- **카카오 채널봇 webhook 준비** — `kakao-skill`, `kakao-channel-event` 배포 완료. 카카오 관리자센터 연결 후 로그 QA 필요
 - **모바일/태블릿 UI 이슈 수정 (PR #30, 2026-06-02)**
   - 출결 로스터 테이블 overflow-x 컨테이너 (#4)
   - 월간 통계 테이블 모바일 열 축소 (#11)

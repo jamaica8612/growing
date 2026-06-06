@@ -70,8 +70,8 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
       <div className="set-intro kakao-intro">
         <span className="set-intro-ic">K</span>
         <p>
-          비즈니스톡 승인 전 준비 화면입니다. 실제 카카오 발송은 하지 않고, 학생 연결 상태와 상담 요청 큐,
-          테스트 Skill API 로그만 확인합니다.
+          카카오 채널봇 연결과 테스트를 관리합니다. Skill/Event URL을 관리자센터에 연결한 뒤,
+          학생 연결 상태와 상담 요청 큐, 최근 요청 로그를 확인합니다.
         </p>
       </div>
 
