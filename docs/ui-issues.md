@@ -24,7 +24,7 @@
 | 7 | `index.css` | `.card` L523 | `padding: 1.5rem` PC값 모바일 미축소 | ✅ 수정됨 |
 | 8 | `Messaging.tsx` | textarea L655 | `rows={12}` 고정 → 모바일에서 textarea가 화면을 과도하게 차지 | ✅ 수정됨 |
 | 9 | `Messaging.tsx` | 템플릿 버튼 L534 | 2열 그리드 → 모바일에서 버튼이 작아짐 | 미수정 |
-| 10 | `index.css` | 미디어쿼리 L1627 | `@media (max-width: 1024px)` 순서가 768px 뒤에 위치 (비논리적) | 미수정 |
+| 10 | `index.css` | 미디어쿼리 L1627 | `@media (max-width: 1024px)` 순서가 768px 뒤에 위치 (비논리적) | ✅ 확인됨 |
 | 11 | `Attendance.tsx` | L730-777 월간 리포트 | 6컬럼 테이블 모바일 미대응 | 미수정 |
 
 ---
@@ -33,11 +33,11 @@
 
 | # | 파일 | 위치 | 문제 | 상태 |
 |---|------|------|------|------|
-| 12 | `index.css` | `.tabs-header` / `.tab-btn` L1645-1658 | 규칙 중복 정의 | 미수정 |
-| 13 | `index.css` | `.modal-content` L964 vs L1865 | `width: 90%` / `width: 95%!important` 중복 | 미수정 |
-| 14 | `index.css` | `.notice-text-box` L1479 | `white-space: pre-wrap` + `word-break: break-all` 상충 | 미수정 |
-| 15 | `Dashboard.tsx` | L365-413 미납 카드 | flex 레이아웃 모바일 줄바꿈 미처리 | 미수정 |
-| 16 | `Students.tsx` | 상세 모달 탭 | 다중 탭(9개) 모바일 수평 스크롤 필요 여부 미확인 | 미수정 |
+| 12 | `index.css` | `.tabs-header` / `.tab-btn` L1645-1658 | 규칙 중복 정의 | ✅ 확인됨 |
+| 13 | `index.css` | `.modal-content` L964 vs L1865 | `width: 90%` / `width: 95%!important` 중복 | ✅ 수정됨 |
+| 14 | `index.css` | `.notice-text-box` L1479 | `white-space: pre-wrap` + `word-break: break-all` 상충 | ✅ 확인됨 |
+| 15 | `Dashboard.tsx` | L365-413 미납 카드 | flex 레이아웃 모바일 줄바꿈 미처리 | ✅ 수정됨 |
+| 16 | `Students.tsx` | 상세 모달 탭 | 다중 탭(9개) 모바일 수평 스크롤 필요 여부 미확인 | ✅ 수정됨 |
 
 ---
 

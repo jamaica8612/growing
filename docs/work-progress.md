@@ -58,11 +58,8 @@
 
 순서대로 진행. 빌드는 `npm run build`.
 
-### 1) 잔여 UI 이슈 (docs/ui-issues.md 미수정 항목)
-- **#15** `Dashboard.tsx` 미납 카드 flex 레이아웃 모바일 줄바꿈 미처리
-- **#16** `Students.tsx` 상세 탭 9개 모바일 수평 스크롤 확인/처리
-- **#10** `index.css` `@media (max-width: 1024px)` 순서가 768px 뒤에 위치 (비논리적)
-- **#12/13/14** CSS 중복·상충 정리 (tabs-header, modal-content, notice-text-box)
+### 1) 잔여 UI 이슈
+- `docs/ui-issues.md` 기준 잔여 모바일/UI 항목(#10, #12~16) 확인 및 정리 완료.
 - 외부 API 불필요, 엣지 함수 재배포 불필요.
 
 ### 2) 의미검색 RAG (보류, 별도 세션 권장)

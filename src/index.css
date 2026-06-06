@@ -1493,7 +1493,7 @@ textarea.form-control {
 .modal-content {
   background-color: var(--color-bg-surface);
   border-radius: var(--radius-lg);
-  width: 90%;
+  width: min(650px, calc(100vw - 2rem));
   max-width: 650px;
   max-height: 90vh;
   overflow-y: auto;
@@ -2390,9 +2390,7 @@ textarea.form-control {
 
   /* Optimize modal popup spacing */
   .modal-content {
-    width: 95%;
-    margin: 10px;
-    max-height: 95vh;
+    max-height: calc(100vh - 1.25rem);
   }
 
   .modal-body {
