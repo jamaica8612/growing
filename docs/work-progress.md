@@ -2,14 +2,16 @@
 
 > 이어서 작업할 때 이 문서를 먼저 읽으세요. 모든 작업은 `main` 브랜치에 직접 커밋·푸시하며,
 > 푸시 시 GitHub Pages가 프론트엔드를 자동 배포합니다. Supabase 엣지 함수(`assistant`)는
-> MCP `deploy_edge_function`으로 수동 배포합니다(이 환경엔 supabase CLI/토큰 없음).
+> Supabase 엣지 함수(`assistant`)는 Supabase CLI `functions deploy --use-api` 또는 MCP 도구가 노출된 환경에서는
+> MCP `deploy_edge_function`으로 수동 배포합니다.
 > 프로젝트 ref: `xrrdokcjhjqdfvwtbenl`.
 
 ## 배포 경로 메모
 - 프론트엔드: `git push origin main` → GitHub Actions(`.github/workflows/deploy.yml`) → GitHub Pages.
-- 엣지 함수: 로컬 `supabase/functions/assistant/index.ts` 수정 → MCP `deploy_edge_function`
-  (전체 파일 내용을 content로 전달). 현재 라이브 **v17**. verify_jwt=true 유지.
-- DB 마이그레이션: MCP `apply_migration` 으로 적용 + `supabase/migrations/`에 파일 기록.
+- 엣지 함수: 로컬 `supabase/functions/assistant/index.ts` 수정 → `npx supabase functions deploy assistant --project-ref xrrdokcjhjqdfvwtbenl --use-api`.
+  MCP 도구가 노출된 환경에서는 `deploy_edge_function`도 가능. verify_jwt=true 유지.
+- DB 마이그레이션: 전체 `db push` 전에 `npx supabase migration list --linked`로 pending 범위를 확인한다.
+  로컬 pending migration이 여러 개면 이번 변경 SQL만 `npx supabase db query --linked --file <migration.sql>`로 적용한다.
 
 ---
 
@@ -33,6 +35,9 @@
   **학생 메모 수정(`propose_student_memo`)**
 - A 아침 브리핑(프롬프트 지침 + 채팅 빠른버튼), E 근거 명시·병렬 호출·토큰 2048
 - **친절한 에러 메시지 + "다시 시도" 버튼**(네트워크/401/과부하/키 미설정 매핑)
+- **의미검색 RAG**: `growing_assistant_notes.embedding vector(384)` + `growing_match_assistant_notes` RPC +
+  Edge Runtime 내장 `gte-small` 임베딩 + `semantic_search_notes` tool. 신규 노트 저장 시 임베딩 생성,
+  기존 미임베딩 노트는 검색 시 소량 백필.
 
 ### 상담일지
 - **내보내기(마크다운 다운로드)** — `CounselLogs.tsx` `handleExport`
@@ -62,16 +67,15 @@
 - `docs/ui-issues.md` 기준 잔여 모바일/UI 항목(#10, #12~16) 확인 및 정리 완료.
 - 외부 API 불필요, 엣지 함수 재배포 불필요.
 
-### 2) 의미검색 RAG (보류, 별도 세션 권장)
-- 위험·대규모: pgvector 확장 + 임베딩 컬럼 + 기존 행 백필(Gemini 임베딩 API) +
-  엣지 벡터검색 RPC + 신규 일지/노트 저장 시 임베딩 생성.
-- 동작 중인 아이비 회귀 위험이 커서 단독으로 신중히 진행할 것.
-- 대안(경량): 현재 substring 검색을 다중 필드/키워드 확장으로 보강.
+### 2) 아이비 RAG 운영 QA
+- 로그인 세션으로 아이비를 열고, 기억 저장 후 표현을 바꿔 다시 질문했을 때 `semantic_search_notes`가 답변 근거로 쓰이는지 확인.
+- 원격 DB 적용 완료: `supabase/migrations/20260606075552_assistant_notes_rag.sql`.
+- Edge Function 배포 완료: `npx supabase functions deploy assistant --project-ref xrrdokcjhjqdfvwtbenl --use-api`.
 
 ---
 
 ## 검증/배포 체크리스트
 - [ ] `npm run verify` (lint+build) 통과
 - [ ] `git add -A && git commit && git push origin main`
-- [ ] 엣지 함수 변경 시에만 MCP `deploy_edge_function`로 재배포(현재 불필요)
+- [ ] 엣지 함수 변경 시에만 Supabase CLI 또는 MCP `deploy_edge_function`로 재배포
 - [ ] 커밋 메시지 끝에 세션 링크 유지
