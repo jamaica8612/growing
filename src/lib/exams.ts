@@ -33,6 +33,16 @@ export interface ExamQuestion {
   explanation: string;
 }
 
+export interface ExamAiChatMessage {
+  role: 'teacher' | 'assistant';
+  content: string;
+}
+
+export interface ExamAiRevisionResult {
+  questions: ExamQuestion[];
+  reply?: string;
+}
+
 export interface Exam {
   id: string;
   classId: string | null;
@@ -104,6 +114,7 @@ export interface ExamAnswer {
   isPartial: boolean;
   gainedPoints: number;
   feedback: string;
+  gradedBy?: 'auto' | 'ai' | 'teacher';
 }
 
 export interface ExamListItem {
@@ -178,13 +189,16 @@ export const examsApi = {
   },
 
   // AI 편집(문항 추가/수정 등 자연어 지시). exam-generate mode:'revise'
-  async revise(input: { materialText: string; instruction: string; questions: ExamQuestion[]; targetLabel?: string; topic?: string; difficulty?: string }): Promise<ExamQuestion[]> {
+  async revise(input: { materialText: string; instruction: string; questions: ExamQuestion[]; targetLabel?: string; topic?: string; difficulty?: string; chatHistory?: ExamAiChatMessage[] }): Promise<ExamAiRevisionResult> {
     const { data, error } = await supabase.functions.invoke('exam-generate', {
       body: { mode: 'revise', ...input, difficulty: DIFFICULTY_TO_DB[input.difficulty ?? '보통'] ?? 'normal' },
     });
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
-    return arr<Row>(data?.questions).map(toQuestion);
+    return {
+      questions: arr<Row>(data?.questions).map(toQuestion),
+      reply: typeof data?.reply === 'string' && data.reply.trim() ? data.reply.trim() : undefined,
+    };
   },
 
   // 신규 시험 저장: growing_exams insert → 문항 insert. owner_id는 DB default(auth.uid()).
@@ -345,6 +359,7 @@ export const examsApi = {
         submissionId: String(r.submission_id), questionId: String(r.question_id),
         answer: (r.answer as number | string) ?? '', isCorrect: !!r.is_correct, isPartial: !!r.is_partial,
         gainedPoints: Number(r.gained_points ?? 0), feedback: String(r.feedback ?? ''),
+        gradedBy: r.graded_by === 'ai' || r.graded_by === 'teacher' ? r.graded_by : 'auto',
       }));
     }
     return { submissions: subs, answers };

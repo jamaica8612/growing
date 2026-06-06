@@ -8,6 +8,7 @@ const corsHeaders = {
 
 type Row = Record<string, unknown>;
 type AnswerValue = string | number;
+const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
 
 function jsonResponse(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj), {
@@ -31,7 +32,26 @@ function normalizeAnswer(value: unknown): AnswerValue {
   return '';
 }
 
-function gradeOne(question: Row, answer: AnswerValue) {
+interface GradeResult {
+  is_correct: boolean;
+  is_partial: boolean;
+  gained_points: number;
+  feedback: string | null;
+  graded_by: 'auto' | 'ai';
+}
+
+function stripFence(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return fenced ? fenced[1].trim() : text.trim();
+}
+
+function clampPoints(value: unknown, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(max, Math.round(n)));
+}
+
+function fallbackGradeOne(question: Row, answer: AnswerValue): GradeResult {
   const points = Number(question.points ?? 0);
   const correctAnswer = normalizeAnswer(question.answer);
   const hasChoices = Array.isArray(question.choices);
@@ -59,6 +79,88 @@ function gradeOne(question: Row, answer: AnswerValue) {
     feedback: isCorrect ? null : '어순, 핵심 어휘, 빠진 표현을 다시 확인해 보세요.',
     graded_by: 'auto',
   };
+}
+
+async function gradeWritingWithAi(question: Row, answer: AnswerValue): Promise<GradeResult | null> {
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  const actual = String(answer).trim();
+  if (!apiKey || !actual) return null;
+  const points = Number(question.points ?? 0);
+  const expected = String(normalizeAnswer(question.answer)).trim();
+  const prompt = `
+You are grading a Korean middle-school English academy writing answer.
+Return ONLY valid JSON:
+{
+  "gainedPoints": 0,
+  "isCorrect": false,
+  "isPartial": true,
+  "feedback": "Korean one-sentence feedback for the student"
+}
+
+Rules:
+- Max points: ${points}
+- Award full points only when the student's answer is meaningfully equivalent to the model answer.
+- Award partial points for answers with useful correct grammar/vocabulary but missing words, wrong order, or small expression errors.
+- Award 0 for blank, unrelated, or mostly incorrect answers.
+- Feedback must be short Korean and mention what to check.
+- This is an AI draft grade. Be conservative.
+
+Question:
+${String(question.prompt ?? '')}
+
+Passage:
+${String(question.passage ?? '')}
+
+Model answer:
+${expected}
+
+Student answer:
+${actual}
+`.trim();
+
+  let lastError: unknown = null;
+  for (const model of MODELS) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generationConfig: {
+            temperature: 0.15,
+            responseMimeType: 'application/json',
+          },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message ?? `Gemini ${res.status}`);
+      const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join('\n') ?? '';
+      const parsed = JSON.parse(stripFence(text)) as { gainedPoints?: unknown; isCorrect?: unknown; isPartial?: unknown; feedback?: unknown };
+      const gained = clampPoints(parsed.gainedPoints, points);
+      const isCorrect = Boolean(parsed.isCorrect) || gained >= points;
+      const isPartial = !isCorrect && (Boolean(parsed.isPartial) || gained > 0);
+      return {
+        is_correct: isCorrect,
+        is_partial: isPartial,
+        gained_points: isCorrect ? points : gained,
+        feedback: isCorrect ? null : typeof parsed.feedback === 'string' && parsed.feedback.trim() ? parsed.feedback.trim().slice(0, 240) : '어순, 핵심 어휘, 빠진 표현을 다시 확인해 보세요.',
+        graded_by: 'ai',
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  console.warn('AI writing grade failed; falling back to rule grade', lastError);
+  return null;
+}
+
+async function gradeOne(question: Row, answer: AnswerValue): Promise<GradeResult> {
+  const hasChoices = Array.isArray(question.choices);
+  if (!hasChoices) {
+    const aiGrade = await gradeWritingWithAi(question, answer);
+    if (aiGrade) return aiGrade;
+  }
+  return fallbackGradeOne(question, answer);
 }
 
 Deno.serve(async req => {
@@ -172,10 +274,10 @@ Deno.serve(async req => {
     const questions = questionsRes.data ?? [];
     if (questions.length === 0) return jsonResponse({ error: '아직 문항이 없는 시험입니다.' }, 422);
     const total = questions.reduce((sum, question) => sum + Number(question.points ?? 0), 0);
-    const graded = questions.map(question => {
+    const graded = await Promise.all(questions.map(async question => {
       const answer = normalizeAnswer(answers[question.id as string]);
-      return { question, answer, grade: gradeOne(question, answer) };
-    });
+      return { question, answer, grade: await gradeOne(question, answer) };
+    }));
     const score = graded.reduce((sum, item) => sum + item.grade.gained_points, 0);
 
     const { data: submission, error: submissionError } = await supabase

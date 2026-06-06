@@ -10,7 +10,7 @@ import {
   Clock, ArrowRight, RotateCw, User, Hand,
 } from 'lucide-react';
 import type { Class, Student } from '../types';
-import { examsApi, type ExamQuestion as SdkQuestion, type ExamStatus, type ExamListItem, type ExamSubmission as DbSubmission, type ExamAnswer as DbAnswer } from '../lib/exams';
+import { examsApi, type ExamQuestion as SdkQuestion, type ExamStatus, type ExamListItem, type ExamSubmission as DbSubmission, type ExamAnswer as DbAnswer, type ExamAiChatMessage } from '../lib/exams';
 import './Exams.css';
 
 /* ===========================================================================
@@ -141,7 +141,7 @@ const JOIN_URL = 'growing.kr/t/ABC123';
 const getQrImageUrl = (value: string) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=18&data=${encodeURIComponent(value)}`;
 
-interface PerQ { correct: boolean; partial?: boolean; gained?: number; answer: number | string; feedback?: string | null; type: 'mcq' | 'write' }
+interface PerQ { correct: boolean; partial?: boolean; gained?: number; answer: number | string; feedback?: string | null; type: 'mcq' | 'write'; gradedBy?: 'auto' | 'ai' | 'teacher' }
 interface Submission { id?: string; no: number; name: string; time: string; score: number; totalPoints: number; submitted: boolean; perQ: Record<string, PerQ> }
 
 const emptyPerQ = (question: Question): PerQ => ({
@@ -151,6 +151,7 @@ const emptyPerQ = (question: Question): PerQ => ({
   answer: question.choices ? -1 : '(미응답)',
   feedback: null,
   type: question.choices ? 'mcq' : 'write',
+  gradedBy: 'auto',
 });
 
 const clampPct = (value: number) => Math.max(0, Math.min(100, value));
@@ -409,7 +410,7 @@ function CreateExam({ classes, onGenerate }: { classes: Class[]; onGenerate: (m:
             </Field>
 
             <Field icon={<Sparkles size={16} color="var(--primary-light)" />} label="선생님 요청" hint="선택 — 출제 방식, 강조, 피할 유형 등을 자유롭게 적어요">
-              <textarea className="input" value={teacherRequest} onChange={e => setTeacherRequest(e.target.value)} style={{ minHeight: 72, fontSize: 14, lineHeight: 1.55 }} placeholder="예: 동명사 중심으로, 보기에는 헷갈리는 오답을 넣고, 중요한 표현은 **굵게** 표시해줘" />
+              <textarea className="input" value={teacherRequest} onChange={e => setTeacherRequest(e.target.value)} style={{ minHeight: 72, fontSize: 14, lineHeight: 1.55 }} placeholder="예: 동명사 중심으로 출제하고, 보기에는 헷갈리는 오답을 넣어줘" />
             </Field>
 
             <div className="exam-col2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
@@ -577,18 +578,55 @@ function MetaPill({ icon, label, value }: { icon: React.ReactNode; label: string
 
 interface Chip { label: string; icon: React.ReactNode; act: 'add' | 'harder' | 'reveal'; type?: QType; n?: number }
 
+interface AiChatMessage {
+  id: string;
+  role: 'teacher' | 'assistant';
+  text: string;
+  pending?: boolean;
+  error?: boolean;
+}
+
 function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDistribute }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onSave: () => void; onDistribute: () => void }) {
   const isMobile = useIsMobile();
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatIdRef = useRef(0);
   const [dockOpen, setDockOpen] = useState(false);
   const [mode, setMode] = useState<'student' | 'teacher'>('student');
   const [editId, setEditId] = useState<string | null>(null);
   const [printMenu, setPrintMenu] = useState(false);
   const [dockText, setDockText] = useState('');
-  const [aiNote, setAiNote] = useState('퀵칩을 누르거나 원하는 문제를 입력하면, 자료 범위 안에서 편집해 드려요.');
+  const [chatMessages, setChatMessages] = useState<AiChatMessage[]>([
+    {
+      id: 'hello',
+      role: 'assistant',
+      text: '시험지를 보면서 같이 다듬을게요. “3번 문제를 더 쉽게”, “서술형 2문항 추가”처럼 편하게 말해 주세요.',
+    },
+  ]);
   const [busy, setBusy] = useState(false);
   const [newId, setNewId] = useState<string | null>(null);
   const reveals = mode === 'teacher' && reveal;
   const total = exam.questions.reduce((s, q) => s + q.points, 0);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [chatMessages, dockOpen, busy]);
+
+  const makeChatId = () => {
+    chatIdRef.current += 1;
+    return `chat-${chatIdRef.current}`;
+  };
+  const toAiHistory = (messages: AiChatMessage[]): ExamAiChatMessage[] => messages
+    .filter(message => !message.pending && !message.error)
+    .slice(-12)
+    .map(message => ({ role: message.role, content: message.text }));
+
+  const appendLocalChat = (teacherText: string, assistantText: string) => {
+    setChatMessages(messages => [
+      ...messages,
+      { id: makeChatId(), role: 'teacher', text: teacherText },
+      { id: makeChatId(), role: 'assistant', text: assistantText },
+    ]);
+  };
 
   const changeQ = (q: Question) => setExam(e => e ? { ...e, questions: e.questions.map(x => x.id === q.id ? q : x) } : e);
   const delQ = (id: string) => setExam(e => e ? { ...e, questions: e.questions.filter(x => x.id !== id) } : e);
@@ -602,10 +640,14 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDi
     q.explanation,
   ].filter(Boolean).join('\n')).join('\n\n');
 
-  const applyAiRevision = async (instruction: string) => {
+  const applyAiRevision = async (instruction: string, teacherText = instruction) => {
     if (busy) return;
+    const teacherMessage: AiChatMessage = { id: makeChatId(), role: 'teacher', text: teacherText };
+    const pendingId = makeChatId();
+    const pendingMessage: AiChatMessage = { id: pendingId, role: 'assistant', text: '문항을 다시 읽고 있어요…', pending: true };
+    const historySeed = [...chatMessages, teacherMessage];
+    setChatMessages([...historySeed, pendingMessage]);
     setBusy(true);
-    setAiNote('AI가 선생님 요청을 반영해 문항을 다시 다듬는 중…');
     try {
       const revised = await examsApi.revise({
         materialText: materialForRevision(),
@@ -614,8 +656,9 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDi
         targetLabel: exam.target,
         topic: exam.topic,
         difficulty: exam.difficulty,
+        chatHistory: toAiHistory(historySeed),
       });
-      const questions = fromSdkQuestions(revised);
+      const questions = fromSdkQuestions(revised.questions);
       if (questions.length === 0) throw new Error('AI가 문항을 만들지 못했어요. 요청을 조금 더 구체적으로 적어 주세요.');
       setExam(e => e ? {
         ...e,
@@ -624,33 +667,44 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDi
       } : e);
       setEditId(null);
       setNewId(questions[0]?.id ?? null);
-      setAiNote('선생님 요청을 반영했어요. 필요하면 다시 한 문장으로 더 지시해 주세요.');
+      const reply = revised.reply ?? '반영했어요. 이어서 더 다듬고 싶은 부분을 말해 주세요.';
+      setChatMessages(messages => messages.map(message => message.id === pendingId ? { ...message, text: reply, pending: false } : message));
     } catch (e) {
-      setAiNote(errMsg(e));
+      const message = errMsg(e);
+      setChatMessages(messages => messages.map(item => item.id === pendingId ? { ...item, text: message, pending: false, error: true } : item));
     } finally {
       setBusy(false);
     }
   };
 
   const addQuestions = (type: QType, n: number) => {
-    void applyAiRevision(`${TYPE_META[type].label} ${n}문항을 추가해줘. 기존 좋은 문항은 유지하고, 자료 범위 안에서 새 문항을 자연스럽게 더해줘.`);
+    const instruction = `${TYPE_META[type].label} ${n}문항을 추가해줘. 기존 좋은 문항은 유지하고, 자료 범위 안에서 새 문항을 자연스럽게 더해줘.`;
+    void applyAiRevision(instruction, `${TYPE_META[type].label} ${n}문항 추가해줘`);
   };
 
   const toggleReveal = () => {
     setReveal(r => {
       const nx = !r;
       if (nx) setMode('teacher');
-      setAiNote(nx ? '정답과 해설을 모두 표시했어요. 선생님용 보기예요.' : '정답을 다시 숨겼어요.');
       return nx;
     });
   };
 
+  const setRevealFromChat = (teacherText: string, desired: boolean) => {
+    const reply = reveal === desired
+      ? desired ? '이미 정답과 해설이 표시되어 있어요.' : '이미 정답이 숨겨져 있어요.'
+      : desired ? '정답과 해설을 표시했어요. 선생님용 보기로 전환했어요.' : '정답을 다시 숨겼어요.';
+    appendLocalChat(teacherText, reply);
+    if (desired) setMode('teacher');
+    setReveal(desired);
+  };
+
   const runChip = (c: Chip) => {
     if (c.act === 'add' && c.type && c.n) addQuestions(c.type, c.n);
-    else if (c.act === 'reveal') toggleReveal();
+    else if (c.act === 'reveal') setRevealFromChat(c.label, !reveal);
     else if (c.act === 'harder') {
       setExam(e => e ? { ...e, difficulty: '어려움' } : e);
-      void applyAiRevision('전체 문항의 난이도를 한 단계 높여줘. 단, 자료 밖 내용은 넣지 말고 기존 문항 의도는 유지해줘.');
+      void applyAiRevision('전체 문항의 난이도를 한 단계 높여줘. 단, 자료 밖 내용은 넣지 말고 기존 문항 의도는 유지해줘.', '난이도를 한 단계 높여줘');
     }
   };
 
@@ -658,8 +712,8 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDi
     const t = dockText.trim();
     if (!t) return;
     setDockText('');
-    if (/정답|해설|답.*보/.test(t) && !/숨/.test(t)) { if (!reveal) toggleReveal(); return; }
-    if (/숨기|가려|숨겨/.test(t)) { if (reveal) toggleReveal(); else setAiNote('이미 정답이 숨겨져 있어요.'); return; }
+    if (/정답|해설|답.*보/.test(t) && !/숨/.test(t)) { setRevealFromChat(t, true); return; }
+    if (/숨기|가려|숨겨/.test(t)) { setRevealFromChat(t, false); return; }
     void applyAiRevision(t);
   };
 
@@ -739,15 +793,35 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDi
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 11 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(150deg,#2c6f52,#10b981)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>{busy ? <div className="spin" style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%' }} /> : <Sparkles size={15} color="#fff" />}</div>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#cfe7da', fontWeight: 500, lineHeight: 1.4 }}>{aiNote}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#cfe7da', fontWeight: 500, lineHeight: 1.4 }}>AI 편집 대화</span>
                 {isMobile && <button onClick={() => setDockOpen(false)} title="접기" style={{ flexShrink: 0, border: 'none', background: 'transparent', display: 'grid', placeItems: 'center', width: 28, height: 28 }}><ChevronDown size={18} color="#9fcfb4" /></button>}
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 11 }}>
-                {chips.map((c, i) => <button key={i} className="dock-chip" onClick={() => runChip(c)}>{c.icon}{c.label}</button>)}
+              <div className="dock-chat-log" role="log" aria-live="polite">
+                {chatMessages.map(message => (
+                  <div key={message.id} className={`dock-msg ${message.role}${message.pending ? ' pending' : ''}${message.error ? ' error' : ''}`}>
+                    <MarkdownText text={message.text} />
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
               </div>
-              <div style={{ display: 'flex', gap: 9 }}>
-                <input className="dock-input" value={dockText} onChange={e => setDockText(e.target.value)} placeholder="원하는 문제를 입력하세요…  예: “동명사 서술형 2문제 추가”" onKeyDown={e => { if (e.key === 'Enter') onDockSend(); }} />
-                <button className="dock-send" onClick={onDockSend} disabled={!dockText.trim()}><Send size={20} color="#06281a" /></button>
+              <div className="dock-chip-row">
+                {chips.map((c, i) => <button key={i} className="dock-chip" onClick={() => runChip(c)} disabled={busy && c.act !== 'reveal'}>{c.icon}{c.label}</button>)}
+              </div>
+              <div className="dock-compose">
+                <textarea
+                  className="dock-input dock-textarea"
+                  value={dockText}
+                  onChange={e => setDockText(e.target.value)}
+                  placeholder="예: 3번 문제를 더 쉽게 바꿔줘 / 독해 2문항 추가해줘"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      onDockSend();
+                    }
+                  }}
+                  disabled={busy}
+                />
+                <button className="dock-send" onClick={onDockSend} disabled={busy || !dockText.trim()}><Send size={20} color="#06281a" /></button>
               </div>
             </>
           )}
@@ -941,6 +1015,14 @@ function Ring({ score, totalPoints = 100, size = 92, stroke = 9 }: { score: numb
   );
 }
 
+type GradeMark = 'correct' | 'partial' | 'wrong';
+
+function GradePencilMark({ mark }: { mark: GradeMark }) {
+  if (mark === 'correct') return <CheckCircle2 size={42} />;
+  if (mark === 'partial') return <span>△</span>;
+  return <X size={44} />;
+}
+
 function ParentGuideModal({ exam, sub, onClose, onSendGuideToMessaging }: { exam: Exam; sub: Submission; onClose: () => void; onSendGuideToMessaging?: (content: string) => void }) {
   const canCreateResultLink = Boolean(sub.id && isSavedId(exam.id));
   const buildGuideText = async () => {
@@ -1034,7 +1116,8 @@ function ResultDetail({ exam, sub, onBack, onSendGuideToMessaging }: { exam: Exa
         const pq = sub.perQ[q.id] ?? emptyPerQ(q);
         const ok = pq.correct, partial = pq.partial;
         return (
-          <div key={q.id} className="card" style={{ padding: 24, marginBottom: 14, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
+          <div key={q.id} className="card graded-paper" data-mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} style={{ padding: 24, marginBottom: 14, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
+            <div className="red-pen-mark" aria-hidden="true"><GradePencilMark mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} /></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
               <div className="num-font h-font" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 700 }}>{i + 1}</div>
               <span className={'badge ' + TYPE_META[q.type].cls}>{TYPE_META[q.type].label}</span>
@@ -1058,7 +1141,7 @@ function ResultDetail({ exam, sub, onBack, onSendGuideToMessaging }: { exam: Exa
             {pq.type === 'write' && pq.feedback && (
               <div style={{ marginTop: 12, display: 'flex', gap: 9, padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 11 }}>
                 <Sparkles size={16} color="var(--warning)" style={{ flexShrink: 0, marginTop: 1 }} />
-                <div><span style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>AI 첨삭 · </span><span style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.55 }}>{pq.feedback}</span></div>
+                <div><span style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{pq.gradedBy === 'ai' ? 'AI 초안 채점 · 선생님 확인 권장 · ' : '자동 첨삭 · '}</span><span style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.55 }}>{pq.feedback}</span></div>
               </div>
             )}
             {q.explanation && (
@@ -1185,7 +1268,7 @@ function Results({ exam, submissions, onParentPreview, onRefresh, onSendGuideToM
 }
 
 // ===========================================================================
-// 화면 6: 학생 응시 (태블릿, 무로그인) — 데모
+// 화면 6: 학생 응시 (무로그인 공개 응시)
 // ===========================================================================
 function gradeSubmission(exam: Exam, answers: Record<string, number | string>, student: RosterStudent): Submission {
   const perQ: Record<string, PerQ> = {};
@@ -1196,14 +1279,14 @@ function gradeSubmission(exam: Exam, answers: Record<string, number | string>, s
       const selectedIndex = choiceAnswerIndex(a);
       const correctIndex = choiceAnswerIndex(q.answer);
       const ok = selectedIndex >= 0 && correctIndex >= 0 && selectedIndex === correctIndex;
-      perQ[q.id] = { correct: ok, answer: selectedIndex, type: 'mcq' };
+      perQ[q.id] = { correct: ok, answer: selectedIndex, type: 'mcq', gradedBy: 'auto' };
       if (ok) score += q.points;
     } else {
       const txt = String(answers[q.id] ?? '').trim();
       const ans = String(q.answer ?? '');
       const ok = txt.toLowerCase().replace(/[.\s]+$/, '') === ans.toLowerCase().replace(/[.\s]+$/, '');
       const pts = ok ? q.points : (txt ? Math.round(q.points * 0.5) : 0);
-      perQ[q.id] = { correct: ok, partial: !ok && !!txt, gained: pts, answer: txt || '(미응답)', feedback: ok ? null : '정답 문장과 비교해 어순·표현을 다시 확인해 보세요.', type: 'write' };
+      perQ[q.id] = { correct: ok, partial: !ok && !!txt, gained: pts, answer: txt || '(미응답)', feedback: ok ? null : '정답 문장과 비교해 어순·표현을 다시 확인해 보세요.', type: 'write', gradedBy: 'auto' };
       score += pts;
     }
   });
@@ -1233,7 +1316,7 @@ function StudentApp({
   onSubmit: (s: Submission, answers: Record<string, number | string>, student: RosterStudent) => void | Promise<void>;
   onExit: () => void;
 }) {
-  const [orient, setOrient] = useState<'landscape' | 'portrait'>('landscape');
+  const isMobile = useIsMobile();
   const [stage, setStage] = useState<StudentStage>('enter');
   const [student, setStudent] = useState<RosterStudent | null>(null);
   const [idx, setIdx] = useState(0);
@@ -1241,9 +1324,7 @@ function StudentApp({
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const land = orient === 'landscape';
-  const screenW = land ? 940 : 700;
-  const screenH = land ? 660 : 940;
+  const land = !isMobile;
 
   const q = exam.questions[idx];
   const answered = exam.questions.filter(qq => answers[qq.id] != null && answers[qq.id] !== '').length;
@@ -1413,22 +1494,13 @@ function StudentApp({
   }
 
   return (
-    <div className="tablet-stage">
-      <div className="exam-pagepad" style={{ width: '100%', maxWidth: screenW + 32, padding: '0 16px', marginBottom: 8 }}>
-        {showExit && <button className="btn btn-ghost" onClick={onExit} style={{ height: 36 }}><ChevronRight size={15} style={{ transform: 'rotate(180deg)' }} /> 배포 화면으로</button>}
+    <div className="student-fullscreen">
+      {showExit && (
+      <div className="student-exitbar">
+        <button className="btn btn-ghost" onClick={onExit} style={{ height: 36 }}><ChevronRight size={15} style={{ transform: 'rotate(180deg)' }} /> 배포 화면으로</button>
       </div>
-      <div className="tablet-bezel" style={{ width: screenW + 32, maxWidth: '100%' }}>
-        <div className="tablet-screen" style={{ width: screenW, maxWidth: '100%', height: screenH, maxHeight: 'calc(100vh - 200px)' }}>{body}</div>
-      </div>
-      <div style={{ position: 'fixed', bottom: 18, right: 18, zIndex: 200 }}>
-        <div className="segment" style={{ background: '#fff', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }}>
-          {([['landscape', '가로'], ['portrait', '세로']] as const).map(([k, lb]) => (
-            <button key={k} data-on={orient === k} onClick={() => setOrient(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-              <Tablet size={16} color={orient === k ? 'var(--primary)' : 'var(--text-2)'} style={{ transform: k === 'landscape' ? 'rotate(90deg)' : 'none' }} />{lb}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
+      <div className="student-screen-full">{body}</div>
     </div>
   );
 }
@@ -1515,7 +1587,8 @@ function ParentResult({ exam, submissions, onExit, showExit = true }: { exam: Ex
           const pq = sub.perQ[q.id] ?? emptyPerQ(q);
           const ok = pq.correct, partial = pq.partial;
           return (
-            <div key={q.id} className="card" style={{ padding: 20, marginBottom: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
+            <div key={q.id} className="card graded-paper" data-mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} style={{ padding: 20, marginBottom: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
+              <div className="red-pen-mark" aria-hidden="true"><GradePencilMark mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 11, flexWrap: 'wrap' }}>
                 <div className="num-font h-font" style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--primary)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13.5, fontWeight: 700 }}>{i + 1}</div>
                 <span className={'badge ' + TYPE_META[q.type].cls}>{TYPE_META[q.type].label}</span>
@@ -1537,7 +1610,7 @@ function ParentResult({ exam, submissions, onExit, showExit = true }: { exam: Ex
               {pq.type === 'write' && pq.feedback && (
                 <div style={{ marginTop: 11, display: 'flex', gap: 8, padding: '11px 13px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
                   <Sparkles size={15} color="var(--warning)" style={{ flexShrink: 0, marginTop: 1 }} />
-                  <div><span style={{ fontSize: 11.5, fontWeight: 700, color: '#b45309' }}>AI 첨삭 · </span><span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{pq.feedback}</span></div>
+                  <div><span style={{ fontSize: 11.5, fontWeight: 700, color: '#b45309' }}>{pq.gradedBy === 'ai' ? 'AI 초안 채점 · 선생님 확인 권장 · ' : '자동 첨삭 · '}</span><span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{pq.feedback}</span></div>
                 </div>
               )}
               {q.explanation && <div style={{ marginTop: 11, display: 'flex', gap: 7 }}><span style={{ fontWeight: 700, fontSize: 11.5, color: 'var(--mint)', flexShrink: 0, marginTop: 1 }}>해설</span><span style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-2)' }}><MarkdownText text={q.explanation} /></span></div>}
@@ -1597,6 +1670,7 @@ const submissionsFromDb = (exam: Exam, dbSubmissions: DbSubmission[], dbAnswers:
         answer: question.choices ? choiceAnswerIndex(rawAnswer) : String(rawAnswer || '(미응답)'),
         feedback: answer?.feedback || null,
         type: question.choices ? 'mcq' : 'write',
+        gradedBy: answer?.gradedBy ?? 'auto',
       };
     });
     return {
@@ -1663,6 +1737,7 @@ const publicResultPayloadToView = (payload: PublicResultPayload): { exam: Exam; 
   questions.forEach(question => {
     const answer = answersByQuestion.get(question.id);
     const rawAnswer = answer?.answer ?? '';
+    const gradedBy = String(answer?.graded_by ?? 'auto');
     perQ[question.id] = {
       correct: Boolean(answer?.is_correct),
       partial: Boolean(answer?.is_partial),
@@ -1670,6 +1745,7 @@ const publicResultPayloadToView = (payload: PublicResultPayload): { exam: Exam; 
       answer: question.choices ? choiceAnswerIndex(rawAnswer) : String(rawAnswer || '(미응답)'),
       feedback: answer?.feedback ? String(answer.feedback) : null,
       type: question.choices ? 'mcq' : 'write',
+      gradedBy: gradedBy === 'ai' || gradedBy === 'teacher' ? gradedBy : 'auto',
     };
   });
   const examRow = payload.exam;

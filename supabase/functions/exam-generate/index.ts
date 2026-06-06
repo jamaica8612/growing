@@ -23,6 +23,16 @@ interface ExamQuestionDraft {
   explanation: string;
 }
 
+interface ChatMessage {
+  role: 'teacher' | 'assistant';
+  content: string;
+}
+
+interface AiResult {
+  questions: ExamQuestionDraft[];
+  reply?: string;
+}
+
 function jsonResponse(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj), {
     status,
@@ -41,12 +51,12 @@ function stripFence(text: string): string {
   return fenced ? fenced[1].trim() : text.trim();
 }
 
-function parseQuestions(text: string): ExamQuestionDraft[] {
+function parseQuestions(text: string): AiResult {
   const raw = stripFence(text);
-  const parsed = JSON.parse(raw) as { questions?: ExamQuestionDraft[] } | ExamQuestionDraft[];
+  const parsed = JSON.parse(raw) as { questions?: ExamQuestionDraft[]; reply?: string } | ExamQuestionDraft[];
   const questions = Array.isArray(parsed) ? parsed : parsed.questions;
   if (!Array.isArray(questions)) throw new Error('AI 응답에 questions 배열이 없습니다.');
-  return questions.map((q, index) => {
+  const normalized = questions.map((q, index) => {
     const type = QUESTION_TYPES.includes(q.type) ? q.type : 'vocab';
     const choices = type === 'writing' ? null : Array.isArray(q.choices) ? q.choices.map(String).slice(0, 5) : null;
     const rawAnswer = Number(q.answer);
@@ -65,9 +75,13 @@ function parseQuestions(text: string): ExamQuestionDraft[] {
       explanation: String(q.explanation || '').trim(),
     };
   }).filter(q => q.prompt && q.source && String(q.answer).length > 0 && (q.type === 'writing' || (Array.isArray(q.choices) && q.choices.length >= 2)));
+  return {
+    questions: normalized,
+    reply: !Array.isArray(parsed) && typeof parsed.reply === 'string' && parsed.reply.trim() ? parsed.reply.trim() : undefined,
+  };
 }
 
-async function callGemini(prompt: string): Promise<ExamQuestionDraft[]> {
+async function callGemini(prompt: string): Promise<AiResult> {
   const apiKey = requiredEnv('GEMINI_API_KEY');
   let lastError: unknown = null;
   for (const model of MODELS) {
@@ -106,13 +120,19 @@ function buildPrompt(payload: {
   types: QuestionType[];
   instruction?: string;
   questions?: ExamQuestionDraft[];
+  chatHistory?: ChatMessage[];
 }) {
   const count = Math.max(1, Math.min(Number(payload.count) || 8, 16));
   const types = payload.types.length ? payload.types : QUESTION_TYPES;
+  const chat = (payload.chatHistory ?? [])
+    .slice(-12)
+    .map(message => `${message.role === 'teacher' ? 'Teacher' : 'AI'}: ${message.content}`)
+    .join('\n') || 'No prior conversation.';
   return `
 You are an English academy exam writer for Korean middle-school students.
 Return ONLY valid JSON in this shape:
 {
+  "reply": "Korean one-sentence reply to the teacher about what you changed",
   "questions": [
     {
       "orderNo": 1,
@@ -131,11 +151,13 @@ Return ONLY valid JSON in this shape:
 Rules:
 - Use ONLY the provided material. Do not invent facts, names, grammar points, or vocabulary that are not grounded in the material.
 - Follow the teacher instruction flexibly unless it conflicts with the material-only rule, JSON schema, or requested question count/types.
+- Treat this as an ongoing teacher-AI conversation. Use the recent conversation for references like "아까", "그 수준", "방금", or "3번만". The latest teacher instruction has priority.
 - Every question MUST include a concrete Korean source label in "source".
 - Multiple-choice answers use 0-based index.
 - Writing questions must use choices: null and answer: a model answer string.
 - Make questions look like real Korean English academy test questions.
 - Keep explanations concise and useful for teacher review.
+- The "reply" must be short, conversational Korean. Mention the main edit and invite the teacher to continue. Do not include any extra text outside JSON.
 - You may use Markdown emphasis like **important expression** in prompt, passage, choices, answer, or explanation when the teacher asks for emphasis or when it improves readability. Do not use HTML.
 - Difficulty: ${payload.difficulty}
 - Target: ${payload.targetLabel}
@@ -146,6 +168,9 @@ Rules:
 ${payload.mode === 'revise' ? `
 Current draft questions:
 ${JSON.stringify(payload.questions ?? [], null, 2)}
+
+Recent teacher-AI conversation:
+${chat}
 
 Teacher chat instruction:
 ${payload.instruction ?? ''}
@@ -160,6 +185,21 @@ ${payload.instruction?.trim() || 'No additional teacher instruction.'}
 Material:
 ${payload.materialText.slice(0, 16000)}
 `.trim();
+}
+
+function cleanChatHistory(value: unknown): ChatMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as { role?: unknown; content?: unknown };
+      const role = row.role === 'teacher' || row.role === 'assistant' ? row.role : null;
+      const content = typeof row.content === 'string' ? row.content.trim() : '';
+      if (!role || !content) return null;
+      return { role, content: content.slice(0, 800) };
+    })
+    .filter((item): item is ChatMessage => item !== null)
+    .slice(-12);
 }
 
 Deno.serve(async req => {
@@ -184,11 +224,12 @@ Deno.serve(async req => {
     types?: QuestionType[];
     instruction?: string;
     questions?: ExamQuestionDraft[];
+    chatHistory?: ChatMessage[];
   } | null;
   if (!payload?.materialText?.trim()) return jsonResponse({ error: '자료 텍스트가 필요합니다.' }, 400);
 
   try {
-    const questions = await callGemini(buildPrompt({
+    const result = await callGemini(buildPrompt({
       mode: payload.mode ?? 'generate',
       materialText: payload.materialText,
       title: payload.title ?? 'Online exam',
@@ -199,8 +240,9 @@ Deno.serve(async req => {
       types: (payload.types ?? []).filter(type => QUESTION_TYPES.includes(type)),
       instruction: payload.instruction,
       questions: payload.questions,
+      chatHistory: cleanChatHistory(payload.chatHistory),
     }));
-    return jsonResponse({ questions });
+    return jsonResponse({ questions: result.questions, reply: result.reply });
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : 'AI 출제에 실패했습니다.' }, 500);
   }

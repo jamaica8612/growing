@@ -170,12 +170,64 @@
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: all .14s ease;
 }
 .exam-app .dock-chip:hover { background: rgba(132,204,22,.2); border-color: rgba(132,204,22,.55); color: #eaf7d8; }
+.exam-app .dock-chip:disabled { opacity: .42; cursor: not-allowed; }
+.exam-app .dock-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0 11px;
+}
+.exam-app .dock-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 210px;
+  overflow: auto;
+  padding: 2px 2px 4px;
+}
+.exam-app .dock-msg {
+  max-width: min(88%, 620px);
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 13px;
+  padding: 9px 12px;
+  color: #e7f5ec;
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.exam-app .dock-msg p { margin: 0; }
+.exam-app .dock-msg.teacher {
+  align-self: flex-end;
+  background: rgba(16,185,129,.2);
+  border-color: rgba(16,185,129,.35);
+}
+.exam-app .dock-msg.assistant {
+  align-self: flex-start;
+  background: rgba(255,255,255,.07);
+}
+.exam-app .dock-msg.pending { color: #bcdac9; }
+.exam-app .dock-msg.error {
+  color: #ffe1e1;
+  background: rgba(239,68,68,.16);
+  border-color: rgba(239,68,68,.32);
+}
+.exam-app .dock-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+}
 .exam-app .dock-input {
   flex: 1; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
   border-radius: 13px; color: #fff; font-size: 14.5px; padding: 13px 16px;
 }
 .exam-app .dock-input::placeholder { color: #6ba889; }
 .exam-app .dock-input:focus { outline: none; border-color: var(--mint); background: rgba(255,255,255,.13); }
+.exam-app .dock-textarea {
+  min-height: 48px;
+  max-height: 132px;
+  resize: vertical;
+  line-height: 1.45;
+}
 .exam-app .dock-send { width: 48px; height: 48px; flex-shrink: 0; border: none; border-radius: 13px; background: var(--mint); display: grid; place-items: center; transition: background .14s; }
 .exam-app .dock-send:hover { background: #0fa372; }
 .exam-app .dock-send:disabled { opacity: .4; }
@@ -196,8 +248,78 @@
 .exam-app .qrate-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; }
 .exam-app .qrate-track { flex: 1; height: 10px; background: #eef3ef; border-radius: 99px; overflow: hidden; }
 .exam-app .qrate-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.22,.61,.36,1); }
+.exam-app .graded-paper {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+.exam-app .graded-paper::after {
+  content: "";
+  position: absolute;
+  top: -34px;
+  right: -30px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mark-color), transparent 88%);
+  pointer-events: none;
+}
+.exam-app .red-pen-mark {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 1;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--mark-color);
+  background: color-mix(in srgb, var(--mark-color), white 90%);
+  border: 1px solid color-mix(in srgb, var(--mark-color), white 68%);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--mark-color), transparent 86%);
+  opacity: .92;
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+.exam-app .red-pen-mark svg { stroke-width: 2.4; }
+.exam-app .red-pen-mark span {
+  font-family: var(--font-head);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+.exam-app .graded-paper[data-mark="correct"] { --mark-color: var(--success); }
+.exam-app .graded-paper[data-mark="wrong"] { --mark-color: var(--danger); }
+.exam-app .graded-paper[data-mark="partial"] { --mark-color: var(--warning); }
+.exam-app .graded-paper[data-mark="wrong"] .red-pen-mark { transform: rotate(4deg); }
+.exam-app .graded-paper[data-mark="partial"] .red-pen-mark {
+  transform: rotate(-5deg);
+}
 
-/* ---- 학생 응시 (태블릿 프레임) ---- */
+/* ---- 학생 응시 ---- */
+.exam-app .student-fullscreen {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.exam-app .student-exitbar {
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+.exam-app .student-screen-full {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg);
+}
 .exam-app .tablet-stage { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px 28px; }
 .exam-app .tablet-bezel { background: #0f2e21; border-radius: 38px; padding: 16px; box-shadow: 0 40px 90px rgba(15,46,33,.34), 0 0 0 1px rgba(0,0,0,.05); position: relative; }
 .exam-app .tablet-screen { background: var(--bg); border-radius: 22px; overflow: hidden; position: relative; }
