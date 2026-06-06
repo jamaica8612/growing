@@ -161,12 +161,6 @@ export const Messaging: React.FC<MessagingProps> = ({
     });
   }, [attendance, classes, counselLogs, currentStudent, noticeDate, noticeMonth, payments]);
 
-  const includeItems: Array<{ key: NoticeIncludeKey; label: string; meta: string }> = [
-    { key: 'attendance', label: '출결', meta: selectedMeta?.attendance ?? '선택일 출결' },
-    { key: 'homework', label: '과제', meta: selectedMeta?.homework ?? '선택일 과제' },
-    { key: 'makeup', label: '보강/보충', meta: selectedMeta?.makeup ?? '수행일 선택' },
-  ];
-
   const buildNoticeForStudent = (student: Student) => buildParentNoticeDraft({
     student,
     classes,
@@ -462,12 +456,18 @@ export const Messaging: React.FC<MessagingProps> = ({
             <div className="msg-section-title">포함 항목</div>
           </div>
           <div className="msg-include-list">
-            {includeItems.map(item => (
-              <button key={item.key} className={`msg-include ${include[item.key] ? 'on' : ''}`} onClick={() => toggleInclude(item.key)}>
-                <span className="msg-include-icon">{include[item.key] ? <CheckSquare size={16} /> : <Square size={16} />}</span>
-                <span><b>{item.label}</b><em>{item.meta}</em></span>
-              </button>
-            ))}
+            <div className="msg-include on locked">
+              <span className="msg-include-icon"><CheckSquare size={16} /></span>
+              <span><b>출결</b><em>{selectedMeta?.attendance ?? '선택일 출결'}</em></span>
+            </div>
+            <div className="msg-include on locked">
+              <span className="msg-include-icon"><CheckSquare size={16} /></span>
+              <span><b>과제</b><em>{selectedMeta?.homework ?? '선택일 과제'}</em></span>
+            </div>
+            <button className={`msg-include ${include.makeup ? 'on' : ''}`} onClick={() => toggleInclude('makeup')}>
+              <span className="msg-include-icon">{include.makeup ? <CheckSquare size={16} /> : <Square size={16} />}</span>
+              <span><b>보강/보충</b><em>{include.makeup ? selectedMeta?.makeup ?? '선택일 기록' : '필요할 때만 선택'}</em></span>
+            </button>
           </div>
         </section>
 

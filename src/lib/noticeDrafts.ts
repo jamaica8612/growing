@@ -54,53 +54,44 @@ const buildMakeupLine = (record: Attendance) => {
   return record.supplementMinutes ? `보충 ${record.supplementMinutes}분` : '';
 };
 
+const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
+  const attendance = rows.map(row => attendanceStatusLabel(row.status)).join(', ') || '기록 없음';
+  const checkIn = rows.map(row => row.checkInTime).filter(Boolean).join(', ') || '-';
+  const checkOut = rows.map(row => row.checkOutTime).filter(Boolean).join(', ') || '-';
+  const homework = rows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ') || '기록 없음';
+  const makeup = includeMakeup
+    ? rows.map(buildMakeupLine).filter(Boolean).join(', ') || '해당 없음'
+    : '해당 없음';
+
+  return { attendance, checkIn, checkOut, homework, makeup };
+};
+
 export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): NoticeDraftMeta => {
   const todayRows = input.attendance.filter(row => row.studentId === input.student.id && row.date === input.today);
-  const todayStatuses = todayRows.map(row => attendanceStatusLabel(row.status)).join(', ');
-  const todayHomework = todayRows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ');
-  const makeupSummary = todayRows.map(buildMakeupLine).filter(Boolean).join(', ');
+  const fields = summarizeDailyNoticeFields(todayRows, true);
 
   return {
-    attendance: todayStatuses || '해당일 출결 기록 없음',
-    homework: todayHomework || '해당일 과제 기록 없음',
-    makeup: makeupSummary || '선택일 보강/보충 기록 없음',
+    attendance: fields.attendance,
+    homework: fields.homework,
+    makeup: fields.makeup,
   };
 };
 
 export const buildParentNoticeDraft = (input: NoticeDraftInput): string => {
   const { student, attendance, today, include } = input;
   const todayRows = attendance.filter(row => row.studentId === student.id && row.date === today);
-  const lines: string[] = [
-    '안녕하세요, 그로잉영어입니다.',
-    '',
+  const fields = summarizeDailyNoticeFields(todayRows, include.makeup);
+  const lines = [
+    '[그로잉영어]',
     `${student.name} 학생의 ${formatDate(today)} 일일 종합알림장입니다.`,
     '',
+    `출결: ${fields.attendance}`,
+    `등원/하원: ${fields.checkIn} / ${fields.checkOut}`,
+    `과제: ${fields.homework}`,
+    `보강/보충: ${fields.makeup}`,
+    '',
+    '확인 부탁드립니다.',
+    '감사합니다.',
   ];
-
-  if (include.attendance) {
-    const todayStatuses = todayRows.map(row => attendanceStatusLabel(row.status)).join(', ') || '해당일 출결 기록 없음';
-    const checkIn = todayRows.map(row => row.checkInTime).filter(Boolean).join(', ') || '-';
-    const checkOut = todayRows.map(row => row.checkOutTime).filter(Boolean).join(', ') || '-';
-    lines.push('[출결]');
-    lines.push(`- ${formatDate(today)} 출결: ${todayStatuses}`);
-    lines.push(`- 등원/하원: ${checkIn} / ${checkOut}`);
-    lines.push('');
-  }
-
-  if (include.homework) {
-    const todayHomework = todayRows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ') || '해당일 과제 기록 없음';
-    lines.push('[과제]');
-    lines.push(`- ${formatDate(today)} 과제: ${todayHomework}`);
-    lines.push('');
-  }
-
-  if (include.makeup) {
-    const makeupSummary = todayRows.map(buildMakeupLine).filter(Boolean).join(', ');
-    lines.push('[보강/보충]');
-    lines.push(`- ${formatDate(today)} 기록: ${makeupSummary || '선택한 날짜에 보강/보충 기록 없음'}`);
-    lines.push('');
-  }
-
-  lines.push('가정에서도 확인 부탁드립니다. 감사합니다.');
   return lines.join('\n').replace(/\n{3,}/g, '\n\n');
 };
