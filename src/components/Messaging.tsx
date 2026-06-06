@@ -116,6 +116,8 @@ export const Messaging: React.FC<MessagingProps> = ({
   const [message, setMessage] = useState('');
   const [batchClassId, setBatchClassId] = useState('');
   const [batchDrafts, setBatchDrafts] = useState<BatchDraft[]>([]);
+  const [singleDraftKey, setSingleDraftKey] = useState('');
+  const [batchDraftKey, setBatchDraftKey] = useState('');
   const [noticeDate, setNoticeDate] = useState(() => todayLocal());
   const [isSending, setIsSending] = useState(false);
   const [isBatchSending, setIsBatchSending] = useState(false);
@@ -161,6 +163,20 @@ export const Messaging: React.FC<MessagingProps> = ({
     });
   }, [attendance, classes, counselLogs, currentStudent, noticeDate, noticeMonth, payments]);
 
+  const batchTargets = useMemo(() => {
+    if (!batchClassId) return activeStudents;
+    const targetClass = classes.find(cls => cls.id === batchClassId);
+    if (!targetClass) return [];
+    return activeStudents.filter(student => targetClass.studentIds.includes(student.id));
+  }, [activeStudents, batchClassId, classes]);
+
+  const includeKey = `${include.attendance ? '1' : '0'}:${include.homework ? '1' : '0'}:${include.makeup ? '1' : '0'}`;
+  const singleNoticeKey = `${selectedStudentId}:${noticeDate}:${includeKey}`;
+  const batchTargetKey = batchTargets.map(student => student.id).join(',');
+  const batchNoticeKey = `${batchClassId || 'all'}:${noticeDate}:${includeKey}:${batchTargetKey}`;
+  const isSingleDraftStale = Boolean(message.trim() && singleDraftKey && singleDraftKey !== singleNoticeKey);
+  const isBatchDraftStale = Boolean(batchDrafts.length > 0 && batchDraftKey && batchDraftKey !== batchNoticeKey);
+
   const buildNoticeForStudent = (student: Student) => buildParentNoticeDraft({
     student,
     classes,
@@ -171,13 +187,6 @@ export const Messaging: React.FC<MessagingProps> = ({
     today: noticeDate,
     include,
   });
-
-  const batchTargets = useMemo(() => {
-    if (!batchClassId) return activeStudents;
-    const targetClass = classes.find(cls => cls.id === batchClassId);
-    if (!targetClass) return [];
-    return activeStudents.filter(student => targetClass.studentIds.includes(student.id));
-  }, [activeStudents, batchClassId, classes]);
 
   const batchStats = useMemo(() => {
     const selected = batchDrafts.filter(draft => draft.selected);
@@ -255,6 +264,7 @@ export const Messaging: React.FC<MessagingProps> = ({
   const handleGenerate = () => {
     if (!currentStudent) return;
     setMessage(buildNoticeForStudent(currentStudent));
+    setSingleDraftKey(singleNoticeKey);
   };
 
   const handleGenerateBatch = () => {
@@ -270,6 +280,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     }));
     setMode('batch');
     setBatchDrafts(drafts);
+    setBatchDraftKey(batchNoticeKey);
   };
 
   const patchBatchDraft = (studentId: string, patch: Partial<BatchDraft>) => {
@@ -284,6 +295,10 @@ export const Messaging: React.FC<MessagingProps> = ({
 
   const handleSendComprehensiveAlimtalk = async () => {
     if (!currentStudent || !currentStudent.parentContact || !message.trim()) return;
+    if (isSingleDraftStale) {
+      alert('날짜, 학생 또는 포함 항목이 바뀌었습니다. 초안을 다시 만든 뒤 발송해 주세요.');
+      return;
+    }
     if (!window.confirm(`${currentStudent.name} 학생 학부모님께 일일 종합알림장을 발송할까요?`)) return;
     setIsSending(true);
     try {
@@ -308,6 +323,10 @@ export const Messaging: React.FC<MessagingProps> = ({
   const handleSendSelectedBatch = async () => {
     const targets = batchDrafts.filter(draft => draft.selected && draft.contact && draft.message.trim());
     if (targets.length === 0) return;
+    if (isBatchDraftStale) {
+      alert('날짜, 반 또는 포함 항목이 바뀌었습니다. 일괄 초안을 다시 만든 뒤 발송해 주세요.');
+      return;
+    }
     if (!window.confirm(`선택한 ${targets.length}명에게 일일 종합알림장을 발송할까요?`)) return;
     setIsBatchSending(true);
     for (const draft of targets) {
@@ -390,7 +409,7 @@ export const Messaging: React.FC<MessagingProps> = ({
             aria-label="알림장 기준일"
           />
           <button className="pay-btn primary" disabled={mode === 'single' ? !currentStudent : batchTargets.length === 0} onClick={mode === 'single' ? handleGenerate : handleGenerateBatch}>
-            <Sparkles size={15} /> 초안 만들기
+            <Sparkles size={15} /> {mode === 'single' && isSingleDraftStale ? '초안 다시 만들기' : mode === 'batch' && isBatchDraftStale ? '일괄 초안 다시 만들기' : '초안 만들기'}
           </button>
         </div>
       </section>
@@ -484,6 +503,9 @@ export const Messaging: React.FC<MessagingProps> = ({
                 onChange={e => setMessage(e.target.value)}
                 placeholder="학생을 선택하고 초안을 만들어 주세요."
               />
+              {isSingleDraftStale && (
+                <span className="msg-error-text">날짜, 학생 또는 포함 항목이 바뀌었습니다. 초안을 다시 만든 뒤 발송해 주세요.</span>
+              )}
               <div className="msg-send">
                 {currentStudent?.parentContact ? (
                   <a href={buildSMSLink(currentStudent.parentContact, message)} className="pay-btn ghost" style={{ textDecoration: 'none', pointerEvents: message.trim() ? 'auto' : 'none', opacity: message.trim() ? 1 : 0.5 }}>
@@ -492,7 +514,7 @@ export const Messaging: React.FC<MessagingProps> = ({
                 ) : (
                   <button className="pay-btn ghost" disabled><Send size={15} /> 연락처 필요</button>
                 )}
-                <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending}>
+                <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending || isSingleDraftStale}>
                   <Send size={15} /> {isSending ? '발송 요청 중' : '알림톡 보내기'}
                 </button>
               </div>
@@ -511,6 +533,10 @@ export const Messaging: React.FC<MessagingProps> = ({
               {batchDrafts.length === 0 ? (
                 <div className="msg-empty-panel">대상을 고른 뒤 초안을 생성하면 학생별 알림장이 여기에 표시됩니다.</div>
               ) : (
+                <>
+                {isBatchDraftStale && (
+                  <span className="msg-error-text">날짜, 반 또는 포함 항목이 바뀌었습니다. 일괄 초안을 다시 만든 뒤 발송해 주세요.</span>
+                )}
                 <div className="msg-batch-list">
                   {batchDrafts.map(draft => (
                     <div className={`msg-batch-row ${draft.selected ? 'sel' : ''} ${draft.expanded ? 'open' : ''}`} key={draft.studentId}>
@@ -554,6 +580,7 @@ export const Messaging: React.FC<MessagingProps> = ({
                     </div>
                   ))}
                 </div>
+                </>
               )}
             </>
           )}
@@ -566,7 +593,7 @@ export const Messaging: React.FC<MessagingProps> = ({
             <b>{batchStats.selected}명 선택</b>
             <span>발송 가능 {batchStats.sendable}명 · 완료 {batchStats.sent}명 · 실패 {batchStats.failed}명</span>
           </div>
-          <button className="pay-btn primary" onClick={() => void handleSendSelectedBatch()} disabled={batchStats.sendable === 0 || isBatchSending}>
+          <button className="pay-btn primary" onClick={() => void handleSendSelectedBatch()} disabled={batchStats.sendable === 0 || isBatchSending || isBatchDraftStale}>
             <Send size={15} /> {isBatchSending ? '발송 중' : '선택 발송'}
           </button>
         </div>
