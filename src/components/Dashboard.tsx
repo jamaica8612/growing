@@ -28,6 +28,7 @@ interface DashboardProps {
   attendance: Attendance[];
   payments: Payment[];
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id' | 'memo'> & { memo?: string }) => void;
+  onNavigate?: (tab: 'attendance' | 'makeup' | 'messaging' | 'payments') => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -36,6 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   attendance,
   payments,
   onSaveAttendance,
+  onNavigate,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -202,6 +204,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* ── 요약 타일 4개 ── */}
+      <section className="today-flow">
+        <div>
+          <span className="today-flow-kicker">오늘 업무 흐름</span>
+          <h2>수업 체크부터 학부모 안내까지 한 번에 이어집니다.</h2>
+        </div>
+        <div className="today-flow-actions" aria-label="오늘 업무 바로가기">
+          <button type="button" onClick={() => onNavigate?.('attendance')}>
+            <Clock size={15} /> 출결 상세
+          </button>
+          <button type="button" onClick={() => onNavigate?.('makeup')}>
+            <RefreshCw size={15} /> 보강 처리
+          </button>
+          <button type="button" onClick={() => onNavigate?.('messaging')}>
+            <Bell size={15} /> 알림장 발송
+          </button>
+          <button type="button" onClick={() => onNavigate?.('payments')}>
+            <CreditCard size={15} /> 미납 확인
+          </button>
+        </div>
+      </section>
+
       <div className="gd-stats">
         <div className="gd-stat">
           <div className="gd-stat-ic" style={{ background: '#eaf4ee', color: 'var(--color-primary)' }}>

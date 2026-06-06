@@ -20,6 +20,16 @@ import { DataQuality } from './components/DataQuality';
 import { MakeupManager } from './components/MakeupManager';
 import { KakaoManager } from './components/KakaoManager';
 import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
+import {
+  MOBILE_QUICK_NAV_ITEMS,
+  PRIMARY_NAV_GROUPS,
+  SETTINGS_NAV_ITEM,
+  TAB_DESCRIPTIONS as FLOW_TAB_DESCRIPTIONS,
+  TAB_TITLES as FLOW_TAB_TITLES,
+  WORKFLOW_SHORTCUTS,
+  type NavItem as FlowNavItem,
+  type TabId,
+} from './navigation';
 
 // Import Icons
 import {
@@ -104,6 +114,8 @@ if (!NAV_GROUPS.some(group => group.items.some(item => item.id === 'exams'))) {
   NAV_GROUPS[1]?.items.splice(2, 0, { id: 'exams', label: '평가 관리', icon: ClipboardList });
 }
 TAB_TITLES.exams = '평가 관리';
+void NAV_GROUPS;
+void TAB_TITLES;
 
 const KIOSK_RELOAD_RESET_KEY = 'growing:kiosk-reload-reset';
 
@@ -193,7 +205,7 @@ function App() {
 
 // The signed-in application: loads data for the owner and renders the UI.
 function AcademyApp({ session }: { session: Session }) {
-  const [activeTab, setActiveTab] = useState<string>(() => {
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
     if (sessionStorage.getItem(KIOSK_RELOAD_RESET_KEY) === '1') {
       sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
     }
@@ -248,13 +260,15 @@ function AcademyApp({ session }: { session: Session }) {
     setIsMobileMenuOpen(false);
   };
 
-  const mobileQuickNavItems: NavItem[] = [
-    { id: 'dashboard', label: '홈', icon: LayoutDashboard },
-    { id: 'attendance', label: '출결', icon: CalendarCheck },
-    { id: 'messaging', label: '알림장', icon: Smartphone },
-    { id: 'students', label: '학생', icon: Users },
-    { id: 'backup', label: '설정', icon: ShieldCheck },
-  ];
+  const startKioskMode = () => {
+    if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
+      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+      setActiveTab('kiosk');
+      setIsMobileMenuOpen(false);
+    }
+  };
+
+  const mobileQuickNavItems: FlowNavItem[] = MOBILE_QUICK_NAV_ITEMS;
 
   // Render Page Content based on tab Selection
   const renderContent = () => {
@@ -267,6 +281,10 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             payments={payments}
             onSaveAttendance={data.handleSaveAttendance}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              setIsMobileMenuOpen(false);
+            }}
           />
         );
       case 'students':
@@ -336,7 +354,7 @@ function AcademyApp({ session }: { session: Session }) {
             payments={payments}
             counselLogs={counselLogs}
             onNavigate={(tab) => {
-              setActiveTab(tab);
+              setActiveTab(tab as TabId);
               setIsMobileMenuOpen(false);
             }}
           />
@@ -421,23 +439,20 @@ function AcademyApp({ session }: { session: Session }) {
 
   // 데스크탑 사이드바 + 모바일 드로어 공용 네비게이션
   const renderNavSection = (opts: { closeOnNav: boolean }) => {
-    const go = (id: string) => {
+    const go = (id: TabId) => {
       sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
       setActiveTab(id);
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
     };
     const launchKiosk = () => {
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
-      if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
-        sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-        setActiveTab('kiosk');
-      }
+      startKioskMode();
     };
 
     return (
       <>
         <nav style={{ flexGrow: 1 }}>
-          {NAV_GROUPS.map(group => (
+          {PRIMARY_NAV_GROUPS.map(group => (
             <div key={group.title} className="side-group">
               <div className="side-group-t">{group.title}</div>
               {group.items.map(item => (
@@ -458,12 +473,42 @@ function AcademyApp({ session }: { session: Session }) {
         <div className="side-foot">
           <NavItemButton
             active={activeTab === 'backup'}
-            icon={ShieldCheck}
-            label="AI·알림·백업 설정"
-            onClick={() => go('backup')}
+            icon={SETTINGS_NAV_ITEM.icon}
+            label={SETTINGS_NAV_ITEM.label}
+            onClick={() => go(SETTINGS_NAV_ITEM.id)}
           />
         </div>
       </>
+    );
+  };
+
+  const renderWorkflowShortcuts = () => {
+    const shortcuts = WORKFLOW_SHORTCUTS[activeTab] ?? [];
+    if (shortcuts.length === 0) return null;
+
+    const go = (id: TabId) => {
+      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+      setActiveTab(id);
+      setIsMobileMenuOpen(false);
+    };
+
+    return (
+      <div className="flow-shortcuts" aria-label="관련 업무 바로가기">
+        {shortcuts.map(item => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={`${activeTab}-${item.id}-${item.label}`}
+              type="button"
+              className={`flow-chip${activeTab === item.id ? ' active' : ''}`}
+              onClick={item.kind === 'kiosk' ? startKioskMode : () => go(item.id)}
+            >
+              <Icon size={14} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
     );
   };
 
@@ -557,10 +602,18 @@ function AcademyApp({ session }: { session: Session }) {
       <main className="main-content">
         <header className="app-topbar">
           <div>
-            <h2>{TAB_TITLES[activeTab] ?? '그로잉영어'}</h2>
-            <p>그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.</p>
+            <h2>{FLOW_TAB_TITLES[activeTab] ?? '그로잉영어'}</h2>
+            <p>{FLOW_TAB_DESCRIPTIONS[activeTab] ?? '그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.'}</p>
+            {renderWorkflowShortcuts()}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ gap: '0.4rem' }}
+              onClick={startKioskMode}
+            >
+              키오스크 시작
+            </button>
             <button
               className="btn btn-secondary"
               style={{ gap: '0.4rem' }}

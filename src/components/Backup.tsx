@@ -39,6 +39,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinStatus, setPinStatus] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<'data' | 'files' | 'kiosk' | 'ai'>('data');
 
   // ---- 파일 보관함 (Supabase Storage) ----
   interface StoredFile { name: string; size: number; updated_at: string; }
@@ -386,6 +387,28 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         <p>데이터는 로그인 계정 기준으로 클라우드에 저장됩니다. 중요한 변경 전에는 백업 파일을 받아두세요.</p>
       </div>
 
+      <div className="settings-tabs" role="tablist" aria-label="설정 분류">
+        {([
+          ['data', '데이터 관리'],
+          ['files', '파일·백업'],
+          ['kiosk', '키오스크'],
+          ['ai', '알림·AI'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={settingsTab === key}
+            className={settingsTab === key ? 'active' : ''}
+            onClick={() => setSettingsTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {settingsTab === 'data' && (
+        <>
       {/* ── 백업/복원 2열 ── */}
       <div className="set-grid2">
         <div className="gd-card set-tile">
@@ -424,7 +447,11 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           </button>
         </div>
       </div>
+        </>
+      )}
 
+      {settingsTab === 'files' && (
+      <>
       {/* 파일 보관함 */}
       <div className="gd-card">
         <div className="set-section-head">
@@ -491,7 +518,11 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           </div>
         )}
       </div>
+      </>
+      )}
 
+      {settingsTab === 'kiosk' && (
+      <>
       {/* Kiosk Security PIN Setting */}
       <div className="gd-card set-accent-warn">
         <h4 className="set-h">
@@ -522,6 +553,8 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           </p>
         )}
       </div>
+      </>
+      )}
 
       {/* Operation Status Feedbacks */}
       {importStatus && (
@@ -544,6 +577,8 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         </div>
       )}
 
+      {settingsTab === 'ai' && (
+      <>
       {/* 아이비 기억 설정 */}
       <div className="gd-card set-accent">
         <h4 className="set-h">
@@ -662,8 +697,11 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           <span>출결 / 등원·하원 / 과제 / 보강·보충</span>
         </div>
       </div>
+      </>
+      )}
 
       {/* Danger Zone Reset Data */}
+      {settingsTab === 'data' && (
       <div className="gd-card set-danger">
         <h4 className="set-h danger">
           <AlertTriangle size={18} /> 위험 영역 (초기화)
@@ -681,6 +719,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 };

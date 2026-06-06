@@ -3885,6 +3885,107 @@ textarea.form-control {
 .app-topbar h2 { font-size: 1.55rem; font-weight: 800; color: var(--color-primary-dark); letter-spacing: -0.03em; }
 .app-topbar p { font-size: 0.85rem; color: var(--color-text-secondary); margin-top: 0.15rem; }
 
+.flow-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+.flow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-weight: 800;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.flow-chip:hover,
+.flow-chip.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+  background: #eef8f2;
+}
+
+.today-flow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #d8ebe2;
+  border-radius: var(--radius-md);
+  background: #f7fbf8;
+}
+.today-flow-kicker {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+.today-flow h2 {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+.today-flow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+.today-flow-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.today-flow-actions button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #f7faf8;
+}
+.settings-tabs button {
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.settings-tabs button.active {
+  background: #fff;
+  color: var(--color-primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+
 /* ── 모바일 헤더 ── */
 .m-header { display: none; align-items: center; justify-content: space-between; padding: 0.7rem 1.1rem; background: var(--color-bg-sidebar); color: #fff; flex-shrink: 0; }
 .m-header-logo { display: flex; align-items: center; gap: 0.5rem; background: none; border: none; color: #fff; cursor: pointer; font-family: inherit; }
@@ -3903,6 +4004,38 @@ textarea.form-control {
 @media (max-width: 768px) {
   .m-header { display: flex; }
   .m-tabs { display: grid; }
+  .app-topbar {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .app-topbar > div:last-child {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .flow-shortcuts {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 0.1rem;
+  }
+  .flow-chip {
+    white-space: nowrap;
+  }
+  .today-flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .today-flow-actions {
+    justify-content: flex-start;
+  }
+  .today-flow-actions button {
+    flex: 1 1 calc(50% - 0.45rem);
+    justify-content: center;
+  }
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ── 보강 관리 (mk-*) ── */
