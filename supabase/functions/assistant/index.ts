@@ -10,6 +10,14 @@
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+declare const Supabase: {
+  ai: {
+    Session: new (model: string) => {
+      run: (input: string, options: { mean_pool: boolean; normalize: boolean }) => Promise<number[] | { data: Iterable<number> }>;
+    };
+  };
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -20,6 +28,11 @@ const MODELS = {
   lite: 'gemini-2.5-flash-lite',
   flash: 'gemini-2.5-flash',
 } as const;
+
+const EMBEDDING_MODEL = 'gte-small';
+const RAG_MATCH_THRESHOLD = 0.72;
+const RAG_MATCH_COUNT = 8;
+const RAG_BACKFILL_LIMIT = 12;
 
 // ---- 한국 시간(KST) 헬퍼 ----
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -201,6 +214,18 @@ const TOOL_DECLARATIONS = [
     },
   },
   {
+    name: 'semantic_search_notes',
+    description: '저장된 아이비 메모를 의미검색(RAG)으로 찾는다. 표현이 정확히 일치하지 않아도 관련 운영 기준이나 학생 메모를 찾아 답변 근거로 사용한다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: '찾고 싶은 의미를 담은 검색 문장' },
+        studentName: { type: 'STRING', description: '특정 학생 메모 안에서만 찾을 때 학생 이름(선택)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'propose_attendance_change',
     description: '학생의 출결 상태 변경을 제안한다. 실제 DB를 변경하지 않고 원장님의 승인을 받을 확인 카드를 생성한다. 출결 수정 요청 시 반드시 이 도구를 사용한다.',
     parameters: {
@@ -293,6 +318,62 @@ async function fetchStudents(sb: SupabaseClient) {
 const norm = (v: unknown) => (typeof v === 'string' ? v : '');
 const matchName = (name: string, q: string) => name.toLowerCase().includes(q.toLowerCase());
 const formatWon = (amount: number) => `${Math.round(amount).toLocaleString('ko-KR')}원`;
+
+let embeddingSession: { run: (input: string, options: { mean_pool: boolean; normalize: boolean }) => Promise<number[] | { data: Iterable<number> }> } | null = null;
+
+async function generateEmbedding(input: string): Promise<number[]> {
+  const text = input.trim();
+  if (!text) throw new Error('임베딩할 내용이 비어 있습니다.');
+  embeddingSession ??= new Supabase.ai.Session(EMBEDDING_MODEL);
+  const output = await embeddingSession.run(text, { mean_pool: true, normalize: true });
+  return Array.from(Array.isArray(output) ? output : output.data);
+}
+
+async function updateNoteEmbedding(sb: SupabaseClient, id: string, content: string): Promise<boolean> {
+  try {
+    const embedding = await generateEmbedding(content);
+    const { error } = await sb
+      .from('growing_assistant_notes')
+      .update({ embedding: JSON.stringify(embedding), embedding_updated_at: new Date().toISOString() })
+      .eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+async function backfillMissingNoteEmbeddings(sb: SupabaseClient): Promise<number> {
+  const { data, error } = await sb
+    .from('growing_assistant_notes')
+    .select('id, content')
+    .is('embedding', null)
+    .order('created_at', { ascending: false })
+    .limit(RAG_BACKFILL_LIMIT);
+  if (error || !data?.length) return 0;
+
+  let updated = 0;
+  for (const row of data as Json[]) {
+    if (await updateNoteEmbedding(sb, row.id as string, norm(row.content))) updated++;
+  }
+  return updated;
+}
+
+async function semanticSearchNotes(
+  sb: SupabaseClient,
+  query: string,
+  studentId: string | null = null,
+): Promise<{ matches: Json[]; backfilled: number }> {
+  const backfilled = await backfillMissingNoteEmbeddings(sb);
+  const embedding = await generateEmbedding(query);
+  const { data, error } = await sb.rpc('growing_match_assistant_notes', {
+    query_embedding: embedding,
+    match_count: RAG_MATCH_COUNT,
+    match_threshold: RAG_MATCH_THRESHOLD,
+    target_student_id: studentId,
+  });
+  if (error) throw error;
+  return { matches: (data ?? []) as Json[], backfilled };
+}
 
 function compactLines(lines: (string | false | null | undefined)[]) {
   return lines.filter(Boolean).join('\n');
@@ -579,17 +660,20 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         studentId = matched[0].id as string;
       }
 
-      const { data: existing } = await sb
+      let existingQb = sb
         .from('growing_assistant_notes').select('id')
-        .eq('scope', scope).eq('content', content).is('student_id', studentId).maybeSingle();
+        .eq('scope', scope).eq('content', content);
+      existingQb = studentId ? existingQb.eq('student_id', studentId) : existingQb.is('student_id', null);
+      const { data: existing } = await existingQb.maybeSingle();
       if (existing) return { saved: false, reason: '이미 동일한 내용이 저장되어 있습니다.' };
 
-      const { error } = await sb.from('growing_assistant_notes').insert({
+      const { data: inserted, error } = await sb.from('growing_assistant_notes').insert({
         scope, category, content,
         ...(studentId ? { student_id: studentId } : {}),
-      });
+      }).select('id').single();
       if (error) throw error;
-      return { saved: true, scope, category, content, studentName: studentName || null };
+      const embedded = inserted?.id ? await updateNoteEmbedding(sb, inserted.id as string, content) : false;
+      return { saved: true, scope, category, content, studentName: studentName || null, embedded };
     }
 
     case 'recall_notes': {
@@ -610,6 +694,38 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       let notes = (data ?? []).map((r: Json) => ({ category: r.category, content: r.content, createdAt: r.created_at }));
       if (query) notes = notes.filter(n => matchName(n.content as string, query));
       return { found: true, count: notes.length, notes };
+    }
+
+    case 'semantic_search_notes': {
+      const query = ((args.query as string) ?? '').trim();
+      const studentName = (args.studentName as string) ?? '';
+      if (!query) return { found: false, matches: [], message: '검색 문장이 비어 있습니다.' };
+
+      let studentId: string | null = null;
+      if (studentName) {
+        const students = await fetchStudents(sb);
+        const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+        if (matched.length === 0) return { found: false, matches: [], message: `'${studentName}' 학생 메모가 없습니다.` };
+        if (matched.length > 1) {
+          return { found: false, matches: [], message: `'${studentName}'로 검색된 학생이 여러 명입니다: ${matched.map((s: Json) => s.name).join(', ')}` };
+        }
+        studentId = matched[0].id as string;
+      }
+
+      const { matches, backfilled } = await semanticSearchNotes(sb, query, studentId);
+      return {
+        found: matches.length > 0,
+        count: matches.length,
+        backfilled,
+        matches: matches.map(r => ({
+          scope: r.scope,
+          studentId: r.student_id,
+          category: r.category,
+          content: r.content,
+          createdAt: r.created_at,
+          similarity: Math.round(Number(r.similarity) * 1000) / 1000,
+        })),
+      };
     }
 
     // ---- Phase 2: 변경 제안 도구 ----
@@ -895,7 +1011,7 @@ function systemPrompt(memory: string): string {
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.
 - 대화에서 운영에 반복적으로 유용할 안정적 사실·선호를 알게 되면 remember_note로 간결히 저장합니다. 추측·일시적 정보·민감정보는 저장하지 않습니다.
-- 학생 관련 질문에 답하기 전 과거 메모가 필요하다고 판단되면 recall_notes로 먼저 확인합니다.
+- 학생 관련 질문이나 운영 기준 질문에 답하기 전 과거 메모가 필요하다고 판단되면 semantic_search_notes로 의미검색을 먼저 사용합니다. 정확한 단어 검색이 필요할 때만 recall_notes를 사용합니다.
 - 전용 도구로 다루지 않는 데이터(키오스크 등하원 알림, 숙제 알림, 발송 로그, 설정, 이후 추가되는 기능 등)는 list_data_sources로 사용할 수 있는 테이블을 확인한 뒤 query_table로 직접 조회합니다.${memorySection}`;
 }
 
