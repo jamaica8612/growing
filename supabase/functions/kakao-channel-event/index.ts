@@ -34,6 +34,16 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+function getEventSecret(req: Request): string {
+  const url = new URL(req.url);
+  return (
+    req.headers.get('x-kakao-event-secret') ||
+    url.searchParams.get('secret') ||
+    url.searchParams.get('event_secret') ||
+    ''
+  );
+}
+
 async function resolveChannelOwner(supabase: ReturnType<typeof createClient>, eventSecret: string): Promise<string | null> {
   if (!eventSecret) return null;
   const { data, error } = await supabase
@@ -58,7 +68,7 @@ Deno.serve(async req => {
   }
 
   const supabase = createClient(requiredEnv('SUPABASE_URL'), requiredEnv('SUPABASE_SERVICE_ROLE_KEY'));
-  const ownerId = await resolveChannelOwner(supabase, req.headers.get('x-kakao-event-secret') ?? '');
+  const ownerId = await resolveChannelOwner(supabase, getEventSecret(req));
   if (!ownerId) {
     return jsonResponse({ error: 'Unauthorized channel' }, 401);
   }

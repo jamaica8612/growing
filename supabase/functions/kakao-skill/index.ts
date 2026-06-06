@@ -83,6 +83,16 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+function getSkillSecret(req: Request): string {
+  const url = new URL(req.url);
+  return (
+    req.headers.get('x-kakao-skill-secret') ||
+    url.searchParams.get('secret') ||
+    url.searchParams.get('skill_secret') ||
+    ''
+  );
+}
+
 function skillText(text: string, quickReplies: { label: string; action: SkillAction; messageText?: string }[] = []) {
   return {
     version: '2.0',
@@ -223,7 +233,7 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
 
   const supabase = createClient(requiredEnv('SUPABASE_URL'), requiredEnv('SUPABASE_SERVICE_ROLE_KEY'));
-  const skillSecret = req.headers.get('x-kakao-skill-secret') ?? '';
+  const skillSecret = getSkillSecret(req);
   const channelOwnerId = await resolveChannelOwner(supabase, skillSecret);
   if (!channelOwnerId) {
     return jsonResponse({ error: 'Unauthorized channel' }, 401);

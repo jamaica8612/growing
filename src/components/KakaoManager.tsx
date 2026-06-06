@@ -56,6 +56,8 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
   const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
   const skillUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/kakao-skill` : 'Supabase URL 설정 필요';
   const eventUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/kakao-channel-event` : 'Supabase URL 설정 필요';
+  const skillUrlWithSecret = skillSecret && supabaseUrl ? `${skillUrl}?secret=${encodeURIComponent(skillSecret)}` : skillUrl;
+  const eventUrlWithSecret = eventSecret && supabaseUrl ? `${eventUrl}?secret=${encodeURIComponent(eventSecret)}` : eventUrl;
   const studentById = new Map(students.map(student => [student.id, student]));
   const linkedStudentIds = new Set(links.filter(link => !link.blockedAt).map(link => link.studentId));
   const unlinkedStudents = students.filter(student => student.status === 'active' && student.parentContact && !linkedStudentIds.has(student.id));
@@ -146,12 +148,18 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
         </div>
         <div className="kakao-endpoints">
           <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(skillUrl)}>
-            <Copy size={14} /> Skill URL: {skillUrl}
+            <Copy size={14} /> Skill URL(헤더 방식): {skillUrl}
+          </button>
+          <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(skillUrlWithSecret)}>
+            <Copy size={14} /> Skill URL(secret 포함): {skillUrlWithSecret}
           </button>
           <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(eventUrl)}>
-            <Copy size={14} /> Event URL: {eventUrl}
+            <Copy size={14} /> Event URL(헤더 방식): {eventUrl}
           </button>
-          <span>카카오 관리자 헤더: <b>x-kakao-skill-secret</b> / <b>x-kakao-event-secret</b></span>
+          <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(eventUrlWithSecret)}>
+            <Copy size={14} /> Event URL(secret 포함): {eventUrlWithSecret}
+          </button>
+          <span>카카오 관리자에서 헤더 입력이 가능하면 <b>x-kakao-skill-secret</b> / <b>x-kakao-event-secret</b>을 쓰고, 불가능하면 secret 포함 URL을 사용하세요.</span>
         </div>
         <div className="kakao-actions" style={{ marginTop: '0.9rem' }}>
           <button
