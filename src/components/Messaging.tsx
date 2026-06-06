@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Attendance, Class, CounselLog, HomeworkAlert, HomeworkStatus, KioskAlert, MessageLog, Payment, Student } from '../types';
-import { Bell, Check, CheckSquare, ChevronDown, ChevronUp, Clock, Copy, MessageSquare, Send, Sparkles, Square, Trash2 } from 'lucide-react';
+import { Bell, Check, CheckSquare, ChevronDown, ChevronUp, Clock, Copy, Send, Sparkles, Square, Trash2 } from 'lucide-react';
 import { sendAlimtalk } from '../lib/alimtalk';
 import { api } from '../lib/api';
 import { getStudentReportSummary } from '../lib/reportSummary';
@@ -17,15 +17,11 @@ interface MessagingProps {
   onClearAlerts: () => void;
   onDismissHomeworkAlert: (id: string) => void;
   onClearHomeworkAlerts: () => void;
-  assistantDraft?: {
-    id: number;
-    content: string;
-  } | null;
 }
 
 type AlertFilter = 'all' | 'in' | 'out' | 'homework' | 'missing-contact';
 type PendingAlertType = 'in' | 'out' | 'homework';
-type IncludeKey = 'attendance' | 'homework' | 'makeup' | 'monthlyReport' | 'recentLogs' | 'studentMemo' | 'assistantDraft' | 'queuedAlerts';
+type IncludeKey = 'attendance' | 'homework' | 'makeup' | 'supplementRate' | 'todayTest';
 
 interface PendingAlertRow {
   id: string;
@@ -70,12 +66,6 @@ const attendanceStatusLabel = (status?: Attendance['status']) => {
   return '미체크';
 };
 
-const logTypeLabel: Record<CounselLog['type'], string> = {
-  counsel: '상담',
-  progress: '진도',
-  test: '평가',
-};
-
 const messageLogTypeLabel: Record<string, string> = {
   check_in: '등원',
   check_out: '하원',
@@ -98,15 +88,6 @@ const buildSMSLink = (parentContact: string, message: string): string => {
   return isIOS ? `sms:${cleanPhone}&body=${encodedBody}` : `sms:${cleanPhone}?body=${encodedBody}`;
 };
 
-const findDraftStudentId = (students: Student[], draft?: string): string => {
-  if (!draft) return '';
-  const activeMatches = students
-    .filter(s => s.status === 'active' && s.name && draft.includes(s.name))
-    .sort((a, b) => b.name.length - a.name.length);
-  if (activeMatches.length !== 1) return '';
-  return activeMatches[0].id;
-};
-
 export const Messaging: React.FC<MessagingProps> = ({
   students,
   classes,
@@ -119,20 +100,16 @@ export const Messaging: React.FC<MessagingProps> = ({
   onClearAlerts,
   onDismissHomeworkAlert,
   onClearHomeworkAlerts,
-  assistantDraft,
 }) => {
-  const [selectedStudentId, setSelectedStudentId] = useState(() => findDraftStudentId(students, assistantDraft?.content));
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [include, setInclude] = useState<Record<IncludeKey, boolean>>({
     attendance: true,
     homework: true,
     makeup: true,
-    monthlyReport: false,
-    recentLogs: true,
-    studentMemo: false,
-    assistantDraft: Boolean(assistantDraft?.content),
-    queuedAlerts: true,
+    supplementRate: true,
+    todayTest: true,
   });
-  const [message, setMessage] = useState(() => assistantDraft?.content ?? '');
+  const [message, setMessage] = useState('');
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [isSending, setIsSending] = useState(false);
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('all');
@@ -145,10 +122,12 @@ export const Messaging: React.FC<MessagingProps> = ({
     api.getMessageLogs(50).then(setMessageLogs).catch(() => {});
   }, []);
 
+  const todayStr = useMemo(() => todayLocal(), []);
   const activeStudents = useMemo(
     () => students.filter(s => s.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     [students]
   );
+  const currentStudent = students.find(s => s.id === selectedStudentId);
 
   const studentsByClass = useMemo(() => {
     const groups: Array<{ classId: string; className: string; students: Student[] }> = [];
@@ -160,23 +139,19 @@ export const Messaging: React.FC<MessagingProps> = ({
     const unassigned = activeStudents.filter(s => !assignedIds.has(s.id));
     if (unassigned.length > 0) groups.push({ classId: '__none__', className: '반 미배정', students: unassigned });
     return groups;
-  }, [classes, activeStudents]);
-
-  const currentStudent = students.find(s => s.id === selectedStudentId);
-  const todayStr = useMemo(() => todayLocal(), []);
+  }, [activeStudents, classes]);
 
   const todayAttendances = useMemo(() => {
     if (!selectedStudentId) return [];
     return attendance.filter(a => a.studentId === selectedStudentId && a.date === todayStr);
   }, [attendance, selectedStudentId, todayStr]);
 
-  const recentLogs = useMemo(() => {
+  const todayTests = useMemo(() => {
     if (!selectedStudentId) return [];
     return counselLogs
-      .filter(log => log.studentId === selectedStudentId)
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 3);
-  }, [counselLogs, selectedStudentId]);
+      .filter(log => log.studentId === selectedStudentId && log.type === 'test' && log.date === todayStr)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [counselLogs, selectedStudentId, todayStr]);
 
   const monthlyReport = useMemo(() => {
     if (!currentStudent) return null;
@@ -194,20 +169,20 @@ export const Messaging: React.FC<MessagingProps> = ({
     const kioskRows: PendingAlertRow[] = kioskAlerts.map(alert => {
       const student = students.find(s => s.id === alert.studentId);
       const name = student?.name ?? '알 수 없음';
-      const kindLabel = alert.kind === 'in' ? '등원' : '하원';
+      const label = alert.kind === 'in' ? '등원' : '하원';
       return {
         id: `kiosk-${alert.id}`,
         source: 'kiosk',
         sourceId: alert.id,
         type: alert.kind,
-        label: kindLabel,
+        label,
         badgeTone: alert.kind === 'in' ? 'ok' : 'info',
         studentId: alert.studentId,
         name,
         contact: student?.parentContact ?? '',
         date: alert.date,
         time: alert.time,
-        message: `${name} 학생 ${alert.time} ${kindLabel}했습니다.`,
+        message: `${name} 학생 ${alert.time} ${label}했습니다.`,
         createdAt: alert.createdAt,
       };
     });
@@ -233,10 +208,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     });
 
     return [...kioskRows, ...homeworkRows].sort((a, b) => b.createdAt - a.createdAt);
-  }, [kioskAlerts, homeworkAlerts, students]);
-
-  const studentPendingRows = pendingRows.filter(row => row.studentId === selectedStudentId);
-  const selectedQueuedRows = studentPendingRows.filter(row => selectedAlertIds.includes(row.id));
+  }, [homeworkAlerts, kioskAlerts, students]);
 
   const filteredAlertRows = pendingRows.filter(row => {
     if (alertFilter === 'in') return row.type === 'in';
@@ -245,7 +217,6 @@ export const Messaging: React.FC<MessagingProps> = ({
     if (alertFilter === 'missing-contact') return !row.contact;
     return true;
   });
-
   const visibleAlertIds = filteredAlertRows.map(row => row.id);
   const selectedVisibleAlertIds = selectedAlertIds.filter(id => visibleAlertIds.includes(id));
   const hasAllVisibleSelected = visibleAlertIds.length > 0 && visibleAlertIds.every(id => selectedAlertIds.includes(id));
@@ -270,89 +241,79 @@ export const Messaging: React.FC<MessagingProps> = ({
     return { classNames: classNames || '-', checkIn, checkOut, statuses, homework, makeup, hasRecord: todayAttendances.length > 0 };
   }, [classes, todayAttendances]);
 
-  const buildComprehensiveNotice = () => {
+  const includeItems: Array<{ key: IncludeKey; label: string; meta: string }> = [
+    { key: 'attendance', label: '출결', meta: todaySummary.statuses },
+    { key: 'homework', label: '숙제', meta: todaySummary.homework },
+    { key: 'makeup', label: '보강/보충', meta: todaySummary.makeup },
+    {
+      key: 'supplementRate',
+      label: '다른 학생 대비 보충률',
+      meta: monthlyReport ? `${monthlyReport.attendance.supplementRate}% / 평균 ${monthlyReport.attendance.peerSupplementRate}%` : '-',
+    },
+    { key: 'todayTest', label: '그날 시험 결과', meta: todayTests.length ? `${todayTests.length}건` : '없음' },
+  ];
+
+  const buildNotice = () => {
     if (!currentStudent) return '';
     const lines = [
-      `안녕하세요, 그로잉영어입니다.`,
-      ``,
+      '안녕하세요, 그로잉영어입니다.',
+      '',
       `${currentStudent.name} 학생의 ${formatDate(todayStr)} 수업 내용을 안내드립니다.`,
-      ``,
+      '',
     ];
 
     if (include.attendance) {
-      lines.push(`[출결]`);
+      lines.push('[출결]');
       lines.push(`- 수업: ${todaySummary.classNames}`);
       lines.push(`- 상태: ${todaySummary.statuses}`);
       lines.push(`- 등원: ${todaySummary.checkIn}`);
       lines.push(`- 하원: ${todaySummary.checkOut}`);
-      lines.push(``);
+      lines.push('');
     }
 
     if (include.homework) {
-      lines.push(`[숙제]`);
+      lines.push('[숙제]');
       lines.push(`- ${todaySummary.homework}`);
-      lines.push(``);
+      lines.push('');
     }
 
     if (include.makeup && todaySummary.makeup !== '없음') {
-      lines.push(`[보강/보충]`);
+      lines.push('[보강/보충]');
       lines.push(`- ${todaySummary.makeup}`);
-      lines.push(``);
+      lines.push('');
     }
 
-    if (include.monthlyReport && monthlyReport) {
+    if (include.supplementRate && monthlyReport) {
       const diff = monthlyReport.attendance.supplementRateDelta;
       const comparison = diff > 0
         ? `다른 학생 평균보다 ${diff}%p 높습니다.`
         : diff < 0
           ? `다른 학생 평균보다 ${Math.abs(diff)}%p 낮습니다.`
           : '다른 학생 평균과 같습니다.';
-      lines.push(`[월말 학습 현황]`);
-      lines.push(`- 대상 월: ${reportMonth}`);
-      lines.push(`- 출석률: ${monthlyReport.attendance.rate}%`);
-      lines.push(`- 보충률: ${monthlyReport.attendance.supplementRate}% (다른 학생 평균 ${monthlyReport.attendance.peerSupplementRate}%, ${comparison})`);
-      lines.push(`- 숙제: 완료 ${monthlyReport.homework.done}회, 미흡 ${monthlyReport.homework.incomplete}회, 미제출 ${monthlyReport.homework.undone}회`);
-      if (diff > 0) {
-        lines.push(`- 보충이 평균보다 많은 편이라 부족한 부분을 가정에서도 함께 확인해 주시면 좋겠습니다.`);
-      }
-      lines.push(``);
+      lines.push('[보충률]');
+      lines.push(`- ${reportMonth} 보충률: ${monthlyReport.attendance.supplementRate}%`);
+      lines.push(`- 다른 학생 평균: ${monthlyReport.attendance.peerSupplementRate}%`);
+      lines.push(`- 비교: ${comparison}`);
+      if (diff > 0) lines.push('- 부족한 부분이 평균보다 많은 편이라 가정에서도 한 번 더 확인 부탁드립니다.');
+      lines.push('');
     }
 
-    if (include.recentLogs && recentLogs.length > 0) {
-      lines.push(`[최근 기록]`);
-      recentLogs.forEach(log => {
-        const score = log.score ? ` (${log.score})` : '';
-        lines.push(`- ${formatDate(log.date)} ${logTypeLabel[log.type]} · ${log.title}${score}: ${log.content}`);
+    if (include.todayTest && todayTests.length > 0) {
+      lines.push('[시험 결과]');
+      todayTests.forEach(test => {
+        const score = test.score ? ` (${test.score})` : '';
+        lines.push(`- ${test.title}${score}: ${test.content}`);
       });
-      lines.push(``);
+      lines.push('');
     }
 
-    if (include.studentMemo && currentStudent.memo.trim()) {
-      lines.push(`[참고 메모]`);
-      lines.push(currentStudent.memo.trim());
-      lines.push(``);
-    }
-
-    if (include.queuedAlerts && selectedQueuedRows.length > 0) {
-      lines.push(`[오늘 확인할 알림]`);
-      selectedQueuedRows.forEach(row => lines.push(`- ${row.message}`));
-      lines.push(``);
-    }
-
-    if (include.assistantDraft && assistantDraft?.content?.trim()) {
-      lines.push(`[추가 안내]`);
-      lines.push(assistantDraft.content.trim());
-      lines.push(``);
-    }
-
-    lines.push(`가정에서도 확인 부탁드립니다. 감사합니다.`);
+    lines.push('가정에서도 확인 부탁드립니다. 감사합니다.');
     return lines.join('\n').replace(/\n{3,}/g, '\n\n');
   };
 
   const handleGenerate = () => {
-    const draft = buildComprehensiveNotice();
-    if (!draft) return;
-    setMessage(draft);
+    const draft = buildNotice();
+    if (draft) setMessage(draft);
   };
 
   const handleSendComprehensiveAlimtalk = async () => {
@@ -378,9 +339,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     }
   };
 
-  const toggleInclude = (key: IncludeKey) => {
-    setInclude(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  const toggleInclude = (key: IncludeKey) => setInclude(prev => ({ ...prev, [key]: !prev[key] }));
 
   const toggleAlertSelection = (id: string) => {
     setSelectedAlertIds(ids => ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id]);
@@ -420,138 +379,92 @@ export const Messaging: React.FC<MessagingProps> = ({
   };
 
   return (
-    <div className="gd-root">
-      <section className="gd-card" style={{ marginBottom: '1.15rem' }}>
-        <div className="gd-card-head">
-          <h2 className="gd-card-title">
-            <MessageSquare size={18} /> 종합알림장 작성
-          </h2>
-          <span className="cl-count">출결·숙제·보강·평가·상담 통합</span>
+    <div className="gd-root msg-pro">
+      <section className="msg-hero">
+        <div>
+          <span className="msg-eyebrow">Parent Notice</span>
+          <h2>종합알림장</h2>
+          <p>출결, 숙제, 보강/보충, 보충률 비교, 시험 결과만 모아 학부모 안내문을 만듭니다.</p>
         </div>
-
-        <div className="msg-main">
-          <div>
-            <label className="msg-label">대상 학생</label>
-            <select className="msg-select" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
-              <option value="">학생을 선택하세요</option>
-              {studentsByClass.map(group => (
-                <optgroup key={group.classId} label={group.className}>
-                  {group.students.map(student => (
-                    <option key={student.id} value={student.id}>
-                      {student.name} ({student.grade.split(' ')[1] || student.grade})
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-
-            {currentStudent && (
-              <div className="msg-today">
-                <div><b>수업</b> {todaySummary.classNames}</div>
-                <div><b>출결</b> {todaySummary.statuses}</div>
-                <div><b>등원</b> {todaySummary.checkIn}</div>
-                <div><b>하원</b> {todaySummary.checkOut}</div>
-                <div><b>숙제</b> {todaySummary.homework}</div>
-                <div><b>보강/보충</b> {todaySummary.makeup}</div>
-                {!todaySummary.hasRecord && (
-                  <div style={{ gridColumn: 'span 2', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
-                    오늘 출결 기록이 아직 없습니다.
-                  </div>
-                )}
-              </div>
-            )}
-
-            <label className="msg-label" style={{ marginTop: '1rem' }}>포함할 내용</label>
-            <div className="msg-tpls">
-              {([
-                ['attendance', '출결'],
-                ['homework', '숙제'],
-                ['makeup', '보강/보충'],
-                ['monthlyReport', '월말 현황'],
-                ['recentLogs', `최근 기록 ${recentLogs.length}`],
-                ['studentMemo', '학생 메모'],
-                ['queuedAlerts', `대기 알림 ${studentPendingRows.length}`],
-                ['assistantDraft', '아이비 초안'],
-              ] as Array<[IncludeKey, string]>).map(([key, label]) => (
-                <button key={key} className={`msg-tpl ${include[key] ? 'on' : ''}`} onClick={() => toggleInclude(key)}>
-                  {include[key] ? <CheckSquare size={14} /> : <Square size={14} />} {label}
-                </button>
-              ))}
-            </div>
-
-            {include.monthlyReport && (
-              <div className="msg-params" style={{ marginTop: '0.8rem' }}>
-                <label className="msg-label">월말 알림장 기준 월</label>
-                <input
-                  type="month"
-                  className="msg-select"
-                  value={reportMonth}
-                  onChange={e => setReportMonth(e.target.value)}
-                />
-                {monthlyReport && (
-                  <div className="msg-today" style={{ marginTop: '0.65rem' }}>
-                    <div><b>출석률</b> {monthlyReport.attendance.rate}%</div>
-                    <div><b>보충률</b> {monthlyReport.attendance.supplementRate}%</div>
-                    <div><b>다른 학생 평균</b> {monthlyReport.attendance.peerSupplementRate}%</div>
-                    <div><b>차이</b> {monthlyReport.attendance.supplementRateDelta > 0 ? '+' : ''}{monthlyReport.attendance.supplementRateDelta}%p</div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {studentPendingRows.length > 0 && (
-              <div className="msg-qlist" style={{ marginTop: '0.9rem' }}>
-                {studentPendingRows.map(row => (
-                  <div key={row.id} className={`msg-qrow ${selectedAlertIds.includes(row.id) ? 'sel' : ''}`}>
-                    <button className="msg-check" onClick={() => toggleAlertSelection(row.id)} aria-label={`${row.label} 선택`}>
-                      <span className={`msg-box ${selectedAlertIds.includes(row.id) ? 'on' : ''}`}>
-                        {selectedAlertIds.includes(row.id) && <Check size={12} />}
-                      </span>
-                    </button>
-                    <span className={`at-pill ${row.badgeTone}`}>{row.label}</span>
-                    <span className="msg-qname">{row.message}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button className="pay-btn primary" style={{ width: '100%', marginTop: '1rem' }} disabled={!currentStudent} onClick={handleGenerate}>
-              <Sparkles size={15} /> 종합알림장 초안 만들기
-            </button>
-          </div>
-
-          <section className="msg-preview">
-            <div className="gd-card-head" style={{ marginBottom: '0.8rem' }}>
-              <h2 className="gd-card-title"><Sparkles size={18} /> 미리보기</h2>
-            </div>
-            <textarea
-              className="msg-select message-preview-textarea"
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              placeholder="학생을 선택하고 포함할 내용을 고른 뒤 초안을 만들어 주세요."
-              style={{ minHeight: 320, resize: 'vertical', lineHeight: 1.65 }}
-            />
-            <div className="msg-send">
-              {currentStudent?.parentContact ? (
-                <a href={buildSMSLink(currentStudent.parentContact, message)} className="pay-btn ghost" style={{ textDecoration: 'none', pointerEvents: message.trim() ? 'auto' : 'none', opacity: message.trim() ? 1 : 0.5 }}>
-                  <Send size={15} /> 문자로 열기
-                </a>
-              ) : (
-                <button className="pay-btn ghost" disabled><Send size={15} /> 연락처 필요</button>
-              )}
-              <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending}>
-                <Send size={15} /> {isSending ? '발송 요청 중' : '알림톡 보내기'}
-              </button>
-            </div>
-            {currentStudent && (
-              <p className="msg-contact">학부모 연락처: {currentStudent.parentContact || '등록되지 않음'}</p>
-            )}
-          </section>
-        </div>
+        <button className="pay-btn primary" disabled={!currentStudent} onClick={handleGenerate}>
+          <Sparkles size={15} /> 초안 만들기
+        </button>
       </section>
 
+      <div className="msg-compose-grid">
+        <section className="gd-card msg-panel">
+          <div className="msg-section-title">대상 학생</div>
+          <select className="msg-select" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
+            <option value="">학생을 선택하세요</option>
+            {studentsByClass.map(group => (
+              <optgroup key={group.classId} label={group.className}>
+                {group.students.map(student => (
+                  <option key={student.id} value={student.id}>
+                    {student.name} ({student.grade.split(' ')[1] || student.grade})
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+
+          {currentStudent && (
+            <div className="msg-summary-grid">
+              <div><span>출결</span><b>{todaySummary.statuses}</b></div>
+              <div><span>숙제</span><b>{todaySummary.homework}</b></div>
+              <div><span>보강/보충</span><b>{todaySummary.makeup}</b></div>
+              <div><span>시험</span><b>{todayTests.length ? `${todayTests.length}건` : '없음'}</b></div>
+            </div>
+          )}
+
+          <div className="msg-section-row">
+            <div className="msg-section-title">포함 항목</div>
+            <input
+              type="month"
+              className="msg-month"
+              value={reportMonth}
+              onChange={e => setReportMonth(e.target.value)}
+              aria-label="보충률 기준 월"
+            />
+          </div>
+
+          <div className="msg-include-list">
+            {includeItems.map(item => (
+              <button key={item.key} className={`msg-include ${include[item.key] ? 'on' : ''}`} onClick={() => toggleInclude(item.key)}>
+                <span className="msg-include-icon">{include[item.key] ? <CheckSquare size={16} /> : <Square size={16} />}</span>
+                <span><b>{item.label}</b><em>{item.meta}</em></span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="gd-card msg-preview-pro">
+          <div className="msg-section-row">
+            <div className="msg-section-title">미리보기</div>
+            {currentStudent && <span className="msg-contact">학부모 연락처 {currentStudent.parentContact || '없음'}</span>}
+          </div>
+          <textarea
+            className="msg-draft-box"
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            placeholder="학생을 선택하고 초안을 만들어 주세요."
+          />
+          <div className="msg-send">
+            {currentStudent?.parentContact ? (
+              <a href={buildSMSLink(currentStudent.parentContact, message)} className="pay-btn ghost" style={{ textDecoration: 'none', pointerEvents: message.trim() ? 'auto' : 'none', opacity: message.trim() ? 1 : 0.5 }}>
+                <Send size={15} /> 문자로 열기
+              </a>
+            ) : (
+              <button className="pay-btn ghost" disabled><Send size={15} /> 연락처 필요</button>
+            )}
+            <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending}>
+              <Send size={15} /> {isSending ? '발송 요청 중' : '알림톡 보내기'}
+            </button>
+          </div>
+        </section>
+      </div>
+
       {pendingRows.length > 0 && (
-        <section className="gd-card msg-queue" style={{ marginBottom: '1.15rem' }}>
+        <section className="gd-card msg-queue" style={{ marginTop: '1.15rem' }}>
           <div className="gd-card-head">
             <h2 className="gd-card-title">
               <Bell size={18} /> 알림 대기 재료 <span className="cl-count">{pendingRows.length}건</span>

@@ -200,7 +200,6 @@ function AcademyApp({ session }: { session: Session }) {
     return 'dashboard';
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [assistantDraft, setAssistantDraft] = useState<{ id: number; content: string } | null>(null);
 
   const data = useAcademyData(session.user.id);
   const {
@@ -239,8 +238,7 @@ function AcademyApp({ session }: { session: Session }) {
     };
   }, [activeTab]);
 
-  const handleAssistantDraftToMessaging = (content: string) => {
-    setAssistantDraft({ id: Date.now(), content });
+  const handleAssistantDraftToMessaging = () => {
     setActiveTab('messaging');
     setIsMobileMenuOpen(false);
   };
@@ -373,7 +371,6 @@ function AcademyApp({ session }: { session: Session }) {
       case 'messaging':
         return (
           <Messaging
-            key={assistantDraft?.id ?? 'manual-messaging'}
             students={students}
             classes={classes}
             attendance={attendance}
@@ -385,7 +382,6 @@ function AcademyApp({ session }: { session: Session }) {
             onClearAlerts={data.handleClearKioskAlerts}
             onDismissHomeworkAlert={data.handleDismissHomeworkAlert}
             onClearHomeworkAlerts={data.handleClearHomeworkAlerts}
-            assistantDraft={assistantDraft}
           />
         );
       case 'kakao':
