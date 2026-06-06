@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Attendance, Class, CounselLog, HomeworkAlert, HomeworkStatus, KioskAlert, MessageLog, Payment, Student } from '../types';
-import { Bell, Check, CheckSquare, ChevronDown, ChevronUp, Clock, Copy, Send, Sparkles, Square, Trash2 } from 'lucide-react';
+import { Bell, Check, CheckSquare, ChevronDown, ChevronUp, Clock, Copy, Edit3, Send, Sparkles, Square, Trash2, User, Users } from 'lucide-react';
 import { sendAlimtalk } from '../lib/alimtalk';
 import { api } from '../lib/api';
-import { getStudentReportSummary } from '../lib/reportSummary';
+import { buildParentNoticeDraft, getNoticeDraftMeta, type NoticeIncludeKey, type NoticeIncludeState } from '../lib/noticeDrafts';
 
 interface MessagingProps {
   students: Student[];
@@ -21,7 +21,8 @@ interface MessagingProps {
 
 type AlertFilter = 'all' | 'in' | 'out' | 'homework' | 'missing-contact';
 type PendingAlertType = 'in' | 'out' | 'homework';
-type IncludeKey = 'attendance' | 'homework' | 'makeup' | 'supplementRate' | 'todayTest';
+type NoticeMode = 'single' | 'batch';
+type BatchStatus = 'idle' | 'sending' | 'sent' | 'failed' | 'skipped';
 
 interface PendingAlertRow {
   id: string;
@@ -39,43 +40,47 @@ interface PendingAlertRow {
   createdAt: number;
 }
 
+interface BatchDraft {
+  studentId: string;
+  name: string;
+  contact: string;
+  message: string;
+  selected: boolean;
+  expanded: boolean;
+  status: BatchStatus;
+  errorMessage?: string;
+}
+
 const todayLocal = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-const formatDate = (date: string) => {
-  if (!date) return '-';
-  const [, month, day] = date.split('-');
-  return month && day ? `${Number(month)}월 ${Number(day)}일` : date;
-};
-
 const homeworkLabel = (status?: HomeworkStatus) => {
   if (status === 'done') return '완료';
-  if (status === 'incomplete') return '일부 미흡';
+  if (status === 'incomplete') return '부분 완료';
   if (status === 'undone') return '미제출';
   return '기록 없음';
-};
-
-const attendanceStatusLabel = (status?: Attendance['status']) => {
-  if (status === 'present') return '출석';
-  if (status === 'absent') return '결석';
-  if (status === 'makeup') return '보강';
-  if (status === 'supplement') return '보충';
-  if (status === 'late') return '지각';
-  return '미체크';
 };
 
 const messageLogTypeLabel: Record<string, string> = {
   check_in: '등원',
   check_out: '하원',
-  homework_done: '숙제 완료',
-  homework_incomplete: '숙제 미흡',
-  homework_undone: '숙제 미제출',
+  homework_done: '과제 완료',
+  homework_incomplete: '과제 부분 완료',
+  homework_undone: '과제 미제출',
   payment_request: '수납 안내',
   payment_paid: '수납 완료',
   exam_result: '평가 결과',
   custom: '종합알림장',
+};
+
+const statusLabel: Record<BatchStatus, string> = {
+  idle: '대기',
+  sending: '발송중',
+  sent: '완료',
+  failed: '실패',
+  skipped: '제외',
 };
 
 const buildSMSLink = (parentContact: string, message: string): string => {
@@ -101,17 +106,21 @@ export const Messaging: React.FC<MessagingProps> = ({
   onDismissHomeworkAlert,
   onClearHomeworkAlerts,
 }) => {
+  const [mode, setMode] = useState<NoticeMode>('single');
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [include, setInclude] = useState<Record<IncludeKey, boolean>>({
+  const [include, setInclude] = useState<NoticeIncludeState>({
     attendance: true,
     homework: true,
     makeup: true,
     supplementRate: true,
-    todayTest: true,
+    recentTest: true,
   });
   const [message, setMessage] = useState('');
+  const [batchClassId, setBatchClassId] = useState('');
+  const [batchDrafts, setBatchDrafts] = useState<BatchDraft[]>([]);
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [isSending, setIsSending] = useState(false);
+  const [isBatchSending, setIsBatchSending] = useState(false);
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('all');
   const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>([]);
   const [bulkCopied, setBulkCopied] = useState(false);
@@ -141,34 +150,61 @@ export const Messaging: React.FC<MessagingProps> = ({
     return groups;
   }, [activeStudents, classes]);
 
-  const todayAttendances = useMemo(() => {
-    if (!selectedStudentId) return [];
-    return attendance.filter(a => a.studentId === selectedStudentId && a.date === todayStr);
-  }, [attendance, selectedStudentId, todayStr]);
-
-  const todayTests = useMemo(() => {
-    if (!selectedStudentId) return [];
-    return counselLogs
-      .filter(log => log.studentId === selectedStudentId && log.type === 'test' && log.date === todayStr)
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [counselLogs, selectedStudentId, todayStr]);
-
-  const monthlyReport = useMemo(() => {
+  const selectedMeta = useMemo(() => {
     if (!currentStudent) return null;
-    return getStudentReportSummary({
+    return getNoticeDraftMeta({
       student: currentStudent,
       classes,
       attendance,
       payments,
       counselLogs,
       month: reportMonth,
+      today: todayStr,
     });
-  }, [attendance, classes, counselLogs, currentStudent, payments, reportMonth]);
+  }, [attendance, classes, counselLogs, currentStudent, payments, reportMonth, todayStr]);
+
+  const includeItems: Array<{ key: NoticeIncludeKey; label: string; meta: string }> = [
+    { key: 'attendance', label: '출결 요약', meta: selectedMeta?.attendance ?? '월 출석률 기준' },
+    { key: 'homework', label: '과제 수행', meta: selectedMeta?.homework ?? '완료/부분/미제출' },
+    { key: 'makeup', label: '보강/보충 현황', meta: selectedMeta?.makeup ?? '보강·보충 횟수' },
+    { key: 'supplementRate', label: '또래 대비 보충률', meta: selectedMeta?.supplementRate ?? '월 기준 비교' },
+    { key: 'recentTest', label: '최근 평가 결과', meta: selectedMeta?.recentTest ?? '최근 평가 기록' },
+  ];
+
+  const buildNoticeForStudent = (student: Student) => buildParentNoticeDraft({
+    student,
+    classes,
+    attendance,
+    payments,
+    counselLogs,
+    month: reportMonth,
+    today: todayStr,
+    include,
+  });
+
+  const batchTargets = useMemo(() => {
+    if (!batchClassId) return activeStudents;
+    const targetClass = classes.find(cls => cls.id === batchClassId);
+    if (!targetClass) return [];
+    return activeStudents.filter(student => targetClass.studentIds.includes(student.id));
+  }, [activeStudents, batchClassId, classes]);
+
+  const batchStats = useMemo(() => {
+    const selected = batchDrafts.filter(draft => draft.selected);
+    return {
+      total: batchDrafts.length,
+      selected: selected.length,
+      sendable: selected.filter(draft => draft.contact && draft.message.trim()).length,
+      missingContact: batchDrafts.filter(draft => !draft.contact).length,
+      sent: batchDrafts.filter(draft => draft.status === 'sent').length,
+      failed: batchDrafts.filter(draft => draft.status === 'failed').length,
+    };
+  }, [batchDrafts]);
 
   const pendingRows = useMemo<PendingAlertRow[]>(() => {
     const kioskRows: PendingAlertRow[] = kioskAlerts.map(alert => {
       const student = students.find(s => s.id === alert.studentId);
-      const name = student?.name ?? '알 수 없음';
+      const name = student?.name ?? '학생 없음';
       const label = alert.kind === 'in' ? '등원' : '하원';
       return {
         id: `kiosk-${alert.id}`,
@@ -189,8 +225,8 @@ export const Messaging: React.FC<MessagingProps> = ({
 
     const homeworkRows: PendingAlertRow[] = homeworkAlerts.map(alert => {
       const student = students.find(s => s.id === alert.studentId);
-      const name = student?.name ?? '알 수 없음';
-      const label = `숙제 ${homeworkLabel(alert.homeworkStatus)}`;
+      const name = student?.name ?? '학생 없음';
+      const label = `과제 ${homeworkLabel(alert.homeworkStatus)}`;
       return {
         id: `homework-${alert.id}`,
         source: 'homework',
@@ -202,7 +238,7 @@ export const Messaging: React.FC<MessagingProps> = ({
         name,
         contact: student?.parentContact ?? '',
         date: alert.date,
-        message: `${name} 학생 숙제 상태: ${homeworkLabel(alert.homeworkStatus)}`,
+        message: `${name} 학생 과제 상태: ${homeworkLabel(alert.homeworkStatus)}`,
         createdAt: alert.createdAt,
       };
     });
@@ -221,103 +257,44 @@ export const Messaging: React.FC<MessagingProps> = ({
   const selectedVisibleAlertIds = selectedAlertIds.filter(id => visibleAlertIds.includes(id));
   const hasAllVisibleSelected = visibleAlertIds.length > 0 && visibleAlertIds.every(id => selectedAlertIds.includes(id));
 
-  const todaySummary = useMemo(() => {
-    const classNames = todayAttendances
-      .map(a => classes.find(cls => cls.id === a.classId)?.name)
-      .filter(Boolean)
-      .join(', ');
-    const checkIn = todayAttendances.map(a => a.checkInTime).filter(Boolean).join(', ') || '-';
-    const checkOut = todayAttendances.map(a => a.checkOutTime).filter(Boolean).join(', ') || '-';
-    const statuses = todayAttendances.map(a => attendanceStatusLabel(a.status)).join(', ') || '기록 없음';
-    const homework = todayAttendances.map(a => homeworkLabel(a.homeworkStatus)).filter(v => v !== '기록 없음').join(', ') || '기록 없음';
-    const makeup = todayAttendances
-      .filter(a => a.status === 'makeup' || a.status === 'supplement' || a.supplementMinutes)
-      .map(a => {
-        if (a.status === 'makeup') return a.makeupForDate ? `보강 (${formatDate(a.makeupForDate)} 결석분)` : '보강';
-        if (a.status === 'supplement') return `보충${a.supplementMinutes ? ` ${a.supplementMinutes}분` : ''}`;
-        return `보충 ${a.supplementMinutes}분`;
-      })
-      .join(', ') || '없음';
-    return { classNames: classNames || '-', checkIn, checkOut, statuses, homework, makeup, hasRecord: todayAttendances.length > 0 };
-  }, [classes, todayAttendances]);
-
-  const includeItems: Array<{ key: IncludeKey; label: string; meta: string }> = [
-    { key: 'attendance', label: '출결', meta: todaySummary.statuses },
-    { key: 'homework', label: '숙제', meta: todaySummary.homework },
-    { key: 'makeup', label: '보강/보충', meta: todaySummary.makeup },
-    {
-      key: 'supplementRate',
-      label: '다른 학생 대비 보충률',
-      meta: monthlyReport ? `${monthlyReport.attendance.supplementRate}% / 평균 ${monthlyReport.attendance.peerSupplementRate}%` : '-',
-    },
-    { key: 'todayTest', label: '그날 시험 결과', meta: todayTests.length ? `${todayTests.length}건` : '없음' },
-  ];
-
-  const buildNotice = () => {
-    if (!currentStudent) return '';
-    const lines = [
-      '안녕하세요, 그로잉영어입니다.',
-      '',
-      `${currentStudent.name} 학생의 ${formatDate(todayStr)} 수업 내용을 안내드립니다.`,
-      '',
-    ];
-
-    if (include.attendance) {
-      lines.push('[출결]');
-      lines.push(`- 수업: ${todaySummary.classNames}`);
-      lines.push(`- 상태: ${todaySummary.statuses}`);
-      lines.push(`- 등원: ${todaySummary.checkIn}`);
-      lines.push(`- 하원: ${todaySummary.checkOut}`);
-      lines.push('');
-    }
-
-    if (include.homework) {
-      lines.push('[숙제]');
-      lines.push(`- ${todaySummary.homework}`);
-      lines.push('');
-    }
-
-    if (include.makeup && todaySummary.makeup !== '없음') {
-      lines.push('[보강/보충]');
-      lines.push(`- ${todaySummary.makeup}`);
-      lines.push('');
-    }
-
-    if (include.supplementRate && monthlyReport) {
-      const diff = monthlyReport.attendance.supplementRateDelta;
-      const comparison = diff > 0
-        ? `다른 학생 평균보다 ${diff}%p 높습니다.`
-        : diff < 0
-          ? `다른 학생 평균보다 ${Math.abs(diff)}%p 낮습니다.`
-          : '다른 학생 평균과 같습니다.';
-      lines.push('[보충률]');
-      lines.push(`- ${reportMonth} 보충률: ${monthlyReport.attendance.supplementRate}%`);
-      lines.push(`- 다른 학생 평균: ${monthlyReport.attendance.peerSupplementRate}%`);
-      lines.push(`- 비교: ${comparison}`);
-      if (diff > 0) lines.push('- 부족한 부분이 평균보다 많은 편이라 가정에서도 한 번 더 확인 부탁드립니다.');
-      lines.push('');
-    }
-
-    if (include.todayTest && todayTests.length > 0) {
-      lines.push('[시험 결과]');
-      todayTests.forEach(test => {
-        const score = test.score ? ` (${test.score})` : '';
-        lines.push(`- ${test.title}${score}: ${test.content}`);
-      });
-      lines.push('');
-    }
-
-    lines.push('가정에서도 확인 부탁드립니다. 감사합니다.');
-    return lines.join('\n').replace(/\n{3,}/g, '\n\n');
+  const refreshLogs = async () => {
+    const logs = await api.getMessageLogs(50).catch(() => messageLogs);
+    setMessageLogs(logs);
   };
 
   const handleGenerate = () => {
-    const draft = buildNotice();
-    if (draft) setMessage(draft);
+    if (!currentStudent) return;
+    setMessage(buildNoticeForStudent(currentStudent));
+  };
+
+  const handleGenerateBatch = () => {
+    const drafts = batchTargets.map(student => ({
+      studentId: student.id,
+      name: student.name,
+      contact: student.parentContact,
+      message: buildNoticeForStudent(student),
+      selected: Boolean(student.parentContact),
+      expanded: false,
+      status: student.parentContact ? 'idle' as BatchStatus : 'skipped' as BatchStatus,
+      errorMessage: student.parentContact ? undefined : '학부모 연락처가 없습니다.',
+    }));
+    setMode('batch');
+    setBatchDrafts(drafts);
+  };
+
+  const patchBatchDraft = (studentId: string, patch: Partial<BatchDraft>) => {
+    setBatchDrafts(rows => rows.map(row => row.studentId === studentId ? { ...row, ...patch } : row));
+  };
+
+  const handleSelectAllBatch = () => {
+    const selectableCount = batchDrafts.filter(draft => draft.contact && draft.message.trim()).length;
+    const allSelected = selectableCount > 0 && batchDrafts.filter(draft => draft.contact && draft.message.trim()).every(draft => draft.selected);
+    setBatchDrafts(rows => rows.map(row => row.contact && row.message.trim() ? { ...row, selected: !allSelected } : { ...row, selected: false }));
   };
 
   const handleSendComprehensiveAlimtalk = async () => {
     if (!currentStudent || !currentStudent.parentContact || !message.trim()) return;
+    if (!window.confirm(`${currentStudent.name} 학생 학부모님께 종합알림장을 발송할까요?`)) return;
     setIsSending(true);
     try {
       await sendAlimtalk({
@@ -329,8 +306,7 @@ export const Messaging: React.FC<MessagingProps> = ({
         message,
         fallbackMessage: message,
       });
-      const logs = await api.getMessageLogs(50).catch(() => messageLogs);
-      setMessageLogs(logs);
+      await refreshLogs();
       alert('종합알림장 발송을 요청했어요.');
     } catch (error) {
       alert(error instanceof Error ? error.message : '종합알림장 발송에 실패했어요.');
@@ -339,7 +315,36 @@ export const Messaging: React.FC<MessagingProps> = ({
     }
   };
 
-  const toggleInclude = (key: IncludeKey) => setInclude(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleSendSelectedBatch = async () => {
+    const targets = batchDrafts.filter(draft => draft.selected && draft.contact && draft.message.trim());
+    if (targets.length === 0) return;
+    if (!window.confirm(`선택한 ${targets.length}명에게 종합알림장을 발송할까요?`)) return;
+    setIsBatchSending(true);
+    for (const draft of targets) {
+      patchBatchDraft(draft.studentId, { status: 'sending', errorMessage: undefined });
+      try {
+        await sendAlimtalk({
+          studentId: draft.studentId,
+          alertType: 'custom',
+          recipientPhone: draft.contact,
+          recipientName: draft.name,
+          subject: `그로잉영어 ${draft.name} 학생 종합알림장`,
+          message: draft.message,
+          fallbackMessage: draft.message,
+        });
+        patchBatchDraft(draft.studentId, { status: 'sent', selected: false });
+      } catch (error) {
+        patchBatchDraft(draft.studentId, {
+          status: 'failed',
+          errorMessage: error instanceof Error ? error.message : '발송 실패',
+        });
+      }
+    }
+    await refreshLogs();
+    setIsBatchSending(false);
+  };
+
+  const toggleInclude = (key: NoticeIncludeKey) => setInclude(prev => ({ ...prev, [key]: !prev[key] }));
 
   const toggleAlertSelection = (id: string) => {
     setSelectedAlertIds(ids => ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id]);
@@ -384,49 +389,82 @@ export const Messaging: React.FC<MessagingProps> = ({
         <div>
           <span className="msg-eyebrow">Parent Notice</span>
           <h2>종합알림장</h2>
-          <p>출결, 숙제, 보강/보충, 보충률 비교, 시험 결과만 모아 학부모 안내문을 만듭니다.</p>
+          <p>출결, 과제, 보강/보충, 또래 대비 보충률, 최근 평가를 한 번에 정리해 검토 후 발송합니다.</p>
         </div>
-        <button className="pay-btn primary" disabled={!currentStudent} onClick={handleGenerate}>
-          <Sparkles size={15} /> 초안 만들기
-        </button>
+        <div className="msg-hero-actions">
+          <input
+            type="month"
+            className="msg-month dark"
+            value={reportMonth}
+            onChange={e => setReportMonth(e.target.value)}
+            aria-label="알림장 기준 월"
+          />
+          <button className="pay-btn primary" disabled={mode === 'single' ? !currentStudent : batchTargets.length === 0} onClick={mode === 'single' ? handleGenerate : handleGenerateBatch}>
+            <Sparkles size={15} /> 초안 만들기
+          </button>
+        </div>
       </section>
+
+      <div className="msg-mode-tabs" role="tablist" aria-label="알림장 작성 방식">
+        <button className={mode === 'single' ? 'on' : ''} onClick={() => setMode('single')}>
+          <User size={15} /> 개별 작성
+        </button>
+        <button className={mode === 'batch' ? 'on' : ''} onClick={() => setMode('batch')}>
+          <Users size={15} /> 반별 일괄
+        </button>
+      </div>
 
       <div className="msg-compose-grid">
         <section className="gd-card msg-panel">
-          <div className="msg-section-title">대상 학생</div>
-          <select className="msg-select" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
-            <option value="">학생을 선택하세요</option>
-            {studentsByClass.map(group => (
-              <optgroup key={group.classId} label={group.className}>
-                {group.students.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.name} ({student.grade.split(' ')[1] || student.grade})
-                  </option>
+          <div className="msg-section-title">{mode === 'single' ? '대상 학생' : '발송 대상'}</div>
+          {mode === 'single' ? (
+            <select className="msg-select" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
+              <option value="">학생을 선택하세요</option>
+              {studentsByClass.map(group => (
+                <optgroup key={group.classId} label={group.className}>
+                  {group.students.map(student => (
+                    <option key={student.id} value={student.id}>
+                      {student.name} ({student.grade.split(' ')[1] || student.grade})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          ) : (
+            <div className="msg-batch-target">
+              <select className="msg-select" value={batchClassId} onChange={e => setBatchClassId(e.target.value)}>
+                <option value="">전체 재원생</option>
+                {classes.map(cls => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
                 ))}
-              </optgroup>
-            ))}
-          </select>
+              </select>
+              <button className="pay-btn ghost" onClick={handleGenerateBatch} disabled={batchTargets.length === 0}>
+                <Sparkles size={15} /> {batchTargets.length}명 초안 생성
+              </button>
+            </div>
+          )}
 
-          {currentStudent && (
+          {currentStudent && mode === 'single' && selectedMeta && (
             <div className="msg-summary-grid">
-              <div><span>출결</span><b>{todaySummary.statuses}</b></div>
-              <div><span>숙제</span><b>{todaySummary.homework}</b></div>
-              <div><span>보강/보충</span><b>{todaySummary.makeup}</b></div>
-              <div><span>시험</span><b>{todayTests.length ? `${todayTests.length}건` : '없음'}</b></div>
+              <div><span>출결</span><b>{selectedMeta.attendance}</b></div>
+              <div><span>과제</span><b>{selectedMeta.homework}</b></div>
+              <div><span>보강/보충</span><b>{selectedMeta.makeup}</b></div>
+              <div><span>최근 평가</span><b>{selectedMeta.recentTest}</b></div>
+            </div>
+          )}
+
+          {mode === 'batch' && (
+            <div className="msg-summary-grid">
+              <div><span>생성 대상</span><b>{batchTargets.length}명</b></div>
+              <div><span>초안</span><b>{batchStats.total}명</b></div>
+              <div><span>선택</span><b>{batchStats.selected}명</b></div>
+              <div><span>연락처 없음</span><b>{batchStats.missingContact}명</b></div>
             </div>
           )}
 
           <div className="msg-section-row">
             <div className="msg-section-title">포함 항목</div>
-            <input
-              type="month"
-              className="msg-month"
-              value={reportMonth}
-              onChange={e => setReportMonth(e.target.value)}
-              aria-label="보충률 기준 월"
-            />
           </div>
-
           <div className="msg-include-list">
             {includeItems.map(item => (
               <button key={item.key} className={`msg-include ${include[item.key] ? 'on' : ''}`} onClick={() => toggleInclude(item.key)}>
@@ -438,36 +476,111 @@ export const Messaging: React.FC<MessagingProps> = ({
         </section>
 
         <section className="gd-card msg-preview-pro">
-          <div className="msg-section-row">
-            <div className="msg-section-title">미리보기</div>
-            {currentStudent && <span className="msg-contact">학부모 연락처 {currentStudent.parentContact || '없음'}</span>}
-          </div>
-          <textarea
-            className="msg-draft-box"
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            placeholder="학생을 선택하고 초안을 만들어 주세요."
-          />
-          <div className="msg-send">
-            {currentStudent?.parentContact ? (
-              <a href={buildSMSLink(currentStudent.parentContact, message)} className="pay-btn ghost" style={{ textDecoration: 'none', pointerEvents: message.trim() ? 'auto' : 'none', opacity: message.trim() ? 1 : 0.5 }}>
-                <Send size={15} /> 문자로 열기
-              </a>
-            ) : (
-              <button className="pay-btn ghost" disabled><Send size={15} /> 연락처 필요</button>
-            )}
-            <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending}>
-              <Send size={15} /> {isSending ? '발송 요청 중' : '알림톡 보내기'}
-            </button>
-          </div>
+          {mode === 'single' ? (
+            <>
+              <div className="msg-section-row">
+                <div className="msg-section-title">미리보기</div>
+                {currentStudent && <span className="msg-contact">학부모 연락처 {currentStudent.parentContact || '없음'}</span>}
+              </div>
+              <textarea
+                className="msg-draft-box"
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="학생을 선택하고 초안을 만들어 주세요."
+              />
+              <div className="msg-send">
+                {currentStudent?.parentContact ? (
+                  <a href={buildSMSLink(currentStudent.parentContact, message)} className="pay-btn ghost" style={{ textDecoration: 'none', pointerEvents: message.trim() ? 'auto' : 'none', opacity: message.trim() ? 1 : 0.5 }}>
+                    <Send size={15} /> 문자로 열기
+                  </a>
+                ) : (
+                  <button className="pay-btn ghost" disabled><Send size={15} /> 연락처 필요</button>
+                )}
+                <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending}>
+                  <Send size={15} /> {isSending ? '발송 요청 중' : '알림톡 보내기'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="msg-section-row">
+                <div>
+                  <div className="msg-section-title">일괄 검토</div>
+                  <p className="msg-small-copy">학생 카드를 열어 문구를 확인하고, 발송할 학생만 선택하세요.</p>
+                </div>
+                <button className="pay-btn ghost sm" onClick={handleSelectAllBatch} disabled={batchDrafts.length === 0}>
+                  <CheckSquare size={14} /> 전체 선택
+                </button>
+              </div>
+              {batchDrafts.length === 0 ? (
+                <div className="msg-empty-panel">대상을 고른 뒤 초안을 생성하면 학생별 알림장이 여기에 표시됩니다.</div>
+              ) : (
+                <div className="msg-batch-list">
+                  {batchDrafts.map(draft => (
+                    <div className={`msg-batch-row ${draft.selected ? 'sel' : ''} ${draft.expanded ? 'open' : ''}`} key={draft.studentId}>
+                      <button
+                        className="msg-check"
+                        onClick={() => patchBatchDraft(draft.studentId, { selected: !draft.selected })}
+                        disabled={!draft.contact || !draft.message.trim() || isBatchSending}
+                        aria-label={`${draft.name} 발송 선택`}
+                      >
+                        <span className={`msg-box ${draft.selected ? 'on' : ''}`}>{draft.selected && <Check size={12} />}</span>
+                      </button>
+                      <button className="msg-batch-summary" onClick={() => patchBatchDraft(draft.studentId, { expanded: !draft.expanded })}>
+                        <b>{draft.name}</b>
+                        <span>{draft.contact || '연락처 없음'}</span>
+                        <em>{draft.message.split('\n').find(Boolean) || '초안 없음'}</em>
+                      </button>
+                      <span className={`at-pill ${draft.status === 'sent' ? 'ok' : draft.status === 'failed' ? 'danger' : draft.status === 'sending' ? 'warn' : draft.status === 'skipped' ? 'danger' : 'info'}`}>
+                        {statusLabel[draft.status]}
+                      </span>
+                      <button className="at-act" onClick={() => patchBatchDraft(draft.studentId, { expanded: !draft.expanded })}>
+                        <Edit3 size={13} /> 수정
+                      </button>
+                      {draft.expanded && (
+                        <div className="msg-batch-editor">
+                          <textarea
+                            value={draft.message}
+                            onChange={e => patchBatchDraft(draft.studentId, { message: e.target.value })}
+                          />
+                          {draft.errorMessage && <span className="msg-error-text">{draft.errorMessage}</span>}
+                          <div className="msg-batch-editor-actions">
+                            {draft.contact ? (
+                              <a href={buildSMSLink(draft.contact, draft.message)} className="pay-btn ghost sm" style={{ textDecoration: 'none' }}>
+                                <Send size={14} /> 문자로 열기
+                              </a>
+                            ) : (
+                              <button className="pay-btn ghost sm" disabled>연락처 필요</button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </section>
       </div>
+
+      {mode === 'batch' && batchDrafts.length > 0 && (
+        <div className="msg-batch-actionbar">
+          <div>
+            <b>{batchStats.selected}명 선택</b>
+            <span>발송 가능 {batchStats.sendable}명 · 완료 {batchStats.sent}명 · 실패 {batchStats.failed}명</span>
+          </div>
+          <button className="pay-btn primary" onClick={() => void handleSendSelectedBatch()} disabled={batchStats.sendable === 0 || isBatchSending}>
+            <Send size={15} /> {isBatchSending ? '발송 중' : '선택 발송'}
+          </button>
+        </div>
+      )}
 
       {pendingRows.length > 0 && (
         <section className="gd-card msg-queue" style={{ marginTop: '1.15rem' }}>
           <div className="gd-card-head">
             <h2 className="gd-card-title">
-              <Bell size={18} /> 알림 대기 재료 <span className="cl-count">{pendingRows.length}건</span>
+              <Bell size={18} /> 알림 대기 자료 <span className="cl-count">{pendingRows.length}건</span>
             </h2>
             <div className="msg-q-actions">
               <button className="pay-btn ghost sm" onClick={handleCopySelectedAlerts} disabled={selectedAlertIds.length === 0}>
@@ -487,7 +600,7 @@ export const Messaging: React.FC<MessagingProps> = ({
               ['all', `전체 ${pendingRows.length}`],
               ['in', `등원 ${pendingRows.filter(row => row.type === 'in').length}`],
               ['out', `하원 ${pendingRows.filter(row => row.type === 'out').length}`],
-              ['homework', `숙제 ${pendingRows.filter(row => row.type === 'homework').length}`],
+              ['homework', `과제 ${pendingRows.filter(row => row.type === 'homework').length}`],
               ['missing-contact', `연락처 없음 ${pendingRows.filter(row => !row.contact).length}`],
             ] as Array<[AlertFilter, string]>).map(([value, label]) => (
               <button key={value} className={`at-chip ${alertFilter === value ? 'on' : ''}`} onClick={() => setAlertFilter(value)}>

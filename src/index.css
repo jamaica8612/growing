@@ -3068,6 +3068,12 @@ textarea.form-control {
   color: #fff;
   box-shadow: 0 18px 45px rgba(15, 46, 33, 0.18);
 }
+.msg-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
 .msg-eyebrow {
   display: inline-flex;
   margin-bottom: 0.35rem;
@@ -3122,6 +3128,52 @@ textarea.form-control {
   font-size: 0.82rem;
   color: var(--color-text-primary);
   background: #fff;
+}
+.msg-month.dark {
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.msg-month.dark::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.85;
+}
+.msg-mode-tabs {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #edf3ef;
+}
+.msg-mode-tabs button {
+  min-width: 128px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.8rem;
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.msg-mode-tabs button.on {
+  background: #fff;
+  color: var(--color-primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+.msg-batch-target {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
 }
 .msg-summary-grid {
   display: grid;
@@ -3219,6 +3271,134 @@ textarea.form-control {
   border-color: var(--color-accent-mint);
   box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
 }
+.msg-small-copy {
+  margin: 0.18rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.msg-empty-panel {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  background: #f8fbf9;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+.msg-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 580px;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+.msg-batch-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+}
+.msg-batch-row.sel {
+  border-color: var(--color-accent-mint);
+  background: #f3fcf7;
+}
+.msg-batch-summary {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.msg-batch-summary b {
+  display: inline-block;
+  color: var(--color-primary-dark);
+  font-size: 0.9rem;
+  margin-right: 0.45rem;
+}
+.msg-batch-summary span {
+  display: inline-block;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+.msg-batch-summary em {
+  display: block;
+  min-width: 0;
+  margin-top: 0.12rem;
+  color: var(--color-text-secondary);
+  font-style: normal;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg-batch-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #edf2ef;
+}
+.msg-batch-editor textarea {
+  width: 100%;
+  min-height: 170px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.8rem;
+  font-family: inherit;
+  font-size: 0.86rem;
+  line-height: 1.58;
+  background: #fbfdfb;
+  color: var(--color-text-primary);
+}
+.msg-batch-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+.msg-error-text {
+  color: var(--color-danger);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.msg-batch-actionbar {
+  position: sticky;
+  bottom: 0.85rem;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(15,46,33,0.16);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 16px 42px rgba(15,46,33,0.16);
+  backdrop-filter: blur(10px);
+}
+.msg-batch-actionbar b {
+  display: block;
+  color: var(--color-primary-dark);
+  font-size: 0.92rem;
+}
+.msg-batch-actionbar span {
+  display: block;
+  margin-top: 0.12rem;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
 .msg-q-actions { display: flex; gap: 0.5rem; }
 .msg-filters { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
 .msg-qlist { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -3256,6 +3436,61 @@ textarea.form-control {
 .msg-contact { font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 0.7rem; }
 .msg-log-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: var(--color-text-primary); cursor: pointer; padding: 0; font-family: inherit; }
 @media (max-width: 768px) {
+  .msg-pro { max-width: none; }
+  .msg-hero {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+    border-radius: 16px;
+  }
+  .msg-hero h2 { font-size: 1.35rem; }
+  .msg-hero-actions { display: grid; grid-template-columns: 1fr; }
+  .msg-hero .pay-btn { width: 100%; justify-content: center; }
+  .msg-mode-tabs { width: 100%; }
+  .msg-mode-tabs button { min-width: 0; min-height: 42px; }
+  .msg-compose-grid { grid-template-columns: 1fr; gap: 0.85rem; }
+  .msg-batch-target { grid-template-columns: 1fr; }
+  .msg-panel,
+  .msg-preview-pro,
+  .msg-batch-results { padding: 0.9rem; border-radius: 14px; }
+  .msg-section-row { align-items: flex-start; flex-direction: column; }
+  .msg-month { width: 100%; height: 42px; }
+  .msg-summary-grid { grid-template-columns: 1fr; }
+  .msg-include { min-height: 62px; padding: 0.75rem; }
+  .msg-draft-box { min-height: 300px; font-size: 0.9rem; }
+  .msg-batch-grid { grid-template-columns: 1fr; }
+  .msg-batch-card textarea { min-height: 150px; }
+  .msg-batch-list { max-height: none; overflow: visible; }
+  .msg-batch-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    padding: 0.72rem;
+  }
+  .msg-batch-row .at-act {
+    grid-column: 1 / -1;
+    min-height: 38px;
+    justify-content: center;
+  }
+  .msg-batch-summary em { max-width: 100%; }
+  .msg-batch-editor textarea {
+    min-height: 132px;
+    max-height: 210px;
+  }
+  .msg-batch-actionbar {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(4.8rem + env(safe-area-inset-bottom));
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.8rem;
+    border-radius: 14px;
+  }
+  .msg-batch-actionbar .pay-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .msg-send .pay-btn { min-height: 44px; }
   .msg-main { grid-template-columns: 1fr; }
   .msg-qrow { grid-template-columns: auto auto 1fr; row-gap: 0.5rem; }
   .msg-qtime, .msg-qcontact { grid-column: 2 / -1; }
