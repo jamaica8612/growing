@@ -1,9 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen, MessageSquare, RotateCcw, FolderOpen, FileSpreadsheet, FileArchive, File, X } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen, MessageSquare, FolderOpen, FileSpreadsheet, FileArchive, File, X } from 'lucide-react';
 import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { type MessageTemplates, DEFAULT_TEMPLATES, TEMPLATE_META } from '../lib/messageTemplates';
 
 // Bump when the backup file shape changes so old/foreign files can be detected.
 const SCHEMA_VERSION = 1;
@@ -26,8 +25,6 @@ interface BackupProps {
   };
   kioskPin: string;
   onChangeKioskPin: (newPin: string) => void;
-  messageTemplates: MessageTemplates;
-  onSaveMessageTemplates: (templates: MessageTemplates) => void;
 }
 
 // Verify each record is an object carrying a string id, so a corrupt or
@@ -36,7 +33,7 @@ const isRecordArray = (value: unknown): value is { id: unknown }[] =>
   Array.isArray(value) &&
   value.every(item => typeof item === 'object' && item !== null && typeof (item as { id?: unknown }).id === 'string');
 
-export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin, messageTemplates, onSaveMessageTemplates }) => {
+export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
@@ -144,28 +141,6 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   const [memoryLoading, setMemoryLoading] = useState(true);
   const [memorySaving, setMemorySaving] = useState(false);
   const [memoryStatus, setMemoryStatus] = useState<{ success: boolean; message: string } | null>(null);
-
-  // 메시지 템플릿 편집 — 저장 전까지 로컬 초안으로 보관하고, 저장 시 상위로 올린다.
-  const [templateDraft, setTemplateDraft] = useState<MessageTemplates>(messageTemplates);
-  const [templateStatus, setTemplateStatus] = useState<string | null>(null);
-
-  // 상위 템플릿 참조가 바뀌면(저장/복원 등) 초안을 동기화. effect 대신 렌더 중
-  // 직접 비교하는 React 권장 패턴이라 편집 중 불필요한 리렌더가 없다.
-  const [prevTemplates, setPrevTemplates] = useState(messageTemplates);
-  if (prevTemplates !== messageTemplates) {
-    setPrevTemplates(messageTemplates);
-    setTemplateDraft(messageTemplates);
-  }
-
-  const handleSaveTemplates = () => {
-    onSaveMessageTemplates(templateDraft);
-    setTemplateStatus('알림 메시지 템플릿이 저장되었습니다.');
-    setTimeout(() => setTemplateStatus(null), 4000);
-  };
-
-  const handleResetTemplate = (key: keyof MessageTemplates) => {
-    setTemplateDraft(prev => ({ ...prev, [key]: DEFAULT_TEMPLATES[key] }));
-  };
 
   useEffect(() => {
     api.getAssistantMemory()
@@ -430,40 +405,40 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       </div>
 
       {/* CSV Export */}
-      <div className="card" style={{ order: 52 }}>
-        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="gd-card set-accent">
+        <h4 className="set-h">
           <Download size={18} /> CSV 내보내기 (엑셀 호환)
         </h4>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+        <p className="set-p">
           학생, 출결, 수납 데이터를 엑셀에서 바로 열 수 있는 CSV 형식으로 다운로드합니다.
         </p>
-        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={handleExportStudentsCsv} style={{ gap: '0.35rem' }}>
+        <div className="set-csv">
+          <button className="pay-btn ghost" onClick={handleExportStudentsCsv}>
             <Download size={14} /> 학생 목록
           </button>
-          <button className="btn btn-secondary" onClick={handleExportAttendanceCsv} style={{ gap: '0.35rem' }}>
+          <button className="pay-btn ghost" onClick={handleExportAttendanceCsv}>
             <Download size={14} /> 출결 기록
           </button>
-          <button className="btn btn-secondary" onClick={handleExportPaymentsCsv} style={{ gap: '0.35rem' }}>
+          <button className="pay-btn ghost" onClick={handleExportPaymentsCsv}>
             <Download size={14} /> 수납 내역
           </button>
         </div>
       </div>
 
       {/* 파일 보관함 */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem' }}>
+      <div className="gd-card">
+        <div className="set-section-head">
           <div>
-            <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h4 className="set-h">
               <FolderOpen size={18} /> 참고 파일 보관함
             </h4>
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+            <p className="set-p tight">
               학원 양식·리포트·장부 파일을 올려두세요. 엑셀, ZIP, PDF 허용 (최대 10MB)
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="set-inline-actions">
             {uploadProgress && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{uploadProgress}</span>
+              <span className="set-status-text">{uploadProgress}</span>
             )}
             <input
               ref={uploadInputRef}
@@ -472,33 +447,32 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
               style={{ display: 'none' }}
               onChange={handleFileUpload}
             />
-            <button className="btn btn-primary" onClick={() => uploadInputRef.current?.click()} disabled={!!uploadProgress}>
+            <button className="pay-btn primary" onClick={() => uploadInputRef.current?.click()} disabled={!!uploadProgress}>
               <Upload size={15} /> 파일 올리기
             </button>
           </div>
         </div>
 
         {filesLoading ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+          <p className="set-muted">불러오는 중...</p>
         ) : storedFiles.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem', border: '2px dashed var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+          <div className="set-empty">
             아직 올린 파일이 없습니다.<br />
-            <span style={{ fontSize: '0.78rem' }}>월말 리포트, 수납 장부, 기존 양식 등을 올려두면 나중에 기능 설계에 활용할 수 있습니다.</span>
+            <span>월말 리포트, 수납 장부, 기존 양식 등을 올려두면 나중에 기능 설계에 활용할 수 있습니다.</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          <div className="set-file-list">
             {storedFiles.map(f => (
-              <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', backgroundColor: '#fafbfc' }}>
+              <div key={f.name} className="set-file-row">
                 {fileIcon(f.name)}
-                <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayName(f.name)}>
+                <span className="set-file-name" title={displayName(f.name)}>
                   {displayName(f.name)}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                <span className="set-file-meta">
                   {fmtSize(f.size)} · {fmtDate(f.updated_at)}
                 </span>
                 <button
-                  className="btn btn-secondary"
-                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                  className="pay-btn ghost sm"
                   onClick={() => handleDownload(f.name)}
                   title="다운로드"
                 >
@@ -519,32 +493,31 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       </div>
 
       {/* Kiosk Security PIN Setting */}
-      <div className="card" style={{ borderLeft: '5px solid var(--color-secondary, #f59e0b)' }}>
-        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="gd-card set-accent-warn">
+        <h4 className="set-h">
           <KeyRound size={18} /> 키오스크 복귀 PIN 설정
         </h4>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+        <p className="set-p">
           자율출결 키오스크 모드에서 관리자 화면으로 돌아올 때 사용하는 비밀번호입니다.
           외부에 노출되지 않도록 기본값(1234)에서 변경하여 사용하시길 권장합니다.
           <strong> 현재 설정: {'•'.repeat(kioskPin.length)} ({kioskPin.length}자리)</strong>
         </p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="set-pin">
           <input
             type="password"
             inputMode="numeric"
-            className="form-control"
-            style={{ maxWidth: '240px' }}
+            className="form-control set-pin-in"
             placeholder="새 PIN (4~8자리 숫자)"
             value={pinInput}
             onChange={e => setPinInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSavePin(); }}
           />
-          <button className="btn btn-primary" onClick={handleSavePin}>
+          <button className="pay-btn primary" onClick={handleSavePin}>
             PIN 변경하기
           </button>
         </div>
         {pinStatus && (
-          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)', marginTop: '0.75rem' }}>
+          <p className="set-success">
             {pinStatus}
           </p>
         )}
@@ -572,48 +545,40 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       )}
 
       {/* 아이비 기억 설정 */}
-      <div className="card" style={{ borderLeft: '5px solid var(--color-primary)' }}>
-        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="gd-card set-accent">
+        <h4 className="set-h">
           <BrainCircuit size={18} /> 아이비 기억 설정
         </h4>
-        <p style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', marginBottom: '0.9rem', lineHeight: 1.65 }}>
+        <p className="set-p">
           아이비가 참고할 <strong>말투·운영 기준·학부모 안내 스타일</strong>을 자유롭게 입력하세요.
           학생 데이터를 저장하는 기능이 아니며, 아이비가 답변·안내문을 작성할 때 일관되게 따를 원칙만 적어두시면 됩니다.
           최대 {MEMORY_MAX.toLocaleString()}자 이내.
         </p>
         {memoryLoading ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+          <p className="set-muted">불러오는 중...</p>
         ) : (
           <>
             <textarea
-              className="form-control settings-memory-textarea"
-              style={{ resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.5rem' }}
+              className="set-memo settings-memory-textarea"
               maxLength={MEMORY_MAX}
               value={memoryText}
               onChange={e => setMemoryText(e.target.value)}
               placeholder="예: 미납 안내는 압박하지 않고 확인 요청 형태로 작성한다."
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.78rem', color: memoryText.length >= MEMORY_MAX ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+            <div className="set-memo-foot">
+              <span className={memoryText.length >= MEMORY_MAX ? 'over' : ''}>
                 {memoryText.length.toLocaleString()} / {MEMORY_MAX.toLocaleString()}자
               </span>
               <button
-                className="btn btn-primary"
+                className="pay-btn primary"
                 onClick={() => void handleSaveMemory()}
                 disabled={memorySaving}
-                style={{ minWidth: '100px' }}
               >
                 {memorySaving ? '저장 중...' : '기억 저장'}
               </button>
             </div>
             {memoryStatus && (
-              <div
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  marginTop: '0.6rem', fontSize: '0.85rem', fontWeight: 600,
-                  color: memoryStatus.success ? 'var(--color-primary)' : 'var(--color-danger)',
-                }}
-              >
+              <div className={memoryStatus.success ? 'set-feedback ok' : 'set-feedback danger'}>
                 {memoryStatus.success ? <CheckCircle size={15} /> : <AlertTriangle size={15} />}
                 {memoryStatus.message}
               </div>
@@ -623,44 +588,34 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       </div>
 
       {/* 아이비 자가학습 메모 목록 */}
-      <div className="card">
-        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="gd-card">
+        <h4 className="set-h">
           <BookOpen size={18} /> 아이비가 스스로 학습한 메모
         </h4>
-        <p style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', marginBottom: '1rem', lineHeight: 1.65 }}>
+        <p className="set-p">
           대화 중 아이비가 자동으로 저장한 메모입니다. <strong>학원 전반(academy)</strong> 노트는 매번 아이비 답변에 반영되고,
           <strong> 학생별(student)</strong> 노트는 해당 학생 관련 질문 시에만 불러옵니다. 잘못된 내용은 삭제하세요.
         </p>
         {notesLoading ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+          <p className="set-muted">불러오는 중...</p>
         ) : notes.length === 0 ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+          <p className="set-empty">
             🌱 아직 아이비가 학습한 메모가 없습니다. 대화를 나눠보세요.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '360px', overflowY: 'auto' }}>
+          <div className="set-notes scroll">
             {notes.map(note => (
-              <div
-                key={note.id}
-                style={{
-                  display: 'grid', gridTemplateColumns: 'auto 1fr auto',
-                  alignItems: 'center', gap: '0.65rem',
-                  padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)', backgroundColor: '#fafcfb',
-                  fontSize: '0.83rem',
-                }}
-              >
+              <div key={note.id} className="set-note">
                 <span
-                  className={note.scope === 'academy' ? 'badge badge-present' : 'badge badge-late'}
-                  style={{ fontSize: '0.68rem', whiteSpace: 'nowrap' }}
+                  className={`set-note-scope ${note.scope === 'academy' ? 'academy' : 'student'}`}
                 >
                   {note.scope === 'academy' ? '학원' : (note.studentName || '학생')}
                 </span>
-                <div style={{ minWidth: 0 }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginRight: '0.4rem' }}>
+                <div className="set-note-body">
+                  <span className="set-note-cat">
                     [{note.category}]
                   </span>
-                  <span style={{ color: 'var(--color-text-primary)', wordBreak: 'break-word' }}>{note.content}</span>
+                  <span>{note.content}</span>
                 </div>
                 <button
                   className="btn-icon-only"
@@ -677,71 +632,49 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         )}
       </div>
 
-      {/* 알림 메시지 템플릿 설정 */}
-      <div className="card" style={{ borderLeft: '5px solid var(--color-secondary, #f59e0b)' }}>
-        <h4 style={{ fontWeight: 700, color: 'var(--color-primary-dark)', fontSize: '1.1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <MessageSquare size={18} /> 알림 메시지 템플릿
+      {/* 일일 종합알림장 설정 안내 */}
+      <div className="gd-card set-accent-warn">
+        <h4 className="set-h">
+          <MessageSquare size={18} /> 일일 종합알림장 발송 설정
         </h4>
-        <p style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', marginBottom: '1rem', lineHeight: 1.65 }}>
-          출결 관리·알림장 발송에서 사용하는 학부모 알림 문구를 직접 수정할 수 있습니다.
-          <strong> {'{학생명}'}, {'{시간}'}, {'{날짜}'}, {'{평가명}'}, {'{점수}'}</strong> 토큰은 전송 시 실제 값으로 자동 치환됩니다.
+        <p className="set-p">
+          현재 학부모 안내는 알림장 발송 화면에서 선택한 날짜의 출결/과제를 자동으로 모아
+          <strong> Aligo `custom` 타입의 일일 종합알림장</strong>으로 발송합니다.
+          출결/과제는 기본 포함되고, 보강/보충은 해당 날짜 기록이 있을 때 선생님이 선택해 포함합니다.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-          {TEMPLATE_META.map(({ key, label, tokens }) => (
-            <div key={key}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.3rem' }}>
-                <label style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--color-primary-dark)' }}>
-                  {label}
-                  <span style={{ marginLeft: '0.5rem', fontWeight: 500, fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
-                    사용 가능: {tokens.join(', ')}
-                  </span>
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem', gap: '0.25rem' }}
-                  onClick={() => handleResetTemplate(key)}
-                  disabled={templateDraft[key] === DEFAULT_TEMPLATES[key]}
-                  title="이 문구를 기본값으로 되돌립니다"
-                >
-                  <RotateCcw size={12} /> 기본값
-                </button>
-              </div>
-              <textarea
-                className="form-control settings-template-textarea"
-                rows={2}
-                style={{ resize: 'vertical', fontFamily: 'inherit' }}
-                value={templateDraft[key]}
-                onChange={e => setTemplateDraft(prev => ({ ...prev, [key]: e.target.value }))}
-              />
-            </div>
-          ))}
+        <div className="set-notice-grid">
+          <div>
+            <span>필수 Secret</span>
+            <b>ALIGO_TPL_CUSTOM</b>
+          </div>
+          <div>
+            <span>템플릿명</span>
+            <b>일일 종합알림장</b>
+          </div>
+          <div>
+            <span>발송 화면</span>
+            <b>알림장 발송</b>
+          </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
-          {templateStatus && (
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <CheckCircle size={15} /> {templateStatus}
-            </span>
-          )}
-          <button className="btn btn-primary" onClick={handleSaveTemplates} style={{ minWidth: '120px' }}>
-            템플릿 저장
-          </button>
+        <div className="set-template-preview">
+          <span>[그로잉영어]</span>
+          <span>{'{학생명}'} 학생의 {'{날짜}'} 일일 종합알림장입니다.</span>
+          <span>출결 / 등원·하원 / 과제 / 보강·보충</span>
         </div>
       </div>
 
       {/* Danger Zone Reset Data */}
-      <div className="card" style={{ border: '1px solid #fca5a5', backgroundColor: '#fffbfb', order: 40 }}>
-        <h4 style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: '1.05rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="gd-card set-danger">
+        <h4 className="set-h danger">
           <AlertTriangle size={18} /> 위험 영역 (초기화)
         </h4>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', maxWidth: '500px' }}>
+        <div className="set-danger-row">
+          <p>
             이 계정의 모든 학원 데이터(학생/반/출결/수납/상담)를 한 번에 비울 수 있습니다.
-            <strong>주의: 클라우드의 실제 데이터가 모두 영구 삭제되므로 필요시 꼭 백업 파일을 먼저 받으세요.</strong>
+            <b> 주의: 클라우드의 실제 데이터가 모두 영구 삭제되므로 필요시 꼭 백업 파일을 먼저 받으세요.</b>
           </p>
           <button
-            className="btn btn-danger"
-            style={{ backgroundColor: '#fee2e2', color: 'var(--color-danger)', border: '1px solid #fca5a5' }}
+            className="set-danger-btn"
             onClick={handleResetClick}
           >
             전체 데이터 삭제

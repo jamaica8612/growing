@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus } from '../types';
 import { Calendar, Clock } from 'lucide-react';
-import { type MessageTemplates } from '../lib/messageTemplates';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 
@@ -9,10 +8,8 @@ interface AttendanceProps {
   attendance: Attendance[];
   students: Student[];
   classes: Class[];
-  messageTemplates: MessageTemplates;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
   onDeleteAttendance: (attendanceId: string) => void;
-  onQueueHomeworkAlert?: (studentId: string, date: string, homeworkStatus: Exclude<HomeworkStatus, ''>) => void;
 }
 
 const ATTENDANCE_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [

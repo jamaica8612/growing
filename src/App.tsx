@@ -217,7 +217,6 @@ function AcademyApp({ session }: { session: Session }) {
     kakaoParentRequests,
     kakaoEventLogs,
     kioskPin,
-    messageTemplates,
   } = data;
 
   const handleLogout = () => {
@@ -305,10 +304,8 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             students={students}
             classes={classes}
-            messageTemplates={messageTemplates}
             onSaveAttendance={data.handleSaveAttendance}
             onDeleteAttendance={data.handleDeleteAttendance}
-            onQueueHomeworkAlert={data.handleQueueHomeworkAlert}
           />
         );
       case 'makeup':
@@ -415,8 +412,6 @@ function AcademyApp({ session }: { session: Session }) {
             getAllData={data.getAllData}
             kioskPin={kioskPin}
             onChangeKioskPin={data.handleChangeKioskPin}
-            messageTemplates={messageTemplates}
-            onSaveMessageTemplates={data.handleSaveMessageTemplates}
           />
         );
       default:
