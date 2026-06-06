@@ -1065,14 +1065,6 @@ function Ring({ score, totalPoints = 100, size = 92, stroke = 9 }: { score: numb
   );
 }
 
-type GradeMark = 'correct' | 'partial' | 'wrong';
-
-function GradePencilMark({ mark }: { mark: GradeMark }) {
-  if (mark === 'correct') return <CheckCircle2 size={42} />;
-  if (mark === 'partial') return <span>△</span>;
-  return <X size={44} />;
-}
-
 function ParentGuideModal({ exam, sub, onClose, onSendGuideToMessaging }: { exam: Exam; sub: Submission; onClose: () => void; onSendGuideToMessaging?: (content: string) => void }) {
   const canCreateResultLink = Boolean(sub.id && isSavedId(exam.id));
   const buildGuideText = async () => {
@@ -1143,8 +1135,23 @@ function ParentGuideModal({ exam, sub, onClose, onSendGuideToMessaging }: { exam
   ), document.body);
 }
 
-function ResultDetail({ exam, sub, onBack, onSendGuideToMessaging }: { exam: Exam; sub: Submission; onBack: () => void; onSendGuideToMessaging?: (content: string) => void }) {
+function ResultDetail({ exam, sub, onBack, onGradeUpdate, onSendGuideToMessaging }: { exam: Exam; sub: Submission; onBack: () => void; onGradeUpdate: (sub: Submission, question: Question, gainedPoints: number) => Promise<void>; onSendGuideToMessaging?: (content: string) => void }) {
   const [modal, setModal] = useState(false);
+  const [gradeDrafts, setGradeDrafts] = useState<Record<string, string>>({});
+  const [savingGradeId, setSavingGradeId] = useState<string | null>(null);
+
+  const saveGrade = async (question: Question, current: PerQ) => {
+    const raw = gradeDrafts[question.id] ?? String(current.gained ?? (current.correct ? question.points : 0));
+    const next = Math.max(0, Math.min(question.points, Math.round(Number(raw))));
+    if (!Number.isFinite(next)) return;
+    setSavingGradeId(question.id);
+    try {
+      await onGradeUpdate(sub, question, next);
+    } finally {
+      setSavingGradeId(null);
+    }
+  };
+
   return (
     <div className="fade-up exam-pagepad" style={{ maxWidth: 820, margin: '0 auto', padding: '28px 44px 60px' }}>
       <button className="btn btn-ghost" onClick={onBack} style={{ marginBottom: 18, height: 38, paddingLeft: 10 }}><ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} /> 결과 목록</button>
@@ -1166,14 +1173,29 @@ function ResultDetail({ exam, sub, onBack, onSendGuideToMessaging }: { exam: Exa
         const pq = sub.perQ[q.id] ?? emptyPerQ(q);
         const ok = pq.correct, partial = pq.partial;
         return (
-          <div key={q.id} className="card graded-paper" data-mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} style={{ padding: 24, marginBottom: 14, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
-            <div className="red-pen-mark" aria-hidden="true"><GradePencilMark mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} /></div>
+          <div key={q.id} className="card graded-paper" style={{ padding: 24, marginBottom: 14, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
               <div className="num-font h-font" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 700 }}>{i + 1}</div>
               <span className={'badge ' + TYPE_META[q.type].cls}>{TYPE_META[q.type].label}</span>
               <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: ok ? 'var(--success)' : partial ? 'var(--warning)' : 'var(--danger)' }}>
-                {ok ? <><CheckCircle2 size={17} color="var(--success)" /> 정답</> : partial ? <>부분 정답 {pq.gained}/{q.points}점</> : <><X size={16} /> 오답</>}
+                {ok ? '정답' : partial ? `부분 정답 ${pq.gained}/${q.points}점` : '오답'}
               </span>
+              {sub.id && (
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
+                  점수
+                  <input
+                    type="number"
+                    min={0}
+                    max={q.points}
+                    value={gradeDrafts[q.id] ?? String(pq.gained ?? (ok ? q.points : 0))}
+                    onChange={e => setGradeDrafts(prev => ({ ...prev, [q.id]: e.target.value }))}
+                    style={{ width: 58, height: 30, border: '1px solid var(--border)', borderRadius: 8, padding: '0 8px', fontWeight: 800 }}
+                  />
+                  <button className="btn btn-soft" style={{ height: 30, padding: '0 10px', fontSize: 12 }} disabled={savingGradeId === q.id} onClick={() => void saveGrade(q, pq)}>
+                    수정
+                  </button>
+                </label>
+              )}
             </div>
             <p style={{ margin: '0 0 12px', fontSize: 14.5, lineHeight: 1.55, color: 'var(--text)', fontWeight: 500, whiteSpace: 'pre-line' }}><MarkdownText text={q.prompt} /></p>
 
@@ -1205,11 +1227,12 @@ function ResultDetail({ exam, sub, onBack, onSendGuideToMessaging }: { exam: Exa
   );
 }
 
-function Results({ exam, submissions, onParentPreview, onRefresh, onSendGuideToMessaging }: { exam: Exam; submissions: Submission[]; onParentPreview: () => void; onRefresh: () => void | Promise<void>; onSendGuideToMessaging?: (content: string) => void }) {
+function Results({ exam, submissions, onParentPreview, onRefresh, onGradeUpdate, onSendGuideToMessaging }: { exam: Exam; submissions: Submission[]; onParentPreview: () => void; onRefresh: () => void | Promise<void>; onGradeUpdate: (sub: Submission, question: Question, gainedPoints: number) => Promise<void>; onSendGuideToMessaging?: (content: string) => void }) {
   const isMobile = useIsMobile();
-  const [detail, setDetail] = useState<Submission | null>(null);
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const detail = detailKey ? submissions.find(sub => (sub.id ?? `no-${sub.no}`) === detailKey) ?? null : null;
 
-  if (detail) return <ResultDetail exam={exam} sub={detail} onBack={() => setDetail(null)} onSendGuideToMessaging={onSendGuideToMessaging} />;
+  if (detail) return <ResultDetail exam={exam} sub={detail} onBack={() => setDetailKey(null)} onGradeUpdate={onGradeUpdate} onSendGuideToMessaging={onSendGuideToMessaging} />;
 
   const scores = submissions.map(s => s.score);
   const scoreRates = submissions.map(submissionPct);
@@ -1298,7 +1321,7 @@ function Results({ exam, submissions, onParentPreview, onRefresh, onSendGuideToM
           </div>
         )}
         {[...submissions].sort((a, b) => submissionPct(b) - submissionPct(a)).map((s, i) => (
-          <button key={s.no} onClick={() => setDetail(s)} className="sub-row" style={{ width: '100%', border: 'none', cursor: 'pointer' }}>
+          <button key={s.id ?? `no-${s.no}`} onClick={() => setDetailKey(s.id ?? `no-${s.no}`)} className="sub-row" style={{ width: '100%', border: 'none', cursor: 'pointer' }}>
             <span className="num-font h-font" style={{ width: 26, fontSize: 14, fontWeight: 800, color: i === 0 ? 'var(--mint)' : 'var(--muted)', flexShrink: 0 }}>{i + 1}</span>
             <div className="sub-av" style={{ background: 'var(--mint-light)', color: 'var(--primary)' }}>{s.name[0]}</div>
             <div style={{ minWidth: 0, textAlign: 'left' }}>
@@ -1637,13 +1660,12 @@ function ParentResult({ exam, submissions, onExit, showExit = true }: { exam: Ex
           const pq = sub.perQ[q.id] ?? emptyPerQ(q);
           const ok = pq.correct, partial = pq.partial;
           return (
-            <div key={q.id} className="card graded-paper" data-mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} style={{ padding: 20, marginBottom: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
-              <div className="red-pen-mark" aria-hidden="true"><GradePencilMark mark={ok ? 'correct' : partial ? 'partial' : 'wrong'} /></div>
+            <div key={q.id} className="card graded-paper" style={{ padding: 20, marginBottom: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '4px solid ' + (ok ? 'var(--mint)' : partial ? 'var(--warning)' : 'var(--danger)') }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 11, flexWrap: 'wrap' }}>
                 <div className="num-font h-font" style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--primary)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13.5, fontWeight: 700 }}>{i + 1}</div>
                 <span className={'badge ' + TYPE_META[q.type].cls}>{TYPE_META[q.type].label}</span>
                 <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: ok ? 'var(--success)' : partial ? 'var(--warning)' : 'var(--danger)' }}>
-                  {ok ? <><CheckCircle2 size={16} color="var(--success)" /> 정답</> : partial ? `부분 정답 ${pq.gained}/${q.points}점` : <><X size={15} /> 오답</>}
+                  {ok ? '정답' : partial ? `부분 정답 ${pq.gained}/${q.points}점` : '오답'}
                 </span>
               </div>
               <p style={{ margin: '0 0 12px', fontSize: 14.5, lineHeight: 1.55, fontWeight: 500, color: 'var(--text)', whiteSpace: 'pre-line' }}><MarkdownText text={q.prompt} /></p>
@@ -2070,6 +2092,21 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
     } catch (e) { flash(errMsg(e)); }
   };
 
+  const handleTeacherGradeUpdate = async (sub: Submission, question: Question, gainedPoints: number) => {
+    if (!exam || !sub.id || !isSavedId(exam.id) || !isSavedId(question.id)) return;
+    try {
+      await examsApi.updateAnswerGrade({
+        examId: exam.id,
+        submissionId: sub.id,
+        questionId: question.id,
+        gainedPoints,
+        questionPoints: question.points,
+      });
+      await loadSubmissions(exam);
+      flash('선생님 채점으로 점수를 수정했어요.');
+    } catch (e) { flash(errMsg(e)); }
+  };
+
   const toggleStatus = async () => {
     if (!exam || !isSavedId(exam.id)) return;
     const next: ExamStatus = exam.status === 'published' ? 'closed' : 'published';
@@ -2198,7 +2235,7 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
             <div className="exam-pagepad" style={{ padding: '0 44px', marginTop: 18 }}>
               <button className="btn btn-ghost" onClick={() => go('distribute')} style={{ height: 38 }}><QrCode size={16} /> 배포 화면으로</button>
             </div>
-            <Results exam={exam} submissions={submissions} onParentPreview={() => go('parent')} onRefresh={refreshSubmissions} onSendGuideToMessaging={onSendGuideToMessaging} />
+            <Results exam={exam} submissions={submissions} onParentPreview={() => go('parent')} onRefresh={refreshSubmissions} onGradeUpdate={handleTeacherGradeUpdate} onSendGuideToMessaging={onSendGuideToMessaging} />
           </div>
         )}
         {screen === 'student' && exam && (

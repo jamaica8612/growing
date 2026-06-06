@@ -102,6 +102,8 @@ Rules:
 - Grade according to the level implied by the exam question and model answer.
 - Award full points only when the student's answer is meaningfully equivalent to the model answer.
 - Award partial points for answers with useful correct grammar/vocabulary but missing words, wrong order, or small expression errors.
+- Award 0 for random strings such as "abc", copied letters, unrelated words, or answers with no meaningful overlap with the model answer.
+- Do not award more than 70% unless the answer is mostly correct.
 - Award 0 for blank, unrelated, or mostly incorrect answers.
 - Feedback must be short Korean and mention what to check.
 - This is an AI draft grade. Be conservative.

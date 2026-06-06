@@ -366,6 +366,41 @@ export const examsApi = {
     return { submissions: subs, answers };
   },
 
+  async updateAnswerGrade(input: {
+    examId: string;
+    submissionId: string;
+    questionId: string;
+    gainedPoints: number;
+    questionPoints: number;
+  }): Promise<void> {
+    const gainedPoints = Math.max(0, Math.min(input.questionPoints, Math.round(input.gainedPoints)));
+    const { error: answerError } = await supabase
+      .from('growing_exam_answers')
+      .update({
+        gained_points: gainedPoints,
+        is_correct: gainedPoints >= input.questionPoints,
+        is_partial: gainedPoints > 0 && gainedPoints < input.questionPoints,
+        graded_by: 'teacher',
+      })
+      .eq('submission_id', input.submissionId)
+      .eq('question_id', input.questionId);
+    if (answerError) throw answerError;
+
+    const { data: answers, error: answersError } = await supabase
+      .from('growing_exam_answers')
+      .select('gained_points')
+      .eq('submission_id', input.submissionId);
+    if (answersError) throw answersError;
+
+    const score = (answers ?? []).reduce((sum, row) => sum + Number((row as Row).gained_points ?? 0), 0);
+    const { error: submissionError } = await supabase
+      .from('growing_exam_submissions')
+      .update({ score, graded_at: new Date().toISOString() })
+      .eq('id', input.submissionId)
+      .eq('exam_id', input.examId);
+    if (submissionError) throw submissionError;
+  },
+
   // 학부모 결과 공유 링크 생성 (토큰 발급)
   async createResultLink(examId: string, submissionId: string): Promise<string> {
     const token = crypto.randomUUID().replace(/-/g, '');

@@ -266,49 +266,6 @@
   overflow: hidden;
   background: #fff;
 }
-.exam-app .graded-paper::after {
-  content: "";
-  position: absolute;
-  top: -34px;
-  right: -30px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--mark-color), transparent 88%);
-  pointer-events: none;
-}
-.exam-app .red-pen-mark {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  z-index: 1;
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  color: var(--mark-color);
-  background: color-mix(in srgb, var(--mark-color), white 90%);
-  border: 1px solid color-mix(in srgb, var(--mark-color), white 68%);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--mark-color), transparent 86%);
-  opacity: .92;
-  transform: rotate(-4deg);
-  pointer-events: none;
-}
-.exam-app .red-pen-mark svg { stroke-width: 2.4; }
-.exam-app .red-pen-mark span {
-  font-family: var(--font-head);
-  font-size: 34px;
-  font-weight: 800;
-  line-height: 1;
-}
-.exam-app .graded-paper[data-mark="correct"] { --mark-color: var(--success); }
-.exam-app .graded-paper[data-mark="wrong"] { --mark-color: var(--danger); }
-.exam-app .graded-paper[data-mark="partial"] { --mark-color: var(--warning); }
-.exam-app .graded-paper[data-mark="wrong"] .red-pen-mark { transform: rotate(4deg); }
-.exam-app .graded-paper[data-mark="partial"] .red-pen-mark {
-  transform: rotate(-5deg);
-}
 
 /* ---- 학생 응시 ---- */
 .exam-app .student-fullscreen {
