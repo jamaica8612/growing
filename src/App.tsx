@@ -377,6 +377,8 @@ function AcademyApp({ session }: { session: Session }) {
             students={students}
             classes={classes}
             attendance={attendance}
+            payments={payments}
+            counselLogs={counselLogs}
             kioskAlerts={kioskAlerts}
             homeworkAlerts={homeworkAlerts}
             onDismissAlert={data.handleDismissKioskAlert}
@@ -384,7 +386,6 @@ function AcademyApp({ session }: { session: Session }) {
             onDismissHomeworkAlert={data.handleDismissHomeworkAlert}
             onClearHomeworkAlerts={data.handleClearHomeworkAlerts}
             assistantDraft={assistantDraft}
-            messageTemplates={messageTemplates}
           />
         );
       case 'kakao':
