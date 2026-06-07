@@ -4002,6 +4002,9 @@ textarea.form-control {
   border-color: var(--color-primary);
   color: var(--color-primary-dark);
 }
+.pay-flow {
+  margin-bottom: 0.15rem;
+}
 
 .settings-tabs {
   display: flex;

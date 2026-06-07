@@ -374,6 +374,10 @@ function AcademyApp({ session }: { session: Session }) {
             onDeletePayment={data.handleDeletePayment}
             onAddManualPayment={data.handleAddManualPayment}
             onImportPayssam={data.handleImportPayssam}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              setIsMobileMenuOpen(false);
+            }}
           />
         );
       case 'counsel':

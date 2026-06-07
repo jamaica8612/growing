@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { Student, Class, Payment, PaymentMethod, PaymentStatus } from '../types';
-import { BarChart3, Check, CheckCircle2, ExternalLink, PieChart, Plus, Search, TrendingUp, Trash2, Upload, X } from 'lucide-react';
+import { BarChart3, Bell, Check, CheckCircle2, ExternalLink, PieChart, Plus, Search, TrendingUp, Trash2, Upload, Users, X } from 'lucide-react';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 import { parsePayssamExcel, type PayssamRow } from '../lib/payssam';
 import { getClassPaymentStats, getPaymentMethodStats, classifyUnpaidMonths } from '../lib/paymentStats';
@@ -17,6 +17,7 @@ interface PaymentsProps {
   onDeletePayment: (paymentId: string) => void;
   onAddManualPayment: (paymentData: Omit<Payment, 'id'>) => void;
   onImportPayssam: (rows: MatchedRow[]) => Promise<{ created: number; updated: number; skipped: number } | undefined>;
+  onNavigate?: (tab: 'messaging' | 'students') => void;
 }
 
 function Ring({ value, total, size = 52, stroke = 6 }: { value: number; total: number; size?: number; stroke?: number }) {
@@ -59,6 +60,7 @@ export const Payments: React.FC<PaymentsProps> = ({
   onDeletePayment,
   onAddManualPayment,
   onImportPayssam,
+  onNavigate,
 }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
   const [search, setSearch] = useState('');
@@ -238,6 +240,24 @@ export const Payments: React.FC<PaymentsProps> = ({
 
   return (
     <div className="gd-root">
+      <section className="today-flow pay-flow">
+        <div>
+          <span className="today-flow-kicker">수납 업무 흐름</span>
+          <h2>미납 확인, 안내 발송, 학생별 이력을 바로 이어서 처리합니다.</h2>
+        </div>
+        <div className="today-flow-actions" aria-label="수납 업무 바로가기">
+          <button type="button" onClick={() => setStatusFilter('unpaid')}>
+            <Search size={15} /> 미납만 보기
+          </button>
+          <button type="button" onClick={() => onNavigate?.('messaging')}>
+            <Bell size={15} /> 미납 안내
+          </button>
+          <button type="button" onClick={() => onNavigate?.('students')}>
+            <Users size={15} /> 학생별 이력
+          </button>
+        </div>
+      </section>
+
       <div className="pay-top">
         <section className="gd-card pay-summary">
           <div className="pay-expected">
