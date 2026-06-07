@@ -103,6 +103,40 @@ export const WORKFLOW_SHORTCUTS: Record<string, NavItem[]> = {
   ],
 };
 
+export type FlowTabGroup = {
+  parentId: TabId;
+  ids: TabId[];
+  tabs: NavItem[];
+};
+
+export const FLOW_TAB_GROUPS: FlowTabGroup[] = [
+  {
+    parentId: 'classes',
+    ids: ['classes', 'attendance', 'makeup', 'exams', 'stats'],
+    tabs: [
+      { id: 'classes', label: '반/시간표', icon: BookOpen },
+      { id: 'attendance', label: '출결 입력', icon: CalendarCheck },
+      { id: 'makeup', label: '보강/보충', icon: CalendarCheck },
+      { id: 'exams', label: '평가', icon: ClipboardList },
+      { id: 'stats', label: '출결 리포트', icon: BarChart3 },
+    ],
+  },
+  {
+    parentId: 'messaging',
+    ids: ['messaging', 'kakao', 'counsel'],
+    tabs: [
+      { id: 'messaging', label: '알림장', icon: Smartphone },
+      { id: 'kakao', label: '카카오 요청', icon: MessageCircle },
+      { id: 'counsel', label: '상담 안내', icon: MessageSquare },
+    ],
+  },
+];
+
+export const getPrimaryTabId = (tabId: TabId): TabId => {
+  const group = FLOW_TAB_GROUPS.find(item => item.ids.includes(tabId));
+  return group?.parentId ?? tabId;
+};
+
 export const TAB_TITLES: Record<TabId, string> = {
   dashboard: '오늘 운영',
   students: '학생 관리',

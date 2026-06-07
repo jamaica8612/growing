@@ -21,12 +21,14 @@ import { MakeupManager } from './components/MakeupManager';
 import { KakaoManager } from './components/KakaoManager';
 import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
 import {
+  FLOW_TAB_GROUPS,
   MOBILE_QUICK_NAV_ITEMS,
   PRIMARY_NAV_GROUPS,
   SETTINGS_NAV_ITEM,
   TAB_DESCRIPTIONS as FLOW_TAB_DESCRIPTIONS,
   TAB_TITLES as FLOW_TAB_TITLES,
   WORKFLOW_SHORTCUTS,
+  getPrimaryTabId,
   type NavItem as FlowNavItem,
   type TabId,
 } from './navigation';
@@ -269,6 +271,7 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   const mobileQuickNavItems: FlowNavItem[] = MOBILE_QUICK_NAV_ITEMS;
+  const primaryActiveTab = getPrimaryTabId(activeTab);
 
   // Render Page Content based on tab Selection
   const renderContent = () => {
@@ -458,7 +461,7 @@ function AcademyApp({ session }: { session: Session }) {
               {group.items.map(item => (
                 <NavItemButton
                   key={item.id}
-                  active={activeTab === item.id}
+                  active={primaryActiveTab === item.id}
                   icon={item.icon}
                   label={item.label}
                   onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
@@ -472,7 +475,7 @@ function AcademyApp({ session }: { session: Session }) {
 
         <div className="side-foot">
           <NavItemButton
-            active={activeTab === 'backup'}
+            active={primaryActiveTab === 'backup'}
             icon={SETTINGS_NAV_ITEM.icon}
             label={SETTINGS_NAV_ITEM.label}
             onClick={() => go(SETTINGS_NAV_ITEM.id)}
@@ -483,6 +486,34 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   const renderWorkflowShortcuts = () => {
+    const tabGroup = FLOW_TAB_GROUPS.find(group => group.ids.includes(activeTab));
+    if (tabGroup) {
+      return (
+        <div className="flow-tabs" role="tablist" aria-label="업무 흐름 탭">
+          {tabGroup.tabs.map(item => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={`${tabGroup.parentId}-${item.id}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === item.id}
+                className={`flow-tab${activeTab === item.id ? ' active' : ''}`}
+                onClick={() => {
+                  sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+                  setActiveTab(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <Icon size={15} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
     const shortcuts = WORKFLOW_SHORTCUTS[activeTab] ?? [];
     if (shortcuts.length === 0) return null;
 
@@ -639,7 +670,7 @@ function AcademyApp({ session }: { session: Session }) {
             <button
               key={item.id}
               type="button"
-              className={`m-tab${activeTab === item.id ? ' active' : ''}`}
+              className={`m-tab${primaryActiveTab === item.id ? ' active' : ''}`}
               onClick={() => {
                 setActiveTab(item.id);
                 setIsMobileMenuOpen(false);
