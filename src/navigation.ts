@@ -77,7 +77,6 @@ export const WORKFLOW_SHORTCUTS: Record<string, NavItem[]> = {
     { id: 'kiosk', label: '키오스크 시작', icon: Monitor, kind: 'kiosk' },
   ],
   students: [
-    { id: 'counsel', label: '상담 기록', icon: MessageSquare },
     { id: 'stats', label: '출결 리포트', icon: BarChart3 },
     { id: 'messaging', label: '학부모 안내', icon: Smartphone },
   ],
@@ -93,7 +92,6 @@ export const WORKFLOW_SHORTCUTS: Record<string, NavItem[]> = {
   ],
   messaging: [
     { id: 'kakao', label: '카카오 요청', icon: MessageCircle },
-    { id: 'counsel', label: '상담 안내', icon: MessageSquare },
     { id: 'exams', label: '시험 결과 안내', icon: ClipboardList },
   ],
   backup: [
@@ -111,6 +109,14 @@ export type FlowTabGroup = {
 
 export const FLOW_TAB_GROUPS: FlowTabGroup[] = [
   {
+    parentId: 'students',
+    ids: ['students', 'counsel'],
+    tabs: [
+      { id: 'students', label: '학생 목록', icon: Users },
+      { id: 'counsel', label: '상담 기록', icon: MessageSquare },
+    ],
+  },
+  {
     parentId: 'classes',
     ids: ['classes', 'attendance', 'makeup', 'exams', 'stats'],
     tabs: [
@@ -123,11 +129,10 @@ export const FLOW_TAB_GROUPS: FlowTabGroup[] = [
   },
   {
     parentId: 'messaging',
-    ids: ['messaging', 'kakao', 'counsel'],
+    ids: ['messaging', 'kakao'],
     tabs: [
       { id: 'messaging', label: '알림장', icon: Smartphone },
       { id: 'kakao', label: '카카오 요청', icon: MessageCircle },
-      { id: 'counsel', label: '상담 안내', icon: MessageSquare },
     ],
   },
 ];
