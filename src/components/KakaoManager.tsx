@@ -48,6 +48,7 @@ const makeSecret = () => {
 };
 
 export function KakaoManager({ students, channels, links, requests, events, onUpdateRequestStatus, onSaveChannel }: KakaoManagerProps) {
+  const [activeTab, setActiveTab] = useState<'inbox' | 'links' | 'settings'>('inbox');
   const primaryChannel = channels[0];
   const [channelName, setChannelName] = useState(primaryChannel?.channelName || '그로잉영어 카카오 채널');
   const [skillSecret, setSkillSecret] = useState(primaryChannel?.skillSecret || '');
@@ -73,6 +74,25 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           카카오 채널봇 연결과 테스트를 관리합니다. Skill/Event URL을 관리자센터에 연결한 뒤,
           학생 연결 상태와 상담 요청 큐, 최근 요청 로그를 확인합니다.
         </p>
+      </div>
+
+      <div className="settings-tabs kakao-tabs" role="tablist" aria-label="카카오 관리 분류">
+        {([
+          ['inbox', '요청 큐'],
+          ['links', '학생 연결'],
+          ['settings', '연동 설정'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === key}
+            className={activeTab === key ? 'active' : ''}
+            onClick={() => setActiveTab(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="gd-stats">
@@ -114,6 +134,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
         </div>
       </div>
 
+      {activeTab === 'settings' && (
       <section className="gd-card">
         <div className="kakao-card-head">
           <div>
@@ -178,7 +199,9 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           </button>
         </div>
       </section>
+      )}
 
+      {activeTab === 'links' && (
       <div className="kakao-grid">
         <section className="gd-card">
           <div className="kakao-card-head">
@@ -239,7 +262,10 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           )}
         </section>
       </div>
+      )}
 
+      {activeTab === 'inbox' && (
+      <>
       <section className="gd-card">
         <div className="kakao-card-head">
           <div>
@@ -317,6 +343,8 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           </div>
         )}
       </section>
+      </>
+      )}
     </div>
   );
 }
