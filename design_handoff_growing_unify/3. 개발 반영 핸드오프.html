@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>그로잉영어 — 개발 반영 핸드오프</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --font:'Outfit','Noto Sans KR',sans-serif; --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --bg:#eef3f0; --surface:#fff; --primary:#1b4b36; --primary-light:#2c6f52; --primary-dark:#0f3023;
+    --mint:#10b981; --text:#1f2937; --text2:#4b5563; --muted:#9ca3af; --border:#e8edea;
+    --danger:#ef4444; --warn:#f59e0b; --info:#3b82f6;
+    --r-md:.85rem; --r-lg:1.25rem; --sh-sm:0 1px 2px rgba(15,46,33,.06);
+    --sh:0 6px 18px -8px rgba(15,46,33,.18),0 2px 6px -4px rgba(15,46,33,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;word-break:keep-all;line-height:1.55;}
+  .wrap{max-width:960px;margin:0 auto;padding:0 1.5rem 6rem;}
+  .hero{position:relative;overflow:hidden;margin:2.2rem auto 1.6rem;max-width:960px;border-radius:var(--r-lg);
+    background:linear-gradient(120deg,#0f3023,#1b5840 55%,#2c6f52);color:#fff;padding:2.2rem 2.4rem;box-shadow:var(--sh);}
+  .hero-tag{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.05em;color:#a8e6cd;background:rgba(255,255,255,.1);padding:.3rem .75rem;border-radius:999px;}
+  .hero h1{font-size:2rem;font-weight:800;letter-spacing:-.03em;margin:.8rem 0 .4rem;}
+  .hero p{font-size:.94rem;color:rgba(255,255,255,.82);max-width:60ch;}
+  .crumbs{display:flex;gap:.5rem;max-width:960px;margin:0 auto 2rem;padding:0 1.5rem;flex-wrap:wrap;}
+  .crumbs a{font-size:.8rem;font-weight:700;color:var(--primary);background:var(--surface);border:1px solid var(--border);padding:.5rem .9rem;border-radius:999px;text-decoration:none;box-shadow:var(--sh-sm);transition:all .15s;}
+  .crumbs a:hover{background:var(--primary);color:#fff;}
+
+  section{margin-bottom:2.2rem;}
+  h2.s{font-size:1.4rem;font-weight:800;color:var(--primary-dark);letter-spacing:-.02em;margin-bottom:.4rem;display:flex;align-items:center;gap:.6rem;}
+  h2.s .n{font-size:.74rem;font-weight:800;color:var(--mint);background:#0f3023;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;}
+  .sub{font-size:.88rem;color:var(--text2);margin:0 0 1rem 2.4rem;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.4rem 1.5rem;box-shadow:var(--sh-sm);}
+  .card + .card{margin-top:.9rem;}
+
+  .principle{background:linear-gradient(135deg,#eef6f1,#fff 70%);border:1px solid #d9e9e1;border-radius:var(--r-md);padding:1.1rem 1.3rem;display:flex;gap:.9rem;align-items:flex-start;}
+  .principle .pi{width:30px;height:30px;border-radius:9px;background:var(--mint);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;}
+  .principle b{color:var(--primary-dark);}
+  .principle p{font-size:.9rem;color:var(--text2);}
+
+  .file{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.84rem;font-weight:600;color:var(--primary-dark);
+    background:#f2f6f4;border:1px solid var(--border);border-radius:8px;padding:.4rem .7rem;margin-bottom:.8rem;}
+  .file .tag{font-family:var(--font);font-size:.66rem;font-weight:800;padding:.15rem .5rem;border-radius:999px;margin-left:auto;}
+  .tag.edit{color:#b4710a;background:#fef3c7;} .tag.del{color:var(--danger);background:#fdeaea;} .tag.new{color:#0c7a55;background:#e3f6ed;} .tag.keep{color:var(--info);background:#e7f0fb;}
+  ul.do{list-style:none;display:flex;flex-direction:column;gap:.5rem;}
+  ul.do li{position:relative;padding-left:1.3rem;font-size:.88rem;color:var(--text2);}
+  ul.do li::before{content:'›';position:absolute;left:.2rem;top:-.05rem;color:var(--mint);font-weight:800;font-size:1.05rem;}
+  ul.do li b{color:var(--text);font-weight:700;}
+  code{font-family:var(--mono);font-size:.8rem;background:#eef4f1;color:var(--primary);padding:.08rem .35rem;border-radius:5px;}
+  code.del{color:var(--danger);background:#fdeaea;}
+
+  pre{background:#0f2820;border-radius:var(--r-md);padding:1rem 1.15rem;overflow-x:auto;margin-top:.5rem;}
+  pre code{font-family:var(--mono);font-size:.78rem;color:#d1e9df;background:none;padding:0;line-height:1.7;white-space:pre;display:block;}
+  pre code .c{color:#5f8775;} pre code .k{color:#7dd3a8;} pre code .b{color:#fca5a5;}
+
+  table{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:.3rem;}
+  th{text-align:left;font-size:.7rem;font-weight:800;color:var(--muted);letter-spacing:.04em;padding:.55rem .7rem;border-bottom:2px solid var(--border);text-transform:uppercase;}
+  td{padding:.6rem .7rem;border-bottom:1px solid #f0f3f1;vertical-align:top;color:var(--text2);}
+  td:first-child b{color:var(--primary-dark);}
+  td code{font-size:.76rem;}
+
+  .check{display:flex;flex-direction:column;gap:.55rem;}
+  .check label{display:flex;align-items:flex-start;gap:.65rem;font-size:.9rem;color:var(--text2);cursor:default;}
+  .check .box{width:19px;height:19px;border-radius:6px;border:2px solid var(--border);flex-shrink:0;margin-top:.05rem;position:relative;}
+  .check .box.on{background:var(--mint);border-color:var(--mint);}
+  .check .box.on::after{content:'✓';position:absolute;inset:0;color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .check b{color:var(--text);font-weight:700;}
+  .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);}
+  @media(max-width:680px){ .sub{margin-left:0;} .hero h1{font-size:1.6rem;} }
+</style>
+</head>
+<body>
+<div class="hero" data-screen-label="핸드오프 표지">
+  <span class="hero-tag">DEV HANDOFF · Claude Code 용</span>
+  <h1>그로잉영어 — 개발 반영 핸드오프</h1>
+  <p>프로토타입의 통일 디자인을 실제 코드베이스(React 19 + TS + Vite + Supabase)에 반영하는 가이드입니다. <b style="color:#a8e6cd">데이터·저장 로직(useAcademyData, api.ts, props)은 한 줄도 바꾸지 않습니다.</b> 마크업/클래스/내비게이션만 정리합니다.</p>
+</div>
+<div class="crumbs">
+  <a href="1. 디자인 점검 리포트.html">← 점검 리포트</a>
+  <a href="2. 통일 프로토타입.html">통일 프로토타입</a>
+</div>
+
+<div class="wrap">
+
+  <section>
+    <div class="principle">
+      <span class="pi">!</span>
+      <p><b>대원칙.</b> 토큰(<code>--color-*</code>, <code>--radius-*</code>, <code>--shadow-*</code>)과 색 팔레트는 이미 정상이므로 <b>그대로 둡니다.</b> 작업은 ① 내비게이션 단순화 ② 컴포넌트 어휘 통일 ③ 새 4화면 시스템 흡수 ④ 평가 비주얼 통합 ⑤ 레거시 CSS 비우기 — 순서로 진행합니다. 프로토타입의 <code>--g-*</code>는 레퍼런스용 별칭일 뿐, 실제로는 기존 <code>--color-*</code> 토큰을 씁니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">1</span> 내비게이션 정리</h2>
+    <p class="sub">3층 내비 → 1층 그룹 사이드바. 데드코드 제거.</p>
+    <div class="card">
+      <div class="file">src/App.tsx <span class="tag del">정리</span></div>
+      <ul class="do">
+        <li><b>데드코드 삭제:</b> <code class="del">const NAV_GROUPS = […]</code>, <code class="del">TAB_TITLES</code>(로컬), <code class="del">NAV_GROUPS[1]?.items.splice(…)</code>, <code class="del">void NAV_GROUPS; void TAB_TITLES;</code> 전부 제거. 이미 <code>navigation.ts</code>가 정본입니다.</li>
+        <li><b>서브탭·바로가기 칩 제거(데스크톱):</b> <code class="del">renderWorkflowShortcuts()</code>의 <code>.flow-tabs</code>/<code>.flow-chip</code> 렌더 삭제. 대신 각 화면 컴포넌트 <b>본문 상단의 액션 버튼</b>으로 이동(프로토타입 <code>topbar-acts</code> 참고).</li>
+        <li><b>맥락 액션은 살림:</b> "미납 안내 보내기 → 알림장" 같은 이동은 기존 <code>onNavigate</code> 콜백으로 그대로. 내비 "층"이 아니라 화면 안 버튼으로.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">src/navigation.ts <span class="tag edit">교체</span></div>
+      <ul class="do">
+        <li><code>PRIMARY_NAV_GROUPS</code>를 <b>3그룹 13항목</b>으로 교체(아래). <code>FLOW_TAB_GROUPS</code> · <code>getPrimaryTabId</code> · <code>WORKFLOW_SHORTCUTS</code>는 더 이상 사이드바엔 안 쓰지만, 화면 내 액션 매핑으로 재활용 가능.</li>
+        <li><code>MOBILE_QUICK_NAV_ITEMS</code>는 <b>오늘·출결·알림장·학생·더보기</b> 5개로. "더보기"는 전체 메뉴 시트.</li>
+      </ul>
+      <pre><code><span class="c">// navigation.ts — PRIMARY_NAV_GROUPS 교체</span>
+<span class="k">export const</span> PRIMARY_NAV_GROUPS = [
+  { title: <span class="k">'그날 운영'</span>, items: [dashboard, attendance, makeup, messaging, kiosk] },
+  { title: <span class="k">'원생 · 수업'</span>, items: [students, classes, exams, payments] },
+  { title: <span class="k">'기록 · 분석'</span>, items: [counsel, stats, kakao, dataQuality] },
+];
+<span class="c">// 설정(backup)은 사이드바 푸터에 그대로</span></code></pre>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">2</span> 컴포넌트 어휘 통일</h2>
+    <p class="sub">"같은 역할 = 같은 클래스." index.css에 정본 컴포넌트만 남깁니다.</p>
+    <div class="card">
+      <table>
+        <thead><tr><th>역할</th><th>제거/병합</th><th>정본 클래스</th></tr></thead>
+        <tbody>
+          <tr><td><b>카드</b></td><td><code>.card</code> <code>.metric-card</code> <code>.makeup-summary-card</code></td><td><code>.gd-card</code> · <code>.gd-stat</code></td></tr>
+          <tr><td><b>탭</b></td><td><code>.settings-tabs</code> <code>.kakao-tabs</code> <code>.tab-btn</code></td><td><code>.st-tab</code>(상세) · <code>.ka-tab</code>(화면)</td></tr>
+          <tr><td><b>세그먼트</b></td><td><code>.makeup-filter-tabs</code></td><td><code>.gd-seg</code> / <code>.gd-seg-b</code></td></tr>
+          <tr><td><b>버튼</b></td><td><code>.at-act</code> <code>.mk-btn</code> 등 산발</td><td><code>.pay-btn</code> + <code>.primary/.ghost/.sm</code></td></tr>
+          <tr><td><b>배지</b></td><td><code>.kakao-status</code></td><td><code>.at-pill</code> + <code>.ok/.warn/.danger/.info</code></td></tr>
+          <tr><td><b>인풋</b></td><td><code>.msg-select</code>(의미불일치)</td><td><code>.gd-field</code>(input·select 공통)</td></tr>
+          <tr><td><b>모달</b></td><td><code>.mk-modal</code></td><td><code>.modal-content</code></td></tr>
+          <tr><td><b>피드백</b></td><td><code class="del">alert()</code> <code class="del">confirm()</code></td><td><code>.gd-toast</code> + 인라인 에러</td></tr>
+        </tbody>
+      </table>
+      <ul class="do" style="margin-top:1rem">
+        <li><b>MakeupManager.tsx:</b> <code class="del">alert('학생, 반, 날짜를…')</code> 등 3곳 → 토스트 + 인라인 검증. <code class="del">.mk-modal</code> → <code>.modal-content</code>. <code class="del">.msg-select</code> → <code>.gd-field</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">+</span> 확정된 단순화 결정 (원장님)</h2>
+    <p class="sub">사용 후 직접 내려주신 결정 — 프로토타입에 반영 완료.</p>
+    <div class="card">
+      <div class="file">src/components/Messaging.tsx <span class="tag edit">단순화</span></div>
+      <ul class="do">
+        <li><b>알림장 = 종합알림장 1종만.</b> 등원/하원/과제/보강/평가 등 <b>개별 템플릿 선택 UI를 제거</b>합니다. 오늘의 등·하원·숙제·보강을 한 번에 묶은 <code>daily</code> 종합 메시지만 생성·발송. (<code class="del">TEMPLATES 배열</code>, <code class="del">tpl/time/testName/score 상태</code>, <code class="del">.msg-tpls · .msg-params</code> 삭제)</li>
+        <li><b>발송 대기 = 학생별 종합 1행.</b> 옛 "등원/하원/숙제 개별 이벤트 행"을 <b>오늘 활동 학생별 1행</b>(등·하원·숙제·보강 요약 칩)으로 바꿉니다. 행의 <b>편집</b>을 누르면 아래 편집기에 로드.</li>
+        <li><b>본문은 선생님이 직접 수정 가능</b> — <code>compiled</code>를 읽기전용 미리보기가 아니라 <b><code>&lt;textarea&gt;</code> 편집 가능 상태</b>로. 학생 변경 시 자동 생성본으로 초기화(되돌리기 버튼 제공), 복사/전송은 편집된 내용 기준.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">src/components/Attendance.tsx <span class="tag edit">단순화</span></div>
+      <ul class="do">
+        <li><b>개별 카톡/문자 버튼 제거.</b> 출결 표의 <b>"학부모 알림" 컬럼(카톡·문자)</b>을 삭제 — 안내는 종합 알림장 한 곳으로 일원화. 표는 <b>5컬럼</b>(학생/등·하원/출결/숙제/메모)으로 줄이고 <code>grid-template-columns</code> 조정.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">src/components/Backup.tsx (설정) <span class="tag edit">단순화</span></div>
+      <ul class="do">
+        <li><b>알림 템플릿 = 종합 알림장 1종.</b> <code class="del">TEMPLATE_META</code>(등원/하원/숙제/보강/평가 5종)를 <b>종합 알림장 한 개 textarea</b>로 교체. 토큰 <code>{'{학생명}{등원시간}{하원시간}{숙제상태}{보강}'}</code>.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">src/components/CounselLogs.tsx <span class="tag edit">버튼 제거</span></div>
+      <ul class="do">
+        <li><b>메뉴는 유지</b>(상담·진도 기록은 핵심 데이터). 각 일지의 <b>"알림장" 보내기 버튼만 제거</b> — 종합알림장으로 일원화됐으므로. <b>"안내 복사"는 유지</b>(텍스트 복사용).</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">src/components/Assistant.tsx (아이비) <span class="tag keep">복원·유지</span></div>
+      <ul class="do">
+        <li><b>우하단 플로팅 아이비는 반드시 유지.</b> 통일 셸에서 빠지지 않도록 — FAB + 패널(인사·추천 질문·입력). 평가 탭에서만 숨기던 기존 규칙은 통합 후 재검토.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">+</span> 키오스크 · 시간표</h2>
+    <p class="sub">현행 유지 1건 + 반응형 보강 1건.</p>
+    <div class="card">
+      <div class="file">src/components/Kiosk.tsx <span class="tag keep">현행 유지</span></div>
+      <ul class="do">
+        <li><b>키오스크는 지금 그대로가 좋다</b> — 다크 포레스트 풀스크린·성공 오버레이 등 <b>변경하지 않습니다.</b> 통일 작업에서 제외.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">src/components/Classes.tsx (시간표) <span class="tag edit">모바일 맞춤</span></div>
+      <ul class="do">
+        <li><b>주간 시간표를 모바일에서 화면 안에 전부 표시.</b> 현재 <code>grid-template-columns: 54px repeat(5, minmax(110px,1fr))</code> = 604px라 폰에서 가로 스크롤. <code>@media(max-width:600px)</code>에서 <code>30px repeat(5, minmax(0,1fr))</code> + 슬롯 폰트 축소로 <b>스크롤 없이 한 화면에</b>. (<code class="del">overflow-x:auto</code> → hidden)</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">3</span> 새 4화면 시스템 흡수</h2>
+    <p class="sub">프로토타입 <code>app/new-screens.jsx</code>의 마크업·클래스를 그대로 옮깁니다. (계산 로직은 기존 lib 유지)</p>
+    <div class="card">
+      <table>
+        <thead><tr><th>화면 / 파일</th><th>프로토타입 레퍼런스</th><th>핵심</th></tr></thead>
+        <tbody>
+          <tr><td><b>보강·보충</b><br /><code>MakeupManager.tsx</code></td><td><code>GrowingMakeup</code> + <code>.mk-*</code></td><td>현황 배너(<code>.gx-banner</code>) + <code>.gd-seg</code> + 카드 그리드. <code>getMakeupSummary</code>/<code>getMakeupRecommendations</code> 유지.</td></tr>
+          <tr><td><b>평가 관리</b><br /><code>Exams.tsx</code></td><td><code>GrowingExams</code> + <code>.ex-*</code></td><td>KPI 4 + 평가 목록 행(응시 진행바·평균·상태). 기존 <code>lib/exams.ts</code>·제출/배포 로직 전부 유지, <b>비주얼만</b>.</td></tr>
+          <tr><td><b>카카오 채널</b><br /><code>KakaoManager.tsx</code></td><td><code>GrowingKakao</code> + <code>.ka-*</code></td><td><code>.ka-tab</code> 3탭(요청큐/연결/설정). URL 복사 → 토스트. 콜백 그대로.</td></tr>
+          <tr><td><b>데이터 점검</b><br /><code>DataQuality.tsx</code></td><td><code>GrowingDataQuality</code> + <code>.dq-*</code></td><td>KPI 3 + <code>.dq-grid</code> 이슈 카드. <code>getDataQualitySections</code> 그대로. <code>onNavigate</code>로 해당 화면 이동.</td></tr>
+        </tbody>
+      </table>
+      <ul class="do" style="margin-top:1rem">
+        <li><b>모바일 분기 필수:</b> 네 화면 모두 <code>@media(max-width:768px)</code>에서 단일 컬럼으로(<code>.gd-mobile .ex-row</code>, <code>.dq-grid</code>, <code>.mk-cards</code> 1fr) — 프로토타입 <code>additions.css</code> 하단 규칙 복사.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">★</span> 새 기능 (채택: 1·4·6)</h2>
+    <p class="sub">기존 데이터/스키마 위에 얹는 추가 기능 — 프로토타입에 목업 반영됨.</p>
+    <div class="card">
+      <div class="file">① 아이비 카카오 자동응답 — KakaoManager.tsx + Assistant <span class="tag new">신규</span></div>
+      <ul class="do">
+        <li>연동 설정에 <b>자동응답 토글</b>(<code>.ka-switch</code>). ON이면 <b>출결·숙제 문의</b>(<code>type: attendance|homework</code>)는 아이비가 DB 조회 후 <b>즉시 자동 답변</b> — 요청 큐에서 "자동 처리됨"으로 표시되고 대기 수에서 빠집니다. <b>상담·연결 요청은 자동 처리하지 않고</b> 큐에 남깁니다.</li>
+        <li>실제 구현: Edge Function(<code>kakao-skill</code>)에서 요청 의도 분류 → 출결/숙제면 DB 조회 답변, 그 외는 <code>pending</code>으로 큐 적재. 기존 <code>kakaoParentRequests</code> 흐름 재사용.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">④ 월간 성장 리포트 — CounselLogs.tsx (모달) <span class="tag new">신규</span></div>
+      <ul class="do">
+        <li>상담/진도 화면 툴바에 <b>"월간 리포트"</b> 버튼 → 모달(<code>.rp-*</code>). 학생 선택 시 <b>출석률·숙제 수행률·평가 추세·상담 하이라이트</b>를 그 달 데이터로 집계(규칙 기반, <b>AI 호출 없음</b>). 인쇄/PDF + <b>종합 알림장으로 전송</b>.</li>
+        <li>집계 소스: <code>attendance</code>(출석률·숙제), <code>counselLogs</code>(평가·상담). README의 "월간 리포트" 항목과 일치 — 기존 <code>reportSummary.ts</code> 재사용 가능.</li>
+      </ul>
+      <div class="file" style="margin-top:1rem">⑥ 반 정원 + 대기자 — Classes.tsx + 타입 <span class="tag new">신규</span></div>
+      <ul class="do">
+        <li><code>Class</code> 타입에 <b><code>capacity: number</code>, <code>waitlist: string[]</code></b> 추가. 클래스 카드에 <b>재원/정원 바</b>(<code>.cls-cap</code>) + <b>정원 마감</b> 배지 + <b>대기자 칩</b>(<code>.cls-wait</code>). 정원 차면 신규 배정 막고 대기자로.</li>
+        <li>Supabase <code>classes</code> 테이블에 <code>capacity</code>/<code>waitlist</code> 컬럼 마이그레이션 필요(기본값 적당히).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">📱</span> 태블릿 브레이크포인트 수정 (중요)</h2>
+    <p class="sub">PWA를 태블릿에서 쓸 때 모바일로 무너지는 문제 — 원장님 직접 확인.</p>
+    <div class="card">
+      <div class="file">src/index.css <span class="tag edit">브레이크포인트</span></div>
+      <ul class="do">
+        <li><b>증상:</b> 현재 모든 모바일 전환이 <code>@media (max-width: 768px)</code>입니다. 아이패드 세로(768~834px)·중소형 태블릿이 이 범위에 걸려 <b>핸드폰 단일 컬럼</b>으로 보입니다. 태블릿은 화면이 넓으니 <b>풀 레이아웃</b>이 맞습니다.</li>
+        <li><b>해결:</b> 모바일 붕괴 기준을 <code class="del">768px</code> → <code>600px</code>(또는 640)로 낮춰 <b>진짜 폰만</b> 단일 컬럼으로. 601~1024px(태블릿)은 데스크탑 레이아웃을 받고, 이미 있는 <code>@media (max-width:1024px / 1200px)</code> 컬럼 축소 규칙으로 자연히 정리됩니다.</li>
+        <li><b>적용 범위:</b> 일괄 치환 — 단, 하단 탭·드로어 같은 <b>모바일 전용 내비</b> 표시 기준은 그대로 두거나 별도 관리(태블릿에선 사이드바 노출이 자연스러움).</li>
+        <li>프로토타입 상단 <b>"태블릿"</b> 토글로 목표 모습을 확인하세요 — 사이드바 + 2단 본문이 그대로 유지됩니다.</li>
+      </ul>
+      <pre><code><span class="c">/* index.css — 모바일 붕괴 기준 하향 */</span>
+<span class="b">@media (max-width: 768px)</span> { ... }   <span class="c">// 변경 전 — 태블릿도 모바일</span>
+<span class="k">@media (max-width: 600px)</span> { ... }   <span class="c">// 변경 후 — 폰만 모바일, 태블릿은 풀 레이아웃</span>
+
+<span class="c">/* 태블릿 구간(601~1024)은 기존 컬럼 축소 규칙이 처리 */</span>
+@media (max-width: 1024px) { <span class="c">/* 그리드 2→1 또는 축소 */</span> }</code></pre>
+    </div>
+  </section>
+
+  <section>
+    <p class="sub">가장 큰 작업과 마무리.</p>
+    <div class="card">
+      <ul class="do">
+        <li><b>Exams.css(20KB):</b> 색·간격·헤더·카드·버튼을 <code>--color-*</code> 토큰과 <code>.gd-*</code> 패턴으로 교체. <b>기능·라우트·채점 로직은 절대 변경 금지</b> — 외부 응시(<code>#/exam/…</code>) 흐름 유지.</li>
+        <li><b>아이비(AI) 노출:</b> 평가 탭에서 숨기던 규칙(<code>activeTab !== 'exams'</code>)은 통합 후 재검토. 통일됐으니 일관되게 노출 가능.</li>
+        <li><b>index.css 다이어트:</b> 각 화면이 정본으로 옮겨질 때마다 2,580줄 <b>위쪽</b> 레거시 클래스(<code class="del">.card</code> <code class="del">.metric-card</code> <code class="del">.makeup-*</code> <code class="del">.kakao-*</code> <code class="del">.attendance-mobile-card</code> 등)를 삭제. 179KB → 목표 절반.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="n">✓</span> 반영 체크리스트</h2>
+    <div class="card">
+      <div class="check">
+        <label><span class="box"></span><span><b>App.tsx</b> 데드코드(NAV_GROUPS·void·splice) 제거</span></label>
+        <label><span class="box"></span><span><b>navigation.ts</b> 3그룹 13항목 + 모바일 5탭으로 교체</span></label>
+        <label><span class="box"></span><span>데스크톱 <b>서브탭/바로가기 칩 제거</b>, 맥락 액션은 화면 본문으로</span></label>
+        <label><span class="box"></span><span>탭·버튼·배지·인풋·모달을 <b>정본 클래스</b>로 일괄 치환</span></label>
+        <label><span class="box"></span><span>MakeupManager의 <b>alert() → 토스트</b>, .mk-modal → .modal-content</span></label>
+        <label><span class="box"></span><span>새 4화면 <b>모바일 768px 분기</b> 추가</span></label>
+        <label><span class="box"></span><span>Exams.css를 <b>토큰/.gd 패턴</b>으로 (기능 무변경)</span></label>
+        <label><span class="box"></span><span>옮겨진 화면의 <b>레거시 CSS 삭제</b> → index.css 다이어트</span></label>
+        <label><span class="box on"></span><span><b>데이터/로직 무변경</b> — useAcademyData·api.ts·props 그대로 (이건 처음부터 지킴)</span></label>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">그로잉영어 개발 반영 핸드오프 · 데이터/로직 무변경 · Forest &amp; Cream 통일</p>
+</div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#0f3023"/><g fill="none" stroke="#6ee7b7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M30 50l12 12 28-28"/></g></svg>
+</template>
+</body>
+</html>

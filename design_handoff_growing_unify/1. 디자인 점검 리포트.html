@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>그로잉영어 — 디자인 점검 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --font:'Outfit','Noto Sans KR',sans-serif;
+    --bg:#eef3f0; --surface:#fff; --paper:#f5f8f5;
+    --primary:#1b4b36; --primary-light:#2c6f52; --primary-dark:#0f3023;
+    --mint:#10b981; --sage:#84cc16;
+    --text:#1f2937; --text2:#4b5563; --muted:#9ca3af;
+    --border:#e8edea; --danger:#ef4444; --warn:#f59e0b; --info:#3b82f6;
+    --r-sm:.5rem; --r-md:.85rem; --r-lg:1.25rem;
+    --sh-sm:0 1px 2px rgba(15,46,33,.06);
+    --sh:0 6px 18px -8px rgba(15,46,33,.18),0 2px 6px -4px rgba(15,46,33,.08);
+    --sh-lg:0 24px 60px -22px rgba(15,46,33,.35);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;word-break:keep-all;line-height:1.5;}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 1.5rem 6rem;}
+
+  /* hero */
+  .hero{position:relative;overflow:hidden;margin:2.2rem auto 1.5rem;max-width:1080px;border-radius:var(--r-lg);
+    background:linear-gradient(120deg,#0f3023 0%,#1b5840 52%,#2c6f52 100%);color:#fff;padding:2.6rem 2.6rem 2.4rem;box-shadow:var(--sh-lg);}
+  .hero-leaf{position:absolute;right:-30px;top:-40px;width:260px;height:260px;color:rgba(255,255,255,.07);}
+  .hero-leaf svg{width:100%;height:100%;}
+  .hero-tag{display:inline-flex;align-items:center;gap:.45rem;font-size:.74rem;font-weight:700;letter-spacing:.04em;
+    color:#a8e6cd;background:rgba(255,255,255,.1);padding:.32rem .8rem;border-radius:999px;position:relative;z-index:1;}
+  .hero h1{font-size:2.5rem;font-weight:800;letter-spacing:-.035em;margin:.9rem 0 .5rem;position:relative;z-index:1;}
+  .hero p{font-size:1rem;color:rgba(255,255,255,.82);max-width:48ch;position:relative;z-index:1;}
+  .hero-meta{display:flex;gap:1.6rem;margin-top:1.5rem;position:relative;z-index:1;flex-wrap:wrap;}
+  .hero-meta div{display:flex;flex-direction:column;gap:.1rem;}
+  .hero-meta b{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;}
+  .hero-meta span{font-size:.72rem;color:rgba(255,255,255,.7);font-weight:600;letter-spacing:.02em;}
+
+  /* section nav */
+  .toc{display:flex;flex-wrap:wrap;gap:.5rem;max-width:1080px;margin:0 auto 2.2rem;padding:0 1.5rem;}
+  .toc a{font-size:.8rem;font-weight:700;color:var(--primary);background:var(--surface);border:1px solid var(--border);
+    padding:.5rem .9rem;border-radius:999px;text-decoration:none;transition:all .15s;box-shadow:var(--sh-sm);}
+  .toc a:hover{background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-1px);}
+
+  section{margin-bottom:2.6rem;}
+  .sec-head{display:flex;align-items:flex-end;gap:.9rem;margin-bottom:1.2rem;}
+  .sec-no{font-size:.78rem;font-weight:800;color:var(--mint);letter-spacing:.08em;background:#0f3023;
+    width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .sec-head h2{font-size:1.55rem;font-weight:800;color:var(--primary-dark);letter-spacing:-.025em;line-height:1.15;}
+  .sec-head p{font-size:.86rem;color:var(--text2);margin-top:.15rem;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.5rem 1.6rem;box-shadow:var(--sh-sm);}
+  .card + .card{margin-top:1rem;}
+
+  /* scorecard */
+  .score-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;}
+  .score{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:1.2rem 1.25rem;box-shadow:var(--sh-sm);}
+  .score b{display:block;font-size:2.1rem;font-weight:800;color:var(--primary-dark);letter-spacing:-.03em;line-height:1;}
+  .score b em{font-size:.95rem;font-weight:700;color:var(--muted);font-style:normal;margin-left:.15rem;}
+  .score span{display:block;font-size:.8rem;font-weight:700;color:var(--text2);margin-top:.5rem;}
+  .score small{display:block;font-size:.72rem;color:var(--muted);margin-top:.2rem;line-height:1.45;}
+  .score.good b{color:var(--mint);} .score.bad b{color:var(--danger);} .score.warn b{color:var(--warn);}
+
+  .lead{font-size:1.02rem;color:var(--text2);line-height:1.7;}
+  .lead b{color:var(--primary-dark);font-weight:700;}
+  .verdict{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.2rem;}
+  .vbox{border-radius:var(--r-md);padding:1.1rem 1.2rem;border:1px solid;}
+  .vbox.keep{background:linear-gradient(135deg,#eefaf3,#fff 75%);border-color:#c7ecd9;}
+  .vbox.fix{background:linear-gradient(135deg,#fef4f4,#fff 75%);border-color:#f6cfcf;}
+  .vbox h4{font-size:.92rem;font-weight:800;margin-bottom:.65rem;display:flex;align-items:center;gap:.4rem;}
+  .vbox.keep h4{color:#0c7a55;} .vbox.fix h4{color:var(--danger);}
+  .vbox ul{list-style:none;display:flex;flex-direction:column;gap:.45rem;}
+  .vbox li{position:relative;padding-left:1.1rem;font-size:.85rem;color:var(--text2);line-height:1.5;}
+  .vbox li::before{content:'';position:absolute;left:.1rem;top:.5rem;width:6px;height:6px;border-radius:50%;}
+  .vbox.keep li::before{background:var(--mint);} .vbox.fix li::before{background:var(--danger);}
+  .vbox li b{color:var(--text);font-weight:700;}
+
+  /* diagnosis cards */
+  .diag{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.5rem 1.6rem;box-shadow:var(--sh-sm);border-left:5px solid var(--border);}
+  .diag + .diag{margin-top:1.1rem;}
+  .diag.sev-high{border-left-color:var(--danger);}
+  .diag.sev-mid{border-left-color:var(--warn);}
+  .diag.sev-low{border-left-color:var(--info);}
+  .diag-head{display:flex;align-items:center;gap:.7rem;margin-bottom:.9rem;flex-wrap:wrap;}
+  .diag-head h3{font-size:1.18rem;font-weight:800;color:var(--primary-dark);letter-spacing:-.01em;}
+  .sev{font-size:.68rem;font-weight:800;padding:.22rem .6rem;border-radius:999px;letter-spacing:.02em;}
+  .sev.high{color:var(--danger);background:#fdeaea;} .sev.mid{color:#b4710a;background:#fef3c7;} .sev.low{color:var(--info);background:#e7f0fb;}
+  .diag p{font-size:.9rem;color:var(--text2);line-height:1.65;margin-bottom:.4rem;}
+  .diag p b{color:var(--text);font-weight:700;}
+  .evidence{margin-top:.9rem;background:#0f2820;border-radius:var(--r-md);padding:.95rem 1.1rem;overflow-x:auto;}
+  .evidence-l{font-size:.66rem;font-weight:800;letter-spacing:.08em;color:#6ee7b7;margin-bottom:.5rem;display:block;}
+  .evidence code{font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:.76rem;color:#d1e9df;line-height:1.7;white-space:pre;display:block;}
+  .evidence code .c{color:#5f8775;} .evidence code .k{color:#7dd3a8;} .evidence code .b{color:#fca5a5;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.9rem;}
+  .chip{font-size:.74rem;font-weight:700;padding:.32rem .65rem;border-radius:7px;background:#f2f6f4;color:var(--text2);border:1px solid var(--border);}
+  .chip.x{color:var(--danger);background:#fdeaea;border-color:#f6cfcf;}
+
+  /* table */
+  .vtable{width:100%;border-collapse:collapse;margin-top:.4rem;font-size:.84rem;}
+  .vtable th{text-align:left;font-size:.7rem;font-weight:800;color:var(--muted);letter-spacing:.04em;padding:.6rem .8rem;border-bottom:2px solid var(--border);text-transform:uppercase;}
+  .vtable td{padding:.7rem .8rem;border-bottom:1px solid #f0f3f1;vertical-align:top;color:var(--text2);}
+  .vtable tr:last-child td{border-bottom:none;}
+  .vtable td b{color:var(--primary-dark);}
+  .vtable code{font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:.76rem;background:#f2f6f4;padding:.1rem .35rem;border-radius:5px;color:var(--primary);}
+  .vtable code.old{color:var(--danger);background:#fdeaea;}
+  .vtable .arrow{color:var(--mint);font-weight:800;}
+
+  /* IA diagram */
+  .ia{display:grid;grid-template-columns:300px 1fr;gap:1.4rem;align-items:start;}
+  .ia-side{background:var(--primary-dark);border-radius:var(--r-lg);padding:1.3rem 1rem;box-shadow:var(--sh);}
+  .ia-logo{display:flex;align-items:center;gap:.6rem;padding:.2rem .5rem .9rem;margin-bottom:.5rem;border-bottom:1px solid rgba(255,255,255,.08);}
+  .ia-logo-ic{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--mint),var(--sage));color:var(--primary-dark);display:flex;align-items:center;justify-content:center;}
+  .ia-logo b{color:#fff;font-weight:800;font-size:1.05rem;letter-spacing:-.02em;}
+  .ia-logo span{font-size:.6rem;color:var(--mint);font-weight:600;display:block;letter-spacing:.04em;}
+  .ia-group{margin-top:.7rem;}
+  .ia-gt{font-size:.6rem;font-weight:800;letter-spacing:.07em;color:rgba(255,255,255,.34);padding:.6rem .7rem .35rem;}
+  .ia-item{display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;border-radius:var(--r-md);color:#9fb5ab;font-size:.83rem;font-weight:500;}
+  .ia-item.on{background:#2a684e;color:#fff;font-weight:700;}
+  .ia-item .dot{width:16px;height:16px;border-radius:5px;background:rgba(255,255,255,.12);display:inline-flex;flex-shrink:0;}
+  .ia-item.on .dot{background:rgba(255,255,255,.25);}
+  .ia-item .nb{margin-left:auto;min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--danger);color:#fff;font-size:.62rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}
+  .ia-foot{margin-top:.6rem;padding-top:.7rem;border-top:1px solid rgba(255,255,255,.08);}
+
+  .ia-notes{display:flex;flex-direction:column;gap:.8rem;}
+  .ia-note{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:1rem 1.15rem;box-shadow:var(--sh-sm);}
+  .ia-note h4{font-size:.92rem;font-weight:800;color:var(--primary-dark);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem;}
+  .ia-note p{font-size:.84rem;color:var(--text2);line-height:1.6;}
+  .ia-note .from{font-size:.76rem;color:var(--muted);}
+  .ia-note .from s{color:var(--danger);text-decoration-color:rgba(239,68,68,.5);}
+
+  /* mobile preview */
+  .mobrow{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;}
+  .mob-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;box-shadow:var(--sh-sm);}
+  .mob-bar h4{font-size:.82rem;font-weight:800;color:var(--primary-dark);margin-bottom:.7rem;}
+  .mtabs{display:grid;grid-template-columns:repeat(5,1fr);gap:.2rem;background:#f7faf8;border:1px solid var(--border);border-radius:var(--r-md);padding:.4rem .3rem;}
+  .mtab{display:flex;flex-direction:column;align-items:center;gap:.25rem;font-size:.6rem;font-weight:700;color:var(--text2);padding:.35rem 0;border-radius:8px;}
+  .mtab.on{background:#eaf6f0;color:var(--primary-dark);}
+  .mtab .mi{width:18px;height:18px;border-radius:5px;background:#d9e9e1;}
+  .mtab.on .mi{background:var(--primary-light);}
+
+  /* roadmap */
+  .road{display:flex;flex-direction:column;gap:.7rem;}
+  .step{display:grid;grid-template-columns:46px 1fr auto;gap:1rem;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:1rem 1.2rem;box-shadow:var(--sh-sm);}
+  .step-n{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;font-weight:800;font-size:1.15rem;display:flex;align-items:center;justify-content:center;}
+  .step-b h4{font-size:.98rem;font-weight:800;color:var(--primary-dark);}
+  .step-b p{font-size:.83rem;color:var(--text2);margin-top:.15rem;line-height:1.5;}
+  .effort{font-size:.7rem;font-weight:800;padding:.3rem .7rem;border-radius:999px;white-space:nowrap;}
+  .effort.s{color:#0c7a55;background:#e3f6ed;} .effort.m{color:#b4710a;background:#fef3c7;} .effort.l{color:var(--info);background:#e7f0fb;}
+
+  .callout{background:linear-gradient(135deg,#eef6f1,#fff 70%);border:1px solid #d9e9e1;border-radius:var(--r-md);padding:1.2rem 1.4rem;margin-top:1rem;}
+  .callout b{color:var(--primary-dark);}
+  .nextbtn{display:inline-flex;align-items:center;gap:.5rem;margin-top:1.4rem;background:var(--primary);color:#fff;font-weight:700;font-size:.92rem;padding:.85rem 1.4rem;border-radius:var(--r-md);text-decoration:none;box-shadow:var(--sh);transition:all .15s;}
+  .nextbtn:hover{background:var(--primary-light);transform:translateY(-2px);}
+
+  .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);}
+
+  @media(max-width:840px){
+    .score-grid{grid-template-columns:1fr 1fr;}
+    .verdict{grid-template-columns:1fr;}
+    .ia{grid-template-columns:1fr;}
+    .ia-side{max-width:340px;}
+    .mobrow{grid-template-columns:1fr;}
+    .hero h1{font-size:1.9rem;}
+    .step{grid-template-columns:40px 1fr;}
+    .effort{grid-column:2;justify-self:start;margin-top:.3rem;}
+  }
+</style>
+</head>
+<body>
+
+<div class="hero" data-screen-label="리포트 표지">
+  <div class="hero-leaf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 20h10M10 20c5.5-2.5.8-6.4 5-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6c-.6 1.4-.5 2.6-.4 4 1.7-.4 3-1 4-2.2 1-1.3 1.3-3 1.4-4.8-2.4.6-3.9 1.5-4.7 3z"/></svg></div>
+  <span class="hero-tag">DESIGN AUDIT · 2026.06</span>
+  <h1>그로잉영어 디자인 점검 리포트</h1>
+  <p>좋아하셨던 <b style="color:#a8e6cd">Forest &amp; Cream</b> 리디자인 이후, 기능이 늘면서 디자인이 어디서·왜 무너졌는지 진단하고, 사용 흐름에 맞춘 메뉴 구조와 통일 방향을 제안합니다.</p>
+  <div class="hero-meta">
+    <div><b>14</b><span>전체 화면</span></div>
+    <div><b>10 → 14</b><span>디자인된 화면 / 실제 화면</span></div>
+    <div><b>5</b><span>핵심 진단</span></div>
+    <div><b>179KB</b><span>index.css (2세대 혼재)</span></div>
+  </div>
+</div>
+
+<nav class="toc">
+  <a href="#summary">요약</a>
+  <a href="#d1">진단1 · CSS 2세대</a>
+  <a href="#d2">진단2 · 컴포넌트 분열</a>
+  <a href="#d3">진단3 · 내비게이션</a>
+  <a href="#d4">진단4 · 인터랙션</a>
+  <a href="#d5">진단5 · 평가/모바일</a>
+  <a href="#system">개선 · 통일 시스템</a>
+  <a href="#ia">개선 · 새 메뉴</a>
+  <a href="#road">로드맵</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- ════ SUMMARY ════ -->
+  <section id="summary">
+    <div class="sec-head"><span class="sec-no">TL;DR</span><div><h2>한눈에 보는 결론</h2><p>나쁜 소식보다 좋은 소식이 큽니다 — 토대는 그대로 살아 있어요.</p></div></div>
+
+    <div class="card">
+      <p class="lead">결론부터 — <b>브랜드와 디자인 토큰은 망가지지 않았습니다.</b> 색(primary <code style="color:var(--primary)">#1b4b36</code>), 폰트(Outfit + Noto Sans KR), 반경·그림자 토큰, 그리고 사랑하셨던 <code style="color:var(--primary)">.gd-*</code> 카드 시스템이 <b>지금도 index.css 안에 그대로</b> 있습니다. 무너진 건 "스타일"이 아니라 <b>일관성</b>입니다. 기능을 빠르게 붙이면서 <b>옛 디자인(레거시 클래스)과 새 디자인(.gd 리디자인)이 한 파일에 공존</b>하게 됐고, 새 화면마다 자기만의 클래스·버튼·탭·모달을 새로 만들면서 "같은 일을 하는 UI가 화면마다 다르게 생긴" 상태가 됐습니다.</p>
+      <div class="verdict">
+        <div class="vbox keep">
+          <h4>✓ 그대로 살릴 자산</h4>
+          <ul>
+            <li><b>Forest &amp; Cream 토큰 전체</b> — 색/폰트/반경/그림자 정상</li>
+            <li><b>.gd-card · .gd-stat · .gd-seg · .gd-hero</b> 핵심 패턴</li>
+            <li><b>대시보드·출결·수납·학생·통계</b> 등 원래 10화면의 룩</li>
+            <li><b>데이터/저장 로직</b> (useAcademyData, api.ts) — 손댈 필요 없음</li>
+          </ul>
+        </div>
+        <div class="vbox fix">
+          <h4>✕ 손봐야 할 곳</h4>
+          <ul>
+            <li><b>2세대 CSS 공존</b> — 레거시 클래스 대량 잔존</li>
+            <li><b>분열된 어휘</b> — 탭 3종·버튼 6종·모달 2종</li>
+            <li><b>3층 내비게이션 + 데드코드</b> (App.tsx)</li>
+            <li><b>새 4화면</b>(평가·보강·카카오·점검)이 시스템 밖</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="score-grid" style="margin-top:1rem;">
+      <div class="score good"><b>4<em>/5</em></b><span>토큰·브랜드</span><small>색·폰트·반경 모두 보존됨</small></div>
+      <div class="score bad"><b>2<em>/5</em></b><span>컴포넌트 일관성</span><small>화면마다 다른 어휘</small></div>
+      <div class="score warn"><b>3<em>/5</em></b><span>내비게이션</span><small>구조는 좋으나 3층·데드코드</small></div>
+      <div class="score bad"><b>2<em>/5</em></b><span>새 화면 통합</span><small>평가는 사실상 별도 앱</small></div>
+    </div>
+  </section>
+
+  <!-- ════ D1 ════ -->
+  <section id="d1">
+    <div class="sec-head"><span class="sec-no">01</span><div><h2>두 세대의 CSS가 한 파일에 산다</h2><p>망가진 느낌의 가장 큰 원인</p></div></div>
+    <div class="diag sev-high">
+      <div class="diag-head"><h3>레거시 + 리디자인 클래스 공존</h3><span class="sev high">심각</span></div>
+      <p><b>index.css가 179KB</b>로 비대해진 핵심 이유입니다. 리디자인 때 도입한 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.gd-*</code> 블록은 파일 <b>2,580번째 줄 부근</b>부터 시작하는데, 그 <b>앞쪽 2,500여 줄에 옛 디자인 클래스가 그대로</b> 남아 있습니다. 새 화면들이 이 둘을 섞어 쓰면서 같은 요소가 화면마다 다른 출처의 스타일을 입습니다.</p>
+      <div class="evidence">
+        <span class="evidence-l">index.css — 같은 목적, 두 세대가 공존</span>
+        <code><span class="c">/* 신세대 (리디자인, 2580줄~) — 살릴 것 */</span>
+.gd-card  .gd-stat  .gd-seg  .gd-hero  .at-row  .pay-badge
+
+<span class="c">/* 구세대 (리디자인 이전, 그대로 잔존) — 정리 대상 */</span>
+.card  .metric-card  .makeup-summary-card  .kakao-status
+.attendance-mobile-card  .mobile-data-card  .settings-tabs
+.dashboard-class-name  .quick-att-student-name  .tab-btn</code>
+      </div>
+      <p style="margin-top:.9rem"><b>증상:</b> 카드 모서리·그림자·여백이 화면마다 미묘하게 다르고, 같은 "배지"가 어디선 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.pay-badge</code>, 어디선 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.at-pill</code>, 어디선 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.kakao-status</code>로 따로 정의됩니다.</p>
+    </div>
+  </section>
+
+  <!-- ════ D2 ════ -->
+  <section id="d2">
+    <div class="sec-head"><span class="sec-no">02</span><div><h2>같은 일을 하는 UI가 화면마다 다르게 생겼다</h2><p>컴포넌트 어휘의 분열</p></div></div>
+    <div class="diag sev-high">
+      <div class="diag-head"><h3>탭·버튼·모달·인풋이 제각각</h3><span class="sev high">심각</span></div>
+      <p>새 기능이 각자 자기 CSS 네임스페이스(<code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.mk-*</code>, <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.dq-*</code>, <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.kakao-*</code>)를 만들면서, <b>동일한 역할의 컴포넌트가 3~6가지 버전</b>으로 흩어졌습니다.</p>
+      <div class="chips">
+        <span class="chip x">탭: .flow-tab</span><span class="chip x">.st-tab</span><span class="chip x">.settings-tabs / .kakao-tabs</span><span class="chip x">.tab-btn</span>
+      </div>
+      <div class="chips">
+        <span class="chip x">버튼: .btn-primary</span><span class="chip x">.pay-btn</span><span class="chip x">.at-act</span><span class="chip x">.gd-copy</span><span class="chip x">.mk-btn</span><span class="chip x">.pay-icon</span>
+      </div>
+      <div class="chips">
+        <span class="chip x">모달: .modal-content</span><span class="chip x">.mk-modal</span>
+      </div>
+      <p style="margin-top:.95rem"><b>가장 헷갈리는 사례 — 의미가 안 맞는 클래스 재사용:</b> 보강·보충 화면(MakeupManager)이 날짜·학생·분량 입력에 전부 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.msg-select</code>(원래 "메시징 화면 셀렉트")를 씁니다. 이름과 용도가 어긋나 유지보수 때 혼선을 줍니다.</p>
+      <div class="evidence">
+        <span class="evidence-l">MakeupManager.tsx — 메시징용 클래스를 일반 폼에 차용</span>
+        <code><span class="b">&lt;input type="date" className="msg-select" .../&gt;</span>   <span class="c">// 날짜인데 msg-select</span>
+<span class="b">&lt;select className="msg-select"&gt;</span>...    <span class="c">// 학생/반/분량 전부 동일</span></code>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ D3 ════ -->
+  <section id="d3">
+    <div class="sec-head"><span class="sec-no">03</span><div><h2>메뉴가 세 겹이고, 옛 메뉴 코드가 남아 있다</h2><p>내비게이션 구조</p></div></div>
+    <div class="diag sev-mid">
+      <div class="diag-head"><h3>3층 내비 + 데드코드</h3><span class="sev mid">주의</span></div>
+      <p>현재 14개 탭이 <b>5개 상단 메뉴</b>(오늘·학생·수업·수납·소통) 아래 들어가 있고, 그 밑에 <b>플로우 서브탭</b>(<code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.flow-tab</code>)과 <b>바로가기 칩</b>(<code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.flow-chip</code>)이 또 깔립니다. 흐름을 살리려는 좋은 의도지만, <b>평가·통계·보강 같은 화면이 2~3단계 깊이</b>에 묻혀 "지금 어디에 있는지" 감을 잡기 어렵습니다.</p>
+      <p>또한 <b>App.tsx에 옛 메뉴 코드가 그대로 남아</b> 있습니다 — 새 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">navigation.ts</code>로 대체됐는데도 옛 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">NAV_GROUPS</code>/<code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">TAB_TITLES</code>가 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">void</code> 처리되어 방치돼 있어요.</p>
+      <div class="evidence">
+        <span class="evidence-l">App.tsx — 죽은 코드 (제거 대상)</span>
+        <code><span class="k">const</span> NAV_GROUPS = [...];     <span class="c">// 옛 3그룹 메뉴</span>
+NAV_GROUPS[1]?.items.splice(2, 0, ...); <span class="c">// 평가 끼워넣기 핵</span>
+<span class="b">void</span> NAV_GROUPS;  <span class="b">void</span> TAB_TITLES;  <span class="c">// 쓰이지 않음 = 데드코드</span></code>
+      </div>
+      <p style="margin-top:.9rem">개선 방향은 <a href="#ia" style="color:var(--primary);font-weight:700">섹션 IA</a>에서 — 데스크톱은 <b>한 화면에 다 보이는 그룹 사이드바</b>로 펴고, 모바일만 5탭+더보기로 접습니다.</p>
+    </div>
+  </section>
+
+  <!-- ════ D4 ════ -->
+  <section id="d4">
+    <div class="sec-head"><span class="sec-no">04</span><div><h2>핸드오프 때 정한 인터랙션 원칙이 새 화면에서 깨졌다</h2><p>상호작용 일관성</p></div></div>
+    <div class="diag sev-mid">
+      <div class="diag-head"><h3>alert() 부활 · 모달 분열</h3><span class="sev mid">주의</span></div>
+      <p>원래 핸드오프 원칙 4번은 <b>"alert()/confirm() 대신 토스트 + 인라인 확인"</b>이었습니다. 그런데 새로 들어온 보강·보충 화면은 검증 실패 시 <b>브라우저 기본 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">alert()</code>를 3곳</b>에서 씁니다. 깔끔한 토스트 피드백과 톤이 어긋나죠.</p>
+      <div class="evidence">
+        <span class="evidence-l">MakeupManager.tsx — 원칙 이탈</span>
+        <code><span class="b">alert</span>(<span class="k">'학생, 반, 날짜를 선택해 주세요.'</span>);
+<span class="b">alert</span>(<span class="k">'이미 이 결석일에 연결된 보강 기록이 있습니다.'</span>);
+<span class="c">// → .gd-toast + 인라인 에러로 통일해야 함</span></code>
+      </div>
+      <p style="margin-top:.9rem">모달도 마찬가지 — 앱 전체는 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.modal-content</code>를 쓰는데 보강 화면만 자체 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">.mk-modal</code>을 새로 그려, 모달 모서리·헤더·버튼이 미묘하게 다릅니다.</p>
+    </div>
+  </section>
+
+  <!-- ════ D5 ════ -->
+  <section id="d5">
+    <div class="sec-head"><span class="sec-no">05</span><div><h2>평가는 사실상 별도 앱 · 새 화면은 모바일 미정의</h2><p>가장 큰 통합 부채</p></div></div>
+    <div class="diag sev-high">
+      <div class="diag-head"><h3>Exams 디자인 섬</h3><span class="sev high">심각</span></div>
+      <p><b>평가 관리(Exams.tsx)는 137KB</b> 단일 컴포넌트에 <b>전용 Exams.css(20KB)</b>까지 따로 가진, 사실상 독립된 앱입니다. 외부 응시 라우트(<code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">#/exam/…</code>)를 갖고, AI 비서 아이비도 이 탭에선 일부러 숨깁니다(<code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">activeTab !== 'exams'</code>). 강력한 기능이지만 <b>나머지 13화면과 비주얼 언어가 가장 동떨어져</b> 있습니다.</p>
+    </div>
+    <div class="diag sev-mid">
+      <div class="diag-head"><h3>새 화면의 모바일 부재</h3><span class="sev mid">주의</span></div>
+      <p>원래 10화면은 <code style="font-family:monospace;background:#f2f6f4;padding:.05rem .3rem;border-radius:4px">@media(max-width:768px)</code>에서 카드로 무너지도록 정성껏 설계됐습니다. 반면 <b>데이터 점검(.dq-grid)·보강(.mk-cards)·카카오</b> 등 새 화면은 모바일 분기가 일부만 정의돼, 좁은 화면에서 그리드가 깨지거나 가로 넘침이 생길 수 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- ════ SYSTEM ════ -->
+  <section id="system">
+    <div class="sec-head"><span class="sec-no">FIX</span><div><h2>통일 시스템 — 한 어휘로 정리</h2><p>"이 클래스 하나만 쓴다"는 정규 매핑</p></div></div>
+    <div class="card">
+      <p class="lead" style="margin-bottom:1.1rem">새 디자인을 만드는 게 아니라, <b>이미 좋은 .gd 시스템을 정본으로 삼고</b> 흩어진 변형들을 거기에 흡수합니다. 아래가 "앞으로 이것만 쓴다" 표입니다.</p>
+      <table class="vtable">
+        <thead><tr><th>역할</th><th>지금 (분열)</th><th></th><th>통일 (정본)</th></tr></thead>
+        <tbody>
+          <tr><td><b>카드</b></td><td><code class="old">.card</code> <code class="old">.metric-card</code> <code class="old">.makeup-summary-card</code></td><td class="arrow">→</td><td><code>.gd-card</code> <code>.gd-stat</code></td></tr>
+          <tr><td><b>탭</b></td><td><code class="old">.settings-tabs</code> <code class="old">.kakao-tabs</code> <code class="old">.tab-btn</code></td><td class="arrow">→</td><td><code>.st-tab</code> (상세) · <code>.flow-tab</code> (화면)</td></tr>
+          <tr><td><b>세그먼트</b></td><td><code class="old">.makeup-filter-tabs</code> 등</td><td class="arrow">→</td><td><code>.gd-seg</code> / <code>.gd-seg-b</code></td></tr>
+          <tr><td><b>버튼</b></td><td><code class="old">.pay-btn</code> <code class="old">.at-act</code> <code class="old">.mk-btn</code> <code class="old">.btn-primary</code></td><td class="arrow">→</td><td><code>.btn</code> + <code>.btn-primary/ghost/sm</code></td></tr>
+          <tr><td><b>상태 배지</b></td><td><code class="old">.pay-badge</code> <code class="old">.at-pill</code> <code class="old">.kakao-status</code></td><td class="arrow">→</td><td><code>.pill</code> + <code>.ok/warn/danger/info</code></td></tr>
+          <tr><td><b>인풋</b></td><td><code class="old">.msg-select</code> (의미불일치)</td><td class="arrow">→</td><td><code>.field</code> (input/select 공통)</td></tr>
+          <tr><td><b>모달</b></td><td><code class="old">.mk-modal</code></td><td class="arrow">→</td><td><code>.modal-content</code></td></tr>
+          <tr><td><b>피드백</b></td><td><code class="old">alert()</code> <code class="old">confirm()</code></td><td class="arrow">→</td><td><code>.gd-toast</code> + 인라인 에러</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <b>한 줄 핸드오프:</b> "index.css에서 <b>2580줄 위쪽(레거시)</b>을 점진적으로 비우고, 모든 화면을 <b>.gd 정본 클래스</b>로 통일한다. 평가(Exams.css)는 .gd 토큰을 쓰도록 헤더·카드·버튼만 교체한다." — 색·로직·데이터는 손대지 않습니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ IA ════ -->
+  <section id="ia">
+    <div class="sec-head"><span class="sec-no">FIX</span><div><h2>새 메뉴 — 하루 흐름대로</h2><p>데스크톱은 펼치고, 모바일은 접는다</p></div></div>
+    <div class="card">
+      <p class="lead" style="margin-bottom:1.3rem">원장님은 PC에서 하루 종일 쓰십니다. 그래서 <b>모든 메뉴를 한 화면에 보여주는 그룹 사이드바</b>가 5버튼+서브탭보다 빠릅니다. 메뉴를 <b>하루 운영 → 원생·수업 → 기록·분석</b> 3블록으로 묶어, 아침에 여는 순서대로 위에서 아래로 흐르게 했습니다.</p>
+      <div class="ia">
+        <div class="ia-side" data-screen-label="새 사이드바 IA">
+          <div class="ia-logo"><span class="ia-logo-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10M10 20c5.5-2.5.8-6.4 5-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6c-.6 1.4-.5 2.6-.4 4 1.7-.4 3-1 4-2.2 1-1.3 1.3-3 1.4-4.8-2.4.6-3.9 1.5-4.7 3z"/></svg></span><div><b>그로잉영어</b><span>GROWING ENGLISH</span></div></div>
+          <div class="ia-group">
+            <div class="ia-gt">그날 운영</div>
+            <div class="ia-item on"><span class="dot"></span>오늘</div>
+            <div class="ia-item"><span class="dot"></span>출결 관리</div>
+            <div class="ia-item"><span class="dot"></span>보강 · 보충</div>
+            <div class="ia-item"><span class="dot"></span>알림장<span class="nb">3</span></div>
+            <div class="ia-item"><span class="dot"></span>키오스크 시작</div>
+          </div>
+          <div class="ia-group">
+            <div class="ia-gt">원생 · 수업</div>
+            <div class="ia-item"><span class="dot"></span>학생 관리</div>
+            <div class="ia-item"><span class="dot"></span>반 / 시간표</div>
+            <div class="ia-item"><span class="dot"></span>평가 관리</div>
+            <div class="ia-item"><span class="dot"></span>수납 관리</div>
+          </div>
+          <div class="ia-group">
+            <div class="ia-gt">기록 · 분석</div>
+            <div class="ia-item"><span class="dot"></span>상담 / 진도 일지</div>
+            <div class="ia-item"><span class="dot"></span>출결 통계</div>
+            <div class="ia-item"><span class="dot"></span>카카오 채널</div>
+            <div class="ia-item"><span class="dot"></span>데이터 점검</div>
+          </div>
+          <div class="ia-foot"><div class="ia-item"><span class="dot"></span>설정 (백업 · AI · 알림)</div></div>
+        </div>
+        <div class="ia-notes">
+          <div class="ia-note"><h4>① 출결을 1단계로 끌어올림</h4><p class="from">지금: <s>수업 ▸ 서브탭 ▸ 출결</s> (3단계)</p><p>매일 쓰는 출결·보강을 상단 "그날 운영"에 노출. 더 이상 묻히지 않습니다.</p></div>
+          <div class="ia-note"><h4>② 평가를 정식 메뉴로</h4><p class="from">지금: 수업 서브탭 한 칸</p><p>독립 앱 수준의 평가를 "원생·수업" 블록의 1급 메뉴로 승격하고 .gd 룩으로 통합.</p></div>
+          <div class="ia-note"><h4>③ 데이터 점검·카카오를 "기록·분석"으로</h4><p class="from">지금: 설정 안쪽 / 소통 서브탭</p><p>관리·점검성 화면을 한 블록에 모아 의도를 명확히.</p></div>
+          <div class="ia-note"><h4>④ 서브탭·바로가기 칩 제거(데스크톱)</h4><p>13개 메뉴가 다 보이므로 3층 내비가 1층으로. 학생 "상세" 안의 탭만 유지.</p></div>
+        </div>
+      </div>
+
+      <div class="mobrow mobow" style="margin-top:1.4rem">
+        <div class="mob-bar">
+          <h4>모바일 — 하단 5탭 + 더보기</h4>
+          <div class="mtabs">
+            <div class="mtab on"><span class="mi"></span>오늘</div>
+            <div class="mtab"><span class="mi"></span>출결</div>
+            <div class="mtab"><span class="mi"></span>알림장</div>
+            <div class="mtab"><span class="mi"></span>학생</div>
+            <div class="mtab"><span class="mi"></span>더보기</div>
+          </div>
+          <p style="font-size:.78rem;color:var(--text2);margin-top:.7rem;line-height:1.55">자주 쓰는 4개만 고정, 나머지(수업·평가·수납·통계·카카오·점검·설정)는 "더보기" 시트로. 모든 새 화면에 768px 카드 분기를 추가합니다.</p>
+        </div>
+        <div class="mob-bar">
+          <h4>유지하는 좋은 장치</h4>
+          <p style="font-size:.82rem;color:var(--text2);line-height:1.65"><b style="color:var(--primary-dark)">맥락 바로가기</b>는 살립니다 — 단, 내비 "층"이 아니라 <b>각 화면 본문 안의 액션</b>으로. 예: 수납 화면에서 "미납 안내 보내기 →" 버튼이 알림장으로 이동. 길찾기는 사이드바 하나로 단순화하고, 바로가기는 업무 연결로만 씁니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ ROADMAP ════ -->
+  <section id="road">
+    <div class="sec-head"><span class="sec-no">PLAN</span><div><h2>적용 로드맵</h2><p>데이터·로직은 한 줄도 안 건드립니다</p></div></div>
+    <div class="road">
+      <div class="step"><span class="step-n">1</span><div class="step-b"><h4>내비게이션 정리 + 데드코드 제거</h4><p>그룹 사이드바로 교체, App.tsx의 void NAV_GROUPS/TAB_TITLES·splice 핵 삭제, 모바일 5탭+더보기.</p></div><span class="effort s">가벼움</span></div>
+      <div class="step"><span class="step-n">2</span><div class="step-b"><h4>컴포넌트 어휘 통일</h4><p>탭·버튼·배지·인풋·모달을 정본 클래스로 매핑(위 표). alert()→토스트.</p></div><span class="effort m">중간</span></div>
+      <div class="step"><span class="step-n">3</span><div class="step-b"><h4>새 4화면 .gd 시스템으로 흡수</h4><p>보강·데이터점검·카카오를 .gd-card/.gd-stat/.pill로 재정렬 + 모바일 분기 추가.</p></div><span class="effort m">중간</span></div>
+      <div class="step"><span class="step-n">4</span><div class="step-b"><h4>평가(Exams) 비주얼만 통합</h4><p>Exams.css의 헤더·카드·버튼을 .gd 토큰으로 교체(로직·기능 유지). 가장 큰 일.</p></div><span class="effort l">무거움</span></div>
+      <div class="step"><span class="step-n">5</span><div class="step-b"><h4>레거시 CSS 비우기</h4><p>화면이 정본으로 옮겨질 때마다 index.css 2580줄 위쪽 클래스를 삭제 → 파일 다이어트.</p></div><span class="effort m">중간</span></div>
+    </div>
+
+    <div class="callout">
+      <b>다음 단계 →</b> 이 진단을 바탕으로, <b>14개 화면을 한 시스템으로 통일한 클릭 가능한 프로토타입</b>(데스크톱+모바일, 새 메뉴 적용)을 만들어 드립니다. 평가·보강·카카오·데이터 점검까지 Forest &amp; Cream으로 통합한 모습을 직접 눌러 보실 수 있어요.
+    </div>
+    <a class="nextbtn" href="2. 통일 프로토타입.html">통일 프로토타입 보기 →</a>
+    <a class="nextbtn" href="3. 개발 반영 핸드오프.html" style="background:#0f3023;margin-left:.6rem;">개발 반영 핸드오프 →</a>
+  </section>
+
+  <p class="foot">그로잉영어 디자인 점검 리포트 · Forest &amp; Cream Design System · 데이터/로직 무변경 원칙</p>
+</div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#1b4b36"/><g fill="none" stroke="#a8e6cd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M35 72h30M44 72c16-7 2-18 14-29M42 40c3 2 5 6 6 10-5 1-9 1-12-1-3-2-6-5-8-11 7-1 11 0 14 2zM58 30c-2 4-1 7-1 11 4-1 8-3 11-6 3-4 4-8 4-13-6 2-11 4-14 8z"/></g></svg>
+</template>
+</body>
+</html>
