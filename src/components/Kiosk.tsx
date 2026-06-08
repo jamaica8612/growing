@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Student, Class } from '../types';
-import { Sprout, Home, Lock, Search, CheckCircle, Volume2 } from 'lucide-react';
+import { Sprout, Home, Lock, CheckCircle, Volume2 } from 'lucide-react';
 
 interface KioskProps {
   students: Student[];
@@ -12,7 +12,6 @@ interface KioskProps {
 }
 
 export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSaveAttendance, onQueueAlert, onExitKiosk }) => {
-  const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
   const [passcode, setPasscode] = useState('');
@@ -28,10 +27,6 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
-  const filteredStudents = activeStudents.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.school.toLowerCase().includes(search.toLowerCase())
-  );
 
   // Web Audio API Chime sound generator (Fully self-contained, works offline!)
   const playSynthesizedChime = (type: 'in' | 'out') => {
@@ -160,21 +155,13 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
 
       {/* ── 본문 ── */}
       <div className="kk-body">
-        <div className="kk-search">
-          <Search size={20} />
-          <input placeholder="이름을 입력하여 내 이름 찾기…" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
         <div className="kk-grid">
-          {filteredStudents.length === 0 ? (
-            <div className="kk-empty">🔍 검색 결과가 없습니다. 이름을 정확히 확인해 주세요.</div>
-          ) : (
-            filteredStudents.map(student => (
-              <button key={student.id} className="kk-card" onClick={() => setSelectedStudent(student)}>
-                <span className="kk-card-name">{student.name}</span>
-                <span className="kk-card-sub">{student.school || '교습소'} {student.grade.split(' ')[1] || student.grade}</span>
-              </button>
-            ))
-          )}
+          {activeStudents.map(student => (
+            <button key={student.id} className="kk-card" onClick={() => setSelectedStudent(student)}>
+              <span className="kk-card-name">{student.name}</span>
+              <span className="kk-card-sub">{student.school || '교습소'} {student.grade.split(' ')[1] || student.grade}</span>
+            </button>
+          ))}
         </div>
       </div>
 
