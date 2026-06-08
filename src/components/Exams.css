@@ -4,37 +4,35 @@
    디자인 토큰(--primary, --mint 등)도 .exam-app 안에서만 선언한다. */
 
 .exam-app {
-  --primary: #1b4b36;
-  --primary-dark: #0f3023;
-  --primary-light: #2c6f52;
+  --primary: var(--color-primary);
+  --primary-dark: var(--color-primary-dark);
+  --primary-light: var(--color-primary-light);
   --sidebar-bg: #0f2e21;
   --sidebar-active: #2a684e;
 
-  --mint: #10b981;
-  --sage: #84cc16;
+  --mint: var(--color-accent-mint);
+  --sage: var(--color-accent-sage);
   --mint-light: #d1fae5;
 
-  --bg: #f5f8f5;
-  --surface: #ffffff;
-  --border: #e8edea;
+  --bg: var(--color-bg-base);
+  --surface: var(--color-bg-surface);
+  --border: var(--color-border);
 
-  --text: #1f2937;
-  --text-2: #4b5563;
-  --muted: #9ca3af;
+  --text: var(--color-text-primary);
+  --text-2: var(--color-text-secondary);
+  --muted: var(--color-text-muted);
 
-  --success: #10b981;
-  --info: #3b82f6;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --success: var(--color-success);
+  --info: var(--color-info);
+  --warning: var(--color-warning);
+  --danger: var(--color-danger);
 
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
+  --r-sm: var(--radius-sm);
+  --r-md: var(--radius-md);
+  --r-lg: var(--radius-lg);
   --r-xl: 22px;
 
-  --shadow-sm: 0 1px 2px rgba(15, 46, 33, .06), 0 1px 3px rgba(15, 46, 33, .05);
-  --shadow-md: 0 4px 14px rgba(15, 46, 33, .08), 0 2px 6px rgba(15, 46, 33, .05);
-  --shadow-lg: 0 14px 40px rgba(15, 46, 33, .12), 0 4px 12px rgba(15, 46, 33, .07);
+  /* shadow vars removed — resolved from :root --shadow-sm/md/lg tokens directly */
 
   --font-head: 'Outfit', 'Noto Sans KR', sans-serif;
   --font-body: 'Noto Sans KR', 'Outfit', sans-serif;
@@ -65,7 +63,7 @@
 .exam-app .btn-primary:hover { background: var(--primary-light); box-shadow: var(--shadow-md); }
 .exam-app .btn-lg { height: 54px; font-size: 16px; padding: 0 26px; border-radius: var(--r-lg); }
 .exam-app .btn-ghost { background: var(--surface); color: var(--text-2); border-color: var(--border); }
-.exam-app .btn-ghost:hover { border-color: #cfdad3; color: var(--text); background: #fbfdfb; }
+.exam-app .btn-ghost:hover { border-color: #cfdad3; color: var(--text); background: var(--surface); }
 .exam-app .btn-soft { background: var(--mint-light); color: var(--primary); }
 .exam-app .btn-soft:hover { background: #bdf3dd; }
 .exam-app .btn-danger-ghost { background: var(--surface); color: var(--danger); border-color: #f3d4d4; }
@@ -85,7 +83,7 @@
 .exam-app .chip[data-on="true"] { background: var(--mint-light); border-color: var(--mint); color: var(--primary); }
 
 .exam-app .segment {
-  display: inline-flex; background: #eef3ef; border-radius: 12px; padding: 4px; gap: 4px;
+  display: inline-flex; background: #eef3ef; border-radius: var(--radius-md); padding: 4px; gap: 4px;
 }
 .exam-app .segment > button {
   border: none; background: transparent; color: var(--text-2);
@@ -150,7 +148,7 @@
 }
 
 /* ---- Upload (자료 올리기) ---- */
-.exam-app .up-tabs { display: flex; gap: 6px; background: #eef3ef; border-radius: 13px; padding: 5px; margin-bottom: 18px; }
+.exam-app .up-tabs { display: flex; gap: 6px; background: #eef3ef; border-radius: var(--radius-lg); padding: 5px; margin-bottom: 18px; }
 .exam-app .up-tab {
   flex: 1; border: none; background: transparent; color: var(--text-2);
   font-weight: 600; font-size: 14.5px; padding: 11px 10px; border-radius: 10px;
@@ -159,12 +157,12 @@
 }
 .exam-app .up-tab[data-on="true"] { background: #fff; color: var(--primary); box-shadow: var(--shadow-sm); }
 .exam-app .up-drop {
-  border: 2px dashed #c4d3ca; border-radius: 18px; background: #fbfdfb;
+  border: 2px dashed #c4d3ca; border-radius: 18px; background: var(--surface);
   padding: 40px 24px; text-align: center; transition: all .18s ease; cursor: pointer;
 }
 .exam-app .up-drop:hover, .exam-app .up-drop.drag { border-color: var(--mint); background: var(--mint-light); }
 .exam-app .up-chip {
-  display: inline-flex; align-items: center; gap: 10px; background: #fff;
+  display: inline-flex; align-items: center; gap: 10px; background: var(--surface);
   border: 1.5px solid var(--border); border-radius: 13px; padding: 10px 12px 10px 10px;
   box-shadow: var(--shadow-sm);
 }
@@ -173,7 +171,7 @@
 /* ---- AI editing studio dock ---- */
 .exam-app .studio-dock {
   position: sticky; bottom: 0; z-index: 30;
-  background: #0f2e21; border-radius: 20px 20px 0 0;
+  background: var(--sidebar-bg); border-radius: 20px 20px 0 0;
   box-shadow: 0 -10px 40px rgba(15,46,33,.22);
   padding: 16px 20px 18px;
 }
@@ -254,17 +252,17 @@
 
 /* ---- 결과 대시보드 ---- */
 .exam-app .ring-num { font-family: var(--font-head); font-weight: 800; font-feature-settings: "tnum"; }
-.exam-app .kpi { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow-sm); }
+.exam-app .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow-sm); }
 .exam-app .dist-bar { display: flex; align-items: flex-end; gap: 10px; height: 130px; }
 .exam-app .dist-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; justify-content: flex-end; }
-.exam-app .dist-fill { width: 100%; background: linear-gradient(180deg,#84cc16,#10b981); border-radius: 8px 8px 0 0; min-height: 4px; transition: height .5s cubic-bezier(.22,.61,.36,1); }
+.exam-app .dist-fill { width: 100%; background: linear-gradient(180deg,var(--sage),var(--mint)); border-radius: 8px 8px 0 0; min-height: 4px; transition: height .5s cubic-bezier(.22,.61,.36,1); }
 .exam-app .qrate-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; }
-.exam-app .qrate-track { flex: 1; height: 10px; background: #eef3ef; border-radius: 99px; overflow: hidden; }
+.exam-app .qrate-track { flex: 1; height: 10px; background: #eef3ef; border-radius: var(--radius-sm); overflow: hidden; }
 .exam-app .qrate-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.22,.61,.36,1); }
 .exam-app .graded-paper {
   position: relative;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 
 /* ---- 학생 응시 ---- */
@@ -281,7 +279,7 @@
   flex-shrink: 0;
   width: 100%;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 .exam-app .student-screen-full {
@@ -291,28 +289,28 @@
   background: var(--bg);
 }
 .exam-app .tablet-stage { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px 28px; }
-.exam-app .tablet-bezel { background: #0f2e21; border-radius: 38px; padding: 16px; box-shadow: 0 40px 90px rgba(15,46,33,.34), 0 0 0 1px rgba(0,0,0,.05); position: relative; }
+.exam-app .tablet-bezel { background: var(--sidebar-bg); border-radius: 38px; padding: 16px; box-shadow: 0 40px 90px rgba(15,46,33,.34), 0 0 0 1px rgba(0,0,0,.05); position: relative; }
 .exam-app .tablet-screen { background: var(--bg); border-radius: 22px; overflow: hidden; position: relative; }
-.exam-app .t-opt { display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; background: #fff; border: 2px solid var(--border); border-radius: 18px; padding: 20px 22px; transition: all .14s ease; cursor: pointer; }
+.exam-app .t-opt { display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; background: var(--surface); border: 2px solid var(--border); border-radius: 18px; padding: 20px 22px; transition: all .14s ease; cursor: pointer; }
 .exam-app .t-opt:hover { border-color: #b9d3c6; }
 .exam-app .t-opt[data-on="true"] { border-color: var(--mint); background: var(--mint-light); }
-.exam-app .t-opt-mark { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-family: var(--font-head); font-weight: 800; font-size: 19px; border: 2px solid var(--border); color: var(--text-2); background: #fff; transition: all .14s ease; }
+.exam-app .t-opt-mark { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-family: var(--font-head); font-weight: 800; font-size: 19px; border: 2px solid var(--border); color: var(--text-2); background: var(--surface); transition: all .14s ease; }
 .exam-app .t-opt[data-on="true"] .t-opt-mark { border-color: var(--mint); background: var(--mint); color: #fff; }
 .exam-app .pg-dots { display: flex; gap: 6px; flex-wrap: wrap; }
-.exam-app .pg-dot { width: 30px; height: 6px; border-radius: 99px; background: #d9e4dd; transition: background .2s; }
+.exam-app .pg-dot { width: 30px; height: 6px; border-radius: 99px; background: var(--border); transition: background .2s; }
 .exam-app .pg-dot[data-state="done"] { background: var(--mint); }
 .exam-app .pg-dot[data-state="cur"] { background: var(--primary); }
 
 /* source micro label */
 .exam-app .src-tag {
   display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
-  color: var(--primary-light); background: #eef6f1; border: 1px solid #d6ebe0;
+  color: var(--primary-light); background: #eef6f1; border: 1px solid var(--border);
   padding: 3px 9px; border-radius: 999px; white-space: nowrap;
 }
 
 /* ===== 모바일 반응형 (폰 브라우저) =====
    인라인 스타일을 덮어쓰기 위해 !important 사용 (.exam-app 안으로만 한정) */
-@media (max-width: 640px) {
+@media (max-width: 600px) {
   .exam-app .exam-pagepad { padding-left: 16px !important; padding-right: 16px !important; }
   .exam-app .exam-toolbar { padding-left: 16px !important; padding-right: 16px !important; }
   .exam-app .exam-col2 { grid-template-columns: 1fr !important; }
@@ -340,52 +338,52 @@
 
 /* ===== 인쇄 뷰 (학생용 시험지 / 선생님용 정답지) ===== */
 .exam-print-doc {
-  --primary: #1b4b36;
-  --primary-light: #2c6f52;
+  --primary: var(--color-primary);
+  --primary-light: var(--color-primary-light);
   --mint-light: #d1fae5;
-  --success: #10b981;
-  --mint: #10b981;
+  --success: var(--color-success);
+  --mint: var(--color-accent-mint);
   display: none;
 }
 @media screen {
-  .exam-print-doc.preview-on { display: block; position: fixed; inset: 0; z-index: 4000; overflow: auto; background: #e8ece9; padding: 30px 0; }
+  .exam-print-doc.preview-on { display: block; position: fixed; inset: 0; z-index: 4000; overflow: auto; background: var(--color-border); padding: 30px 0; }
   .exam-print-doc.preview-on .print-page { box-shadow: 0 10px 40px rgba(0,0,0,.14); }
 }
 .exam-print-doc .print-page {
-  background: #fff; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 18mm 16mm;
-  color: #1f2937; font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box;
+  background: var(--color-bg-surface); width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 18mm 16mm;
+  color: var(--color-text-primary); font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box;
 }
 .exam-print-doc .pr-head { border-bottom: 2.5px solid var(--primary); padding-bottom: 14px; margin-bottom: 20px; }
 .exam-print-doc .pr-head-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .exam-print-doc .pr-brand { font-family: 'Outfit','Noto Sans KR',sans-serif; font-weight: 700; font-size: 13px; color: var(--primary); letter-spacing: .01em; }
 .exam-print-doc .pr-kind { font-size: 12px; font-weight: 700; color: #fff; background: var(--primary); padding: 4px 11px; border-radius: 6px; }
 .exam-print-doc .pr-title { font-family: 'Outfit','Noto Sans KR',sans-serif; font-size: 22px; font-weight: 700; margin: 0 0 12px; letter-spacing: -.01em; }
-.exam-print-doc .pr-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: #4b5563; }
-.exam-print-doc .pr-meta b { color: #1f2937; font-weight: 700; }
-.exam-print-doc .pr-namebar { display: flex; gap: 28px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed #cfdad3; font-size: 13px; color: #4b5563; font-weight: 600; }
+.exam-print-doc .pr-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: var(--color-text-secondary); }
+.exam-print-doc .pr-meta b { color: var(--color-text-primary); font-weight: 700; }
+.exam-print-doc .pr-namebar { display: flex; gap: 28px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed #cfdad3; font-size: 13px; color: var(--color-text-secondary); font-weight: 600; }
 .exam-print-doc .pr-qlist { list-style: none; margin: 0; padding: 0; }
-.exam-print-doc .pr-q { padding: 14px 0 16px; border-bottom: 1px solid #eef2ef; break-inside: avoid; }
+.exam-print-doc .pr-q { padding: 14px 0 16px; border-bottom: 1px solid var(--color-border); break-inside: avoid; }
 .exam-print-doc .pr-q-head { display: flex; align-items: baseline; gap: 7px; line-height: 1.55; }
 .exam-print-doc .pr-q-num { font-family: 'Outfit',sans-serif; font-weight: 700; font-size: 14px; color: #fff; background: var(--primary); min-width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; flex-shrink: 0; }
 .exam-print-doc .pr-q-type { font-size: 12px; font-weight: 700; color: var(--primary-light); flex-shrink: 0; }
 .exam-print-doc .pr-q-prompt { font-size: 14px; font-weight: 500; white-space: pre-line; flex: 1; }
-.exam-print-doc .pr-q-pts { font-size: 11.5px; color: #9ca3af; font-weight: 600; flex-shrink: 0; }
-.exam-print-doc .pr-passage { background: #f7faf8; border: 1px solid #e8edea; border-radius: 8px; padding: 10px 13px; margin: 9px 0 9px 29px; font-size: 12.5px; line-height: 1.65; color: #374151; }
+.exam-print-doc .pr-q-pts { font-size: 11.5px; color: var(--color-text-muted); font-weight: 600; flex-shrink: 0; }
+.exam-print-doc .pr-passage { background: #f7faf8; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px 13px; margin: 9px 0 9px 29px; font-size: 12.5px; line-height: 1.65; color: #374151; }
 .exam-print-doc .pr-choices { display: flex; flex-wrap: wrap; gap: 6px 26px; margin: 9px 0 0 29px; }
-.exam-print-doc .pr-choice { font-size: 13px; color: #1f2937; }
+.exam-print-doc .pr-choice { font-size: 13px; color: var(--color-text-primary); }
 .exam-print-doc .pr-correct { font-weight: 700; color: var(--primary); background: var(--mint-light); padding: 1px 7px; border-radius: 5px; }
 .exam-print-doc .pr-write { height: 42px; border-bottom: 1px solid #cfdad3; margin: 10px 0 0 29px; }
-.exam-print-doc .pr-ans { margin: 10px 0 0 29px; background: #f3faf6; border: 1px solid #c7ecd9; border-radius: 8px; padding: 9px 12px; font-size: 12.5px; line-height: 1.6; }
+.exam-print-doc .pr-ans { margin: 10px 0 0 29px; background: #f3faf6; border: 1px solid #c7ecd9; border-radius: var(--radius-sm); padding: 9px 12px; font-size: 12.5px; line-height: 1.6; }
 .exam-print-doc .pr-ans-tag { font-weight: 700; color: #fff; background: var(--success); padding: 1px 8px; border-radius: 5px; font-size: 11px; margin-right: 8px; }
-.exam-print-doc .pr-ans-val { font-weight: 700; color: #1f2937; }
-.exam-print-doc .pr-ans-exp { display: block; margin-top: 6px; color: #4b5563; }
+.exam-print-doc .pr-ans-val { font-weight: 700; color: var(--color-text-primary); }
+.exam-print-doc .pr-ans-exp { display: block; margin-top: 6px; color: var(--color-text-secondary); }
 .exam-print-doc .pr-ans-exp b { color: var(--mint); font-weight: 700; margin-right: 5px; }
-.exam-print-doc .pr-foot { margin-top: 22px; padding-top: 12px; border-top: 1px solid #eef2ef; font-size: 11px; color: #9ca3af; text-align: center; }
+.exam-print-doc .pr-foot { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 11px; color: var(--color-text-muted); text-align: center; }
 
 @media print {
   @page { size: A4; margin: 0; }
-  body { background: #fff !important; }
+  body { background: var(--color-bg-surface) !important; }
   body.exam-printing > #root { display: none !important; }
-  .exam-print-doc { display: block !important; position: static !important; background: #fff !important; padding: 0 !important; }
+  .exam-print-doc { display: block !important; position: static !important; background: var(--color-bg-surface) !important; padding: 0 !important; }
   .exam-print-doc .print-page { box-shadow: none; margin: 0; }
 }

@@ -293,6 +293,22 @@ function SavedExamsScreen({ exams, classes, onOpen, onNew }: { exams: ExamCard[]
         <button className="btn btn-primary" onClick={onNew} style={{ height: 46 }}><Plus size={18} color="#fff" /> 새 시험 만들기</button>
       </div>
 
+      {!empty && (
+        <div className="ex-kpis" style={{ marginBottom: 24 }}>
+          {([
+            { label: '전체', value: exams.length, bg: '#eef3ef', color: 'var(--primary)' },
+            { label: '응시중', value: exams.filter(e => e.status === 'published').length, bg: 'var(--mint-light)', color: '#0c7a55' },
+            { label: '마감', value: exams.filter(e => e.status === 'closed').length, bg: '#fef3c7', color: '#b45309' },
+            { label: '작성중', value: exams.filter(e => e.status === 'draft').length, bg: '#f3f4f6', color: '#4b5563' },
+          ] as { label: string; value: number; bg: string; color: string }[]).map(k => (
+            <div key={k.label} className="kpi" style={{ textAlign: 'center', padding: '14px 12px' }}>
+              <div className="num-font" style={{ fontSize: 26, fontWeight: 800, color: k.color, marginBottom: 4 }}>{k.value}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {empty ? (
         <div className="card" style={{ padding: '60px 30px', textAlign: 'center', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ width: 76, height: 76, borderRadius: 22, margin: '0 auto 20px', background: 'var(--mint-light)', display: 'grid', placeItems: 'center' }}><FileText size={34} color="var(--primary-light)" /></div>
