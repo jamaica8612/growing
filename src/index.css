@@ -3538,7 +3538,7 @@ textarea.form-control {
 .kk-search { position: relative; max-width: 460px; width: 100%; margin: 0 auto 1.5rem; display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem 1.1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5); }
 .kk-search input { flex: 1; background: none; border: none; outline: none; color: #fff; font-family: inherit; font-size: 1.1rem; }
 .kk-search input::placeholder { color: rgba(255,255,255,0.4); }
-.kk-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; align-content: start; }
+.kk-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-content: start; }
 .kk-card { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 1.35rem 1rem; background: #0f3223; border: 1px solid rgba(16,185,129,0.25); border-radius: 16px; color: #fff; transition: all 0.13s; cursor: pointer; font-family: inherit; width: 100%; }
 .kk-card:hover { background: #13442f; transform: translateY(-2px); }
 .kk-card:active { transform: scale(0.96); }
@@ -3571,6 +3571,23 @@ textarea.form-control {
   .kk-search input { font-size: 0.95rem; }
   .kk-modal-name { font-size: 1.6rem; }
   .kk-success-name { font-size: 2.2rem; }
+}
+
+/* 태블릿 세로(portrait) 모드 — 키오스크를 강제로 가로 방향으로 회전 표시
+   screen.orientation.lock()이 실패할 때(브라우저 미지원) CSS로 폴백 */
+@media (orientation: portrait) {
+  .kk-root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* 가로(landscape) 크기로 설정: 너비=vh, 높이=vw */
+    width: 100dvh;
+    height: 100dvw;
+    /* 반시계 방향 90도 회전 후 뷰포트 안으로 이동 */
+    transform-origin: left top;
+    transform: rotate(-90deg) translate(-100dvh, 0);
+    overflow: hidden;
+  }
 }
 
 /* ── 출결 통계 ── */
