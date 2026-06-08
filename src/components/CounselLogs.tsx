@@ -15,7 +15,6 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
   students,
   onAddCounselLog,
   onDeleteCounselLog,
-  onSendDraftToMessaging,
 }) => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<CounselLogType | 'all'>('all');
@@ -98,10 +97,6 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     });
   };
 
-  const handleSendToMessaging = (log: CounselLog, student?: Student) => {
-    onSendDraftToMessaging?.(buildParentMessage(log, student));
-  };
-
   // 현재 필터된 일지를 마크다운 파일로 내보낸다(상담 자료·인수인계용).
   const handleExport = () => {
     if (filteredLogs.length === 0) {
@@ -173,10 +168,10 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
       </div>
 
       {recentShareCandidates.length > 0 && (
-        <div className="card" style={{ borderLeft: '5px solid var(--color-info)' }}>
+        <div className="gd-card" style={{ borderLeft: '3px solid var(--color-info)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
             <div>
-              <h3 className="card-title" style={{ marginBottom: '0.35rem' }}>
+              <h3 className="gd-card-title" style={{ marginBottom: '0.35rem' }}>
                 <MessageSquare size={20} className="text-primary" /> 최근 일지 공유 후보
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
@@ -227,18 +222,10 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
                   </p>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <button
-                      className="btn btn-secondary"
-                      style={{ flex: '1 1 110px', padding: '0.4rem 0.6rem', fontSize: '0.76rem', gap: '0.25rem' }}
+                      className="at-act"
                       onClick={() => handleCopyParentMessage(log, student)}
                     >
                       {copiedLogId === log.id ? <><Check size={12} className="text-success" /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      style={{ flex: '1 1 120px', padding: '0.4rem 0.6rem', fontSize: '0.76rem', gap: '0.25rem' }}
-                      onClick={() => handleSendToMessaging(log, student)}
-                    >
-                      <MessageSquare size={12} /> 알림장으로
                     </button>
                   </div>
                 </div>
@@ -275,11 +262,6 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
                     <button className={`at-act ${copiedLogId === log.id ? 'done' : ''}`} onClick={() => handleCopyParentMessage(log, student)}>
                       {copiedLogId === log.id ? <><Check size={12} /> 복사됨</> : <><Copy size={12} /> 안내 복사</>}
                     </button>
-                    {onSendDraftToMessaging && (
-                      <button className="at-act primary" onClick={() => handleSendToMessaging(log, student)}>
-                        <MessageSquare size={12} /> 알림장으로
-                      </button>
-                    )}
                     <button className="cl-del" onClick={() => handleDelete(log.id, log.title)} title="일지 삭제"><Trash2 size={14} /></button>
                   </div>
                 </div>

@@ -387,7 +387,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         <p>데이터는 로그인 계정 기준으로 클라우드에 저장됩니다. 중요한 변경 전에는 백업 파일을 받아두세요.</p>
       </div>
 
-      <div className="settings-tabs" role="tablist" aria-label="설정 분류">
+      <div className="ka-tabs" role="tablist" aria-label="설정 분류">
         {([
           ['data', '데이터 관리'],
           ['files', '파일·백업'],
@@ -399,7 +399,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             type="button"
             role="tab"
             aria-selected={settingsTab === key}
-            className={settingsTab === key ? 'active' : ''}
+            className={`ka-tab${settingsTab === key ? ' on' : ''}`}
             onClick={() => setSettingsTab(key)}
           >
             {label}
@@ -691,11 +691,12 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             <b>알림장 발송</b>
           </div>
         </div>
-        <div className="set-template-preview">
-          <span>[그로잉영어]</span>
-          <span>{'{학생명}'} 학생의 {'{날짜}'} 일일 종합알림장입니다.</span>
-          <span>출결 / 등원·하원 / 과제 / 보강·보충</span>
-        </div>
+        <textarea
+          className="set-memo"
+          readOnly
+          style={{ minHeight: 90, fontSize: '0.83rem' }}
+          value={`[그로잉영어] {학생명} 학생의 {날짜} 일일 종합알림장입니다.\n\n출결: {출결상태} / 등원 {등원시간} · 하원 {하원시간}\n과제: {숙제상태}\n보강·보충: {보강}`}
+        />
       </div>
       </>
       )}
