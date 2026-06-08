@@ -260,10 +260,10 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
 
           {/* 우선 관리 대상 — 출결 저조 또는 미납 */}
           {riskList.length > 0 && (
-            <div className="card" style={{ borderLeft: '5px solid var(--color-warning)' }}>
+            <div className="gd-card" style={{ borderLeft: '5px solid var(--color-warning)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
                 <div>
-                  <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>🚨 우선 관리 대상</h3>
+                  <h3 className="gd-card-title" style={{ marginBottom: '0.25rem' }}>🚨 우선 관리 대상</h3>
                   <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
                     {monthLabel} 기준 출석률 저조·결석 반복·미납 학생입니다.
                   </p>
@@ -305,10 +305,10 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           )}
 
           {concernRows.length > 0 && (
-            <div className="card" style={{ borderLeft: '5px solid var(--color-danger)' }}>
+            <div className="gd-card" style={{ borderLeft: '5px solid var(--color-danger)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                 <div>
-                  <h3 className="card-title" style={{ marginBottom: '0.35rem' }}>
+                  <h3 className="gd-card-title" style={{ marginBottom: '0.35rem' }}>
                     <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} /> 출결 후속 관리 대상
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
@@ -372,8 +372,8 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           )}
 
           {/* Status distribution bar */}
-          <div className="card">
-            <h3 className="card-title">출결 상태 분포 ({monthLabel})</h3>
+          <div className="gd-card">
+            <h3 className="gd-card-title">출결 상태 분포 ({monthLabel})</h3>
             <div style={{ display: 'flex', height: '28px', borderRadius: 'var(--radius-full)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
               {orderedStatuses.map(status => {
                 const count = totals[status];
@@ -399,8 +399,8 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           </div>
 
           {/* Per-student table */}
-          <div className="card">
-            <h3 className="card-title">학생별 출결 현황 (출석률 낮은 순)</h3>
+          <div className="gd-card">
+            <h3 className="gd-card-title">학생별 출결 현황 (출석률 낮은 순)</h3>
             <div className="table-wrapper mobile-card-desktop">
               <table className="custom-table">
                 <thead>
@@ -522,8 +522,8 @@ export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, clas
           </div>
 
           {/* Per-class summary */}
-          <div className="card">
-            <h3 className="card-title">반별 출석률 ({monthLabel})</h3>
+          <div className="gd-card">
+            <h3 className="gd-card-title">반별 출석률 ({monthLabel})</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {classes.length === 0 ? (
                 <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>개설된 반이 없습니다.</span>

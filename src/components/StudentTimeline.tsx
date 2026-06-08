@@ -50,7 +50,7 @@ export function StudentTimeline({ student, classes, attendance, payments, counse
           <button
             key={item.key}
             type="button"
-            className={`tab-btn ${filter === item.key ? 'active' : ''}`}
+            className={`ka-tab${filter === item.key ? ' on' : ''}`}
             onClick={() => setFilter(item.key)}
           >
             {item.label}
