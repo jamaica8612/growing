@@ -8,6 +8,7 @@ import {
   MessageCircle,
   MessageSquare,
   Monitor,
+  RefreshCw,
   Settings,
   ShieldCheck,
   Smartphone,
@@ -49,16 +50,74 @@ export type NavGroup = {
 
 export const PRIMARY_NAV_GROUPS: NavGroup[] = [
   {
-    title: '하루 운영',
+    title: '그날 운영',
     items: [
       { id: 'dashboard', label: '오늘', icon: LayoutDashboard, mobile: true },
-      { id: 'students', label: '학생', icon: Users, mobile: true },
-      { id: 'classes', label: '수업', icon: BookOpen, mobile: true },
-      { id: 'payments', label: '수납', icon: CreditCard },
-      { id: 'messaging', label: '소통', icon: Smartphone, mobile: true },
+      { id: 'attendance', label: '출결 관리', icon: CalendarCheck, mobile: true },
+      { id: 'makeup', label: '보강 · 보충', icon: RefreshCw },
+      { id: 'messaging', label: '알림장', icon: Smartphone, mobile: true },
+      { id: 'kiosk', label: '키오스크 시작', icon: Monitor, kind: 'kiosk' },
+    ],
+  },
+  {
+    title: '원생 · 수업',
+    items: [
+      { id: 'students', label: '학생 관리', icon: Users, mobile: true },
+      { id: 'classes', label: '반 / 시간표', icon: BookOpen },
+      { id: 'exams', label: '평가 관리', icon: ClipboardList },
+      { id: 'payments', label: '수납 관리', icon: CreditCard },
+    ],
+  },
+  {
+    title: '기록 · 분석',
+    items: [
+      { id: 'counsel', label: '상담 / 진도', icon: MessageSquare },
+      { id: 'stats', label: '출결 통계', icon: BarChart3 },
+      { id: 'kakao', label: '카카오 채널', icon: MessageCircle },
+      { id: 'data-quality', label: '데이터 점검', icon: ShieldCheck },
     ],
   },
 ];
+
+export type ScreenAction = {
+  to: TabId;
+  label: string;
+  primary?: boolean;
+  kind?: 'kiosk';
+};
+
+// 화면별 토픽바 맥락 액션 — 내비게이션 서브탭/바로가기 칩을 대체한다.
+export const SCREEN_ACTIONS: Record<TabId, ScreenAction[]> = {
+  dashboard: [
+    { to: 'attendance', label: '출결 체크' },
+    { to: 'kiosk', label: '키오스크 시작', kind: 'kiosk', primary: true },
+  ],
+  attendance: [
+    { to: 'makeup', label: '보강 관리' },
+    { to: 'messaging', label: '알림장 발송', primary: true },
+  ],
+  makeup: [{ to: 'attendance', label: '출결 입력' }],
+  messaging: [{ to: 'kakao', label: '카카오 요청', primary: true }],
+  students: [
+    { to: 'stats', label: '출결 리포트' },
+    { to: 'messaging', label: '학부모 안내', primary: true },
+  ],
+  classes: [
+    { to: 'attendance', label: '출결 입력' },
+    { to: 'exams', label: '평가 만들기', primary: true },
+  ],
+  exams: [{ to: 'messaging', label: '시험 결과 안내', primary: true }],
+  payments: [
+    { to: 'messaging', label: '미납 안내 보내기', primary: true },
+    { to: 'students', label: '학생별 이력' },
+  ],
+  counsel: [{ to: 'students', label: '학생 상세' }],
+  stats: [{ to: 'messaging', label: '관리 대상 안내', primary: true }],
+  kakao: [{ to: 'messaging', label: '알림장' }],
+  'data-quality': [],
+  backup: [{ to: 'data-quality', label: '데이터 점검' }],
+  kiosk: [],
+};
 
 export const SETTINGS_NAV_ITEM: NavItem = {
   id: 'backup',
@@ -176,10 +235,10 @@ export const TAB_DESCRIPTIONS: Record<TabId, string> = {
   exams: '시험 제작, 배포, 제출 현황, 결과 안내를 관리합니다.',
 };
 
+// 모바일 하단 빠른 이동 — 4개 핵심 탭. 5번째 "더보기"는 App에서 전체 메뉴 시트로 처리.
 export const MOBILE_QUICK_NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: '오늘', icon: LayoutDashboard },
-  { id: 'classes', label: '수업', icon: BookOpen },
-  { id: 'messaging', label: '소통', icon: Smartphone },
+  { id: 'attendance', label: '출결', icon: CalendarCheck },
+  { id: 'messaging', label: '알림장', icon: Smartphone },
   { id: 'students', label: '학생', icon: Users },
-  SETTINGS_NAV_ITEM,
 ];

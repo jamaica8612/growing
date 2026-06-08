@@ -21,34 +21,20 @@ import { MakeupManager } from './components/MakeupManager';
 import { KakaoManager } from './components/KakaoManager';
 import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
 import {
-  FLOW_TAB_GROUPS,
   MOBILE_QUICK_NAV_ITEMS,
   PRIMARY_NAV_GROUPS,
+  SCREEN_ACTIONS,
   SETTINGS_NAV_ITEM,
   TAB_DESCRIPTIONS as FLOW_TAB_DESCRIPTIONS,
   TAB_TITLES as FLOW_TAB_TITLES,
-  WORKFLOW_SHORTCUTS,
-  getPrimaryTabId,
   type NavItem as FlowNavItem,
   type TabId,
 } from './navigation';
 
 // Import Icons
 import {
-  LayoutDashboard,
-  Users,
-  BookOpen,
-  ClipboardList,
-  CalendarCheck,
-  CreditCard,
-  MessageSquare,
-  ShieldCheck,
   Menu,
-  X,
-  Smartphone,
-  MessageCircle,
-  Monitor,
-  BarChart3,
+  Send,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -61,63 +47,6 @@ const IvyIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
-// Navigation grouped by usage flow so the most-frequent daily tasks sit at the
-// top. Rendered by both the desktop sidebar and the mobile drawer. The 'kiosk'
-// item launches full-screen mode via a confirm; settings live in the footer.
-type NavItem = { id: string; label: string; icon: LucideIcon; kind?: 'kiosk' };
-const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
-  {
-    title: '오늘 업무',
-    items: [
-      { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-      { id: 'attendance', label: '출결 관리', icon: CalendarCheck },
-      { id: 'makeup', label: '보강/보충 관리', icon: CalendarCheck },
-      { id: 'messaging', label: '알림장 발송', icon: Smartphone },
-      { id: 'kiosk', label: '키오스크 모드', icon: Monitor, kind: 'kiosk' },
-    ],
-  },
-  {
-    title: '원생 · 수업',
-    items: [
-      { id: 'students', label: '학생 관리', icon: Users },
-      { id: 'classes', label: '반/시간표 관리', icon: BookOpen },
-      { id: 'payments', label: '수납 관리', icon: CreditCard },
-    ],
-  },
-  {
-    title: '기록 · 분석',
-    items: [
-      { id: 'counsel', label: '상담/진도 일지', icon: MessageSquare },
-      { id: 'kakao', label: '카카오 관리', icon: MessageCircle },
-      { id: 'stats', label: '출결 통계', icon: BarChart3 },
-      { id: 'data-quality', label: '\uB370\uC774\uD130 \uC810\uAC80', icon: ShieldCheck },
-    ],
-  },
-];
-
-
-const TAB_TITLES: Record<string, string> = {
-  dashboard: '학원 운영 대시보드',
-  students: '재원생 주소록 및 관리',
-  classes: '학급 개설 및 시간표',
-  attendance: '출석 및 보강 관리',
-  makeup: '보강/보충 관리',
-  stats: '월별 출결 통계 리포트',
-  'data-quality': '\uB370\uC774\uD130 \uC810\uAC80',
-  payments: '교육비 수납 장부',
-  counsel: '상담 및 학습/성적 일지',
-  kakao: '카카오 채널봇 관리',
-  messaging: '알림장 발송 도우미',
-  kiosk: '자율 등하원 키오스크',
-  backup: 'AI·알림·백업 설정',
-};
-
-if (!NAV_GROUPS.some(group => group.items.some(item => item.id === 'exams'))) {
-  NAV_GROUPS[1]?.items.splice(2, 0, { id: 'exams', label: '평가 관리', icon: ClipboardList });
-}
-TAB_TITLES.exams = '평가 관리';
-void NAV_GROUPS;
-void TAB_TITLES;
 
 const KIOSK_RELOAD_RESET_KEY = 'growing:kiosk-reload-reset';
 
@@ -271,7 +200,6 @@ function AcademyApp({ session }: { session: Session }) {
   };
 
   const mobileQuickNavItems: FlowNavItem[] = MOBILE_QUICK_NAV_ITEMS;
-  const primaryActiveTab = getPrimaryTabId(activeTab);
 
   // Render Page Content based on tab Selection
   const renderContent = () => {
@@ -465,7 +393,7 @@ function AcademyApp({ session }: { session: Session }) {
               {group.items.map(item => (
                 <NavItemButton
                   key={item.id}
-                  active={primaryActiveTab === item.id}
+                  active={activeTab === item.id}
                   icon={item.icon}
                   label={item.label}
                   onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
@@ -479,7 +407,7 @@ function AcademyApp({ session }: { session: Session }) {
 
         <div className="side-foot">
           <NavItemButton
-            active={primaryActiveTab === 'backup'}
+            active={activeTab === 'backup'}
             icon={SETTINGS_NAV_ITEM.icon}
             label={SETTINGS_NAV_ITEM.label}
             onClick={() => go(SETTINGS_NAV_ITEM.id)}
@@ -489,61 +417,28 @@ function AcademyApp({ session }: { session: Session }) {
     );
   };
 
-  const renderWorkflowShortcuts = () => {
-    const tabGroup = FLOW_TAB_GROUPS.find(group => group.ids.includes(activeTab));
-    if (tabGroup) {
-      return (
-        <div className="flow-tabs" role="tablist" aria-label="업무 흐름 탭">
-          {tabGroup.tabs.map(item => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={`${tabGroup.parentId}-${item.id}`}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === item.id}
-                className={`flow-tab${activeTab === item.id ? ' active' : ''}`}
-                onClick={() => {
-                  sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-                  setActiveTab(item.id);
-                  setIsMobileMenuOpen(false);
-                }}
-              >
-                <Icon size={15} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      );
-    }
-
-    const shortcuts = WORKFLOW_SHORTCUTS[activeTab] ?? [];
-    if (shortcuts.length === 0) return null;
-
+  // 토픽바 맥락 액션 — 서브탭/바로가기 칩 대신 화면 본문 상단 액션 버튼.
+  const renderTopbarActions = () => {
+    const actions = SCREEN_ACTIONS[activeTab] ?? [];
     const go = (id: TabId) => {
       sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
       setActiveTab(id);
       setIsMobileMenuOpen(false);
     };
-
     return (
-      <div className="flow-shortcuts" aria-label="관련 업무 바로가기">
-        {shortcuts.map(item => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={`${activeTab}-${item.id}-${item.label}`}
-              type="button"
-              className={`flow-chip${activeTab === item.id ? ' active' : ''}`}
-              onClick={item.kind === 'kiosk' ? startKioskMode : () => go(item.id)}
-            >
-              <Icon size={14} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <>
+        {actions.map(action => (
+          <button
+            key={`${activeTab}-${action.to}-${action.label}`}
+            type="button"
+            className={`tb-act${action.primary ? ' primary' : ''}`}
+            onClick={action.kind === 'kiosk' ? startKioskMode : () => go(action.to)}
+          >
+            {action.primary ? <Send size={14} /> : null}
+            <span>{action.label}</span>
+          </button>
+        ))}
+      </>
     );
   };
 
@@ -612,23 +507,56 @@ function AcademyApp({ session }: { session: Session }) {
         </div>
       </header>
 
-      {/* ── 모바일 드로어 ── */}
+      {/* ── 모바일 '더보기' 전체 메뉴 시트 ── */}
       {isMobileMenuOpen && (
-        <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="mobile-menu-drawer" onClick={e => e.stopPropagation()}>
-            <div className="mobile-menu-header">
-              <button className="m-header-logo" type="button" onClick={goDashboard} aria-label="대시보드로 이동">
-                <span className="side-logo-ic" style={{ width: 30, height: 30, borderRadius: 9 }}>
-                  <IvyIcon size={18} />
-                </span>
-                <span style={{ color: '#fff' }}>그로잉영어</span>
-              </button>
-              <button className="btn-icon-only" style={{ color: '#ffffff' }} onClick={() => setIsMobileMenuOpen(false)}>
-                <X size={22} />
+        <div className="sheet-bg" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-grip" />
+            <h3>모든 메뉴</h3>
+            {PRIMARY_NAV_GROUPS.map(group => (
+              <div key={group.title}>
+                <div className="sheet-sec">{group.title}</div>
+                <div className="sheet-grid">
+                  {group.items.map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`sheet-item${activeTab === item.id ? ' on' : ''}`}
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          if (item.kind === 'kiosk') {
+                            startKioskMode();
+                          } else {
+                            sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+                            setActiveTab(item.id);
+                          }
+                        }}
+                      >
+                        <span className="si-ic"><Icon size={18} /></span>
+                        <b>{item.label}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <div className="sheet-sec">설정</div>
+            <div className="sheet-grid">
+              <button
+                type="button"
+                className={`sheet-item${activeTab === 'backup' ? ' on' : ''}`}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+                  setActiveTab(SETTINGS_NAV_ITEM.id);
+                }}
+              >
+                <span className="si-ic"><SETTINGS_NAV_ITEM.icon size={18} /></span>
+                <b>{SETTINGS_NAV_ITEM.label}</b>
               </button>
             </div>
-
-            {renderNavSection({ closeOnNav: true })}
           </div>
         </div>
       )}
@@ -639,19 +567,11 @@ function AcademyApp({ session }: { session: Session }) {
           <div>
             <h2>{FLOW_TAB_TITLES[activeTab] ?? '그로잉영어'}</h2>
             <p>{FLOW_TAB_DESCRIPTIONS[activeTab] ?? '그로잉영어 교습소의 학생 성장을 기록하고 관리합니다.'}</p>
-            {renderWorkflowShortcuts()}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="topbar-acts">
+            {renderTopbarActions()}
             <button
-              className="btn btn-secondary"
-              style={{ gap: '0.4rem' }}
-              onClick={startKioskMode}
-            >
-              키오스크 시작
-            </button>
-            <button
-              className="btn btn-secondary"
-              style={{ gap: '0.4rem' }}
+              className="tb-act"
               onClick={handleLogout}
               title={session.user.email ?? ''}
             >
@@ -665,7 +585,7 @@ function AcademyApp({ session }: { session: Session }) {
         </div>
       </main>
 
-      {/* ── 모바일 하단 탭 (m-tabs) ── */}
+      {/* ── 모바일 하단 탭 (m-tabs) — 4개 핵심 + 더보기 ── */}
       <nav className="mobile-bottom-nav m-tabs" aria-label="빠른 이동">
         {mobileQuickNavItems.map(item => {
           const Icon = item.icon;
@@ -674,7 +594,7 @@ function AcademyApp({ session }: { session: Session }) {
             <button
               key={item.id}
               type="button"
-              className={`m-tab${primaryActiveTab === item.id ? ' active' : ''}`}
+              className={`m-tab${activeTab === item.id ? ' active' : ''}`}
               onClick={() => {
                 setActiveTab(item.id);
                 setIsMobileMenuOpen(false);
@@ -686,6 +606,14 @@ function AcademyApp({ session }: { session: Session }) {
             </button>
           );
         })}
+        <button
+          type="button"
+          className={`m-tab${isMobileMenuOpen ? ' active' : ''}`}
+          onClick={() => setIsMobileMenuOpen(true)}
+        >
+          <Menu size={20} />
+          <span>더보기</span>
+        </button>
       </nav>
 
       {/* AI 비서 아이비 — 평가 관리에서는 전용 AI 편집 UI와 겹치므로 숨긴다. */}
