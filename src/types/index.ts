@@ -25,6 +25,8 @@ export interface Class {
   tuitionOverrides: Record<string, number>;
   studentIds: string[]; // List of Student IDs in this class
   color?: string; // hex color e.g. "#10b981"
+  capacity?: number;   // 0 = 제한 없음
+  waitlist?: string[]; // Student IDs
 }
 
 export interface ClassSchedule {

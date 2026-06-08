@@ -312,6 +312,24 @@ export const Classes: React.FC<ClassesProps> = ({
                       <div className="cls-card-line">💰 {cls.tuitionFee.toLocaleString()}원
                         {getTuitionOverrideCount(cls) > 0 && <span className="cls-chip">개별 {getTuitionOverrideCount(cls)}명</span>}
                       </div>
+                      {(cls.capacity ?? 0) > 0 && (() => {
+                        const activeCount = cls.studentIds.filter(id => students.find(s => s.id === id && s.status === 'active')).length;
+                        const pct = Math.min(100, Math.round(activeCount / cls.capacity! * 100));
+                        const full = activeCount >= cls.capacity!;
+                        return (
+                          <div style={{ marginBottom: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', gap: '0.4rem' }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
+                                정원 {activeCount}/{cls.capacity}명
+                              </span>
+                              {full && <span className="at-pill warn" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>정원 마감</span>}
+                            </div>
+                            <div className="cls-cap">
+                              <div className="cls-cap-bar" style={{ width: `${pct}%`, background: full ? 'var(--color-danger)' : 'var(--color-accent-mint)' }} />
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <div className="cls-chips">
                         {cls.studentIds.length === 0 ? (
                           <span className="cls-empty">배정 없음</span>
@@ -323,6 +341,15 @@ export const Classes: React.FC<ClassesProps> = ({
                           })
                         )}
                       </div>
+                      {(cls.waitlist ?? []).length > 0 && (
+                        <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                          <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--color-text-muted)', marginRight: '0.15rem' }}>대기</span>
+                          {cls.waitlist!.map(sid => {
+                            const st = students.find(s => s.id === sid);
+                            return <span key={sid} className="cls-wchip">{st?.name || '미등록'}</span>;
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -83,6 +83,8 @@ const toClass = (r: Row): Class => ({
   tuitionOverrides: toTuitionOverrides(r.tuition_overrides),
   studentIds: (r.student_ids as string[]) ?? [],
   color: (r.color as string) ?? undefined,
+  capacity: (r.capacity as number) ?? 0,
+  waitlist: (r.waitlist as string[]) ?? [],
 });
 
 const toAttendance = (r: Row): Attendance => ({
