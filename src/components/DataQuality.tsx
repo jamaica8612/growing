@@ -33,7 +33,7 @@ export function DataQuality({ students, classes, attendance, payments, counselLo
   const activeSections = sections.filter(sec => sec.issues.length > 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+    <div className="gd-root">
       {/* ── KPI 3개 ── */}
       <div className="gd-stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="gd-stat gd-stat-danger">

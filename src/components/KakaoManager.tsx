@@ -26,6 +26,13 @@ const requestStatusLabel: Record<KakaoParentRequestStatus, string> = {
   dismissed: '보류',
 };
 
+const statusPillClass: Record<KakaoParentRequestStatus, string> = {
+  pending: 'at-pill warn',
+  drafted: 'at-pill info',
+  resolved: 'at-pill ok',
+  dismissed: 'at-pill info',
+};
+
 const fmtDateTime = (iso?: string) => {
   if (!iso) return '-';
   const date = new Date(iso);
@@ -68,29 +75,30 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
 
   return (
     <div className="gd-root kakao-admin">
-      <div className="set-intro kakao-intro">
-        <span className="set-intro-ic">K</span>
+      <div className="ka-intro">
+        <span className="ka-k">K</span>
         <p>
           카카오 채널봇 연결과 테스트를 관리합니다. Skill/Event URL을 관리자센터에 연결한 뒤,
           학생 연결 상태와 상담 요청 큐, 최근 요청 로그를 확인합니다.
         </p>
       </div>
 
-      <div className="settings-tabs kakao-tabs" role="tablist" aria-label="카카오 관리 분류">
+      <div className="ka-tabs" role="tablist" aria-label="카카오 관리 분류">
         {([
-          ['inbox', '요청 큐'],
-          ['links', '학생 연결'],
-          ['settings', '연동 설정'],
-        ] as const).map(([key, label]) => (
+          ['inbox', '요청 큐', pendingRequests.length],
+          ['links', '연결', null],
+          ['settings', '설정', null],
+        ] as const).map(([key, label, count]) => (
           <button
             key={key}
             type="button"
             role="tab"
             aria-selected={activeTab === key}
-            className={activeTab === key ? 'active' : ''}
+            className={`ka-tab${activeTab === key ? ' on' : ''}`}
             onClick={() => setActiveTab(key)}
           >
             {label}
+            {count ? <span className="ka-n">{count}</span> : null}
           </button>
         ))}
       </div>
@@ -143,48 +151,72 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           </div>
           <KeyRound size={20} />
         </div>
-        <div className="kakao-setup-grid">
-          <label>
-            <span>채널명</span>
-            <input className="form-control" value={channelName} onChange={event => setChannelName(event.target.value)} />
-          </label>
-          <label>
-            <span>Skill secret 헤더값</span>
-            <div className="kakao-secret-row">
-              <input className="form-control" value={skillSecret} onChange={event => setSkillSecret(event.target.value)} placeholder="생성 버튼을 눌러 주세요" />
-              <button className="btn btn-secondary" type="button" onClick={() => setSkillSecret(makeSecret())}>생성</button>
+        <div className="ka-fields">
+          <div className="ka-field">
+            <label>채널명</label>
+            <input className="gd-field" value={channelName} onChange={event => setChannelName(event.target.value)} />
+          </div>
+          <div className="ka-field">
+            <label>Skill secret 헤더값</label>
+            <div className="ka-url">
+              <input className="gd-field" value={skillSecret} onChange={event => setSkillSecret(event.target.value)} placeholder="생성 버튼을 눌러 주세요" />
+              <button className="pay-btn ghost sm" type="button" onClick={() => setSkillSecret(makeSecret())}>생성</button>
             </div>
-          </label>
-          <label>
-            <span>Event secret 헤더값</span>
-            <div className="kakao-secret-row">
-              <input className="form-control" value={eventSecret} onChange={event => setEventSecret(event.target.value)} placeholder="생성 버튼을 눌러 주세요" />
-              <button className="btn btn-secondary" type="button" onClick={() => setEventSecret(makeSecret())}>생성</button>
+          </div>
+          <div className="ka-field">
+            <label>Event secret 헤더값</label>
+            <div className="ka-url">
+              <input className="gd-field" value={eventSecret} onChange={event => setEventSecret(event.target.value)} placeholder="생성 버튼을 눌러 주세요" />
+              <button className="pay-btn ghost sm" type="button" onClick={() => setEventSecret(makeSecret())}>생성</button>
             </div>
-          </label>
+          </div>
+          <div className="ka-field">
+            <label>Skill URL (헤더 방식)</label>
+            <div className="ka-url">
+              <code>{skillUrl}</code>
+              <button className="pay-btn ghost sm" type="button" onClick={() => void navigator.clipboard.writeText(skillUrl)}>
+                <Copy size={14} /> 복사
+              </button>
+            </div>
+          </div>
+          <div className="ka-field">
+            <label>Skill URL (secret 포함)</label>
+            <div className="ka-url">
+              <code>{skillUrlWithSecret}</code>
+              <button className="pay-btn ghost sm" type="button" onClick={() => void navigator.clipboard.writeText(skillUrlWithSecret)}>
+                <Copy size={14} /> 복사
+              </button>
+            </div>
+          </div>
+          <div className="ka-field">
+            <label>Event URL (헤더 방식)</label>
+            <div className="ka-url">
+              <code>{eventUrl}</code>
+              <button className="pay-btn ghost sm" type="button" onClick={() => void navigator.clipboard.writeText(eventUrl)}>
+                <Copy size={14} /> 복사
+              </button>
+            </div>
+          </div>
+          <div className="ka-field">
+            <label>Event URL (secret 포함)</label>
+            <div className="ka-url">
+              <code>{eventUrlWithSecret}</code>
+              <button className="pay-btn ghost sm" type="button" onClick={() => void navigator.clipboard.writeText(eventUrlWithSecret)}>
+                <Copy size={14} /> 복사
+              </button>
+            </div>
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0' }}>
+            카카오 관리자에서 헤더 입력이 가능하면 <b>x-kakao-skill-secret</b> / <b>x-kakao-event-secret</b>을 쓰고, 불가능하면 secret 포함 URL을 사용하세요.
+          </p>
           <label className="kakao-toggle">
             <input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)} />
             <span>이 채널 사용</span>
           </label>
         </div>
-        <div className="kakao-endpoints">
-          <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(skillUrl)}>
-            <Copy size={14} /> Skill URL(헤더 방식): {skillUrl}
-          </button>
-          <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(skillUrlWithSecret)}>
-            <Copy size={14} /> Skill URL(secret 포함): {skillUrlWithSecret}
-          </button>
-          <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(eventUrl)}>
-            <Copy size={14} /> Event URL(헤더 방식): {eventUrl}
-          </button>
-          <button className="kakao-copy" type="button" onClick={() => void navigator.clipboard.writeText(eventUrlWithSecret)}>
-            <Copy size={14} /> Event URL(secret 포함): {eventUrlWithSecret}
-          </button>
-          <span>카카오 관리자에서 헤더 입력이 가능하면 <b>x-kakao-skill-secret</b> / <b>x-kakao-event-secret</b>을 쓰고, 불가능하면 secret 포함 URL을 사용하세요.</span>
-        </div>
         <div className="kakao-actions" style={{ marginTop: '0.9rem' }}>
           <button
-            className="btn btn-primary"
+            className="pay-btn primary"
             type="button"
             disabled={!channelName.trim() || !skillSecret.trim()}
             onClick={() => onSaveChannel({
@@ -217,16 +249,18 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
               <span>아직 연결된 학부모가 없습니다.</span>
             </div>
           ) : (
-            <div className="kakao-list">
+            <div className="ka-links">
               {activeLinks.map(link => {
                 const student = studentById.get(link.studentId);
                 return (
-                  <div key={link.id} className="kakao-row">
+                  <div key={link.id} className="ka-link">
+                    <span className="ka-av">{student?.name?.[0] ?? '?'}</span>
                     <div>
-                      <strong>{student?.name ?? '알 수 없는 학생'}</strong>
+                      <b>{student?.name ?? '알 수 없는 학생'}</b>
+                      <br />
                       <span>{cleanPhone(link.parentPhone) || '전화번호 없음'} · {maskKey(link.kakaoUserKey)}</span>
                     </div>
-                    <em>{fmtDateTime(link.verifiedAt)}</em>
+                    <span className="ka-state linked">{fmtDateTime(link.verifiedAt)}</span>
                   </div>
                 );
               })}
@@ -248,14 +282,16 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
               <span>연결 대기 학생이 없습니다.</span>
             </div>
           ) : (
-            <div className="kakao-list">
+            <div className="ka-links">
               {unlinkedStudents.slice(0, 8).map(student => (
-                <div key={student.id} className="kakao-row">
+                <div key={student.id} className="ka-link">
+                  <span className="ka-av">{student.name[0]}</span>
                   <div>
-                    <strong>{student.name}</strong>
+                    <b>{student.name}</b>
+                    <br />
                     <span>{student.grade || '학년 없음'} · {student.parentContact}</span>
                   </div>
-                  <em>대기</em>
+                  <span className="ka-state pending">대기</span>
                 </div>
               ))}
             </div>
@@ -280,27 +316,29 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
             <span>접수된 카카오 요청이 없습니다.</span>
           </div>
         ) : (
-          <div className="kakao-request-list">
+          <div className="ka-inbox">
             {requests.map(request => {
               const student = request.studentId ? studentById.get(request.studentId) : undefined;
               return (
-                <article key={request.id} className="kakao-request">
-                  <div className="kakao-request-main">
-                    <span className={`kakao-status ${request.status}`}>{requestStatusLabel[request.status]}</span>
-                    <div>
-                      <h4>{requestTypeLabel[request.requestType]} · {student?.name ?? '미연결 학부모'}</h4>
-                      <p>{request.message || '메시지 없음'}</p>
-                      <small>{fmtDateTime(request.createdAt)} · {maskKey(request.kakaoUserKey)}</small>
-                    </div>
+                <article key={request.id} className="ka-req">
+                  <div className="ka-req-ic">
+                    <MessageCircle size={18} />
                   </div>
-                  <div className="kakao-actions">
-                    <button className="btn btn-secondary" disabled={request.status === 'drafted'} onClick={() => onUpdateRequestStatus(request.id, 'drafted')}>
+                  <div className="ka-req-id">
+                    <b>{requestTypeLabel[request.requestType]}</b>
+                    <span className="ka-type">{student?.name ?? '미연결 학부모'}</span>
+                    <p>{request.message || '메시지 없음'}</p>
+                    <div className="ka-time">{fmtDateTime(request.createdAt)} · {maskKey(request.kakaoUserKey)}</div>
+                  </div>
+                  <div className="ka-req-acts">
+                    <span className={statusPillClass[request.status]}>{requestStatusLabel[request.status]}</span>
+                    <button className="pay-btn ghost sm" disabled={request.status === 'drafted'} onClick={() => onUpdateRequestStatus(request.id, 'drafted')}>
                       답변 준비
                     </button>
-                    <button className="btn btn-primary" disabled={request.status === 'resolved'} onClick={() => onUpdateRequestStatus(request.id, 'resolved')}>
+                    <button className="pay-btn primary sm" disabled={request.status === 'resolved'} onClick={() => onUpdateRequestStatus(request.id, 'resolved')}>
                       완료
                     </button>
-                    <button className="btn btn-secondary" disabled={request.status === 'dismissed'} onClick={() => onUpdateRequestStatus(request.id, 'dismissed')}>
+                    <button className="pay-btn ghost sm" disabled={request.status === 'dismissed'} onClick={() => onUpdateRequestStatus(request.id, 'dismissed')}>
                       보류
                     </button>
                   </div>
