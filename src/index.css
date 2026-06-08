@@ -3538,20 +3538,20 @@ textarea.form-control {
 .kk-search { position: relative; max-width: 460px; width: 100%; margin: 0 auto 1.5rem; display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem 1.1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5); }
 .kk-search input { flex: 1; background: none; border: none; outline: none; color: #fff; font-family: inherit; font-size: 1.1rem; }
 .kk-search input::placeholder { color: rgba(255,255,255,0.4); }
-.kk-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-content: start; }
-.kk-card { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 1.35rem 1rem; background: #0f3223; border: 1px solid rgba(16,185,129,0.25); border-radius: 16px; color: #fff; transition: all 0.13s; cursor: pointer; font-family: inherit; width: 100%; }
+.kk-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; align-content: start; }
+.kk-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.55rem; padding: 2rem 1.2rem; background: #0f3223; border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; color: #fff; transition: all 0.13s; cursor: pointer; font-family: inherit; width: 100%; min-height: 110px; }
 .kk-card:hover { background: #13442f; transform: translateY(-2px); }
 .kk-card:active { transform: scale(0.96); }
-.kk-card-name { font-size: 1.45rem; font-weight: 800; }
-.kk-card-sub { font-size: 0.82rem; color: #a3b8b0; }
+.kk-card-name { font-size: 1.7rem; font-weight: 800; }
+.kk-card-sub { font-size: 0.92rem; color: #a3b8b0; }
 .kk-empty { grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; color: rgba(255,255,255,0.4); }
 .kk-foot { padding: 0.9rem; text-align: center; background: #081c13; font-size: 0.82rem; color: #849b90; border-top: 1px solid rgba(255,255,255,0.05); }
 .kk-modal-bg { position: absolute; inset: 0; background: rgba(5,15,11,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 20; }
-.kk-modal { background: #0c2a1d; border: 1px solid rgba(16,185,129,0.3); border-radius: 22px; padding: 2.2rem; max-width: 440px; width: 88%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-.kk-modal-meta { font-size: 1rem; color: var(--color-accent-mint); font-weight: 700; }
-.kk-modal-name { font-size: 2rem; font-weight: 800; margin: 0.4rem 0 1.6rem; }
-.kk-modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-.kk-btn { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; padding: 1.6rem 1rem; border: none; border-radius: 16px; color: #fff; font-size: 1.25rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+.kk-modal { background: #0c2a1d; border: 1px solid rgba(16,185,129,0.3); border-radius: 22px; padding: 2.5rem; max-width: 520px; width: 88%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.kk-modal-meta { font-size: 1.05rem; color: var(--color-accent-mint); font-weight: 700; }
+.kk-modal-name { font-size: 2.4rem; font-weight: 800; margin: 0.5rem 0 2rem; }
+.kk-modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.5rem; }
+.kk-btn { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 2.2rem 1.2rem; border: none; border-radius: 20px; color: #fff; font-size: 1.5rem; font-weight: 800; cursor: pointer; font-family: inherit; }
 .kk-btn.in { background: #10b981; box-shadow: 0 6px 15px rgba(16,185,129,0.3); }
 .kk-btn.out { background: #f59e0b; box-shadow: 0 6px 15px rgba(245,158,11,0.3); }
 .kk-cancel { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 0.65rem; border-radius: 10px; font-size: 0.95rem; cursor: pointer; font-family: inherit; }
@@ -3565,11 +3565,12 @@ textarea.form-control {
   .kk-logo-tx { font-size: 1rem; }
   .kk-spk { display: none; }
   .kk-body { padding: 1rem; }
-  .kk-grid { grid-template-columns: 1fr 1fr; gap: 0.7rem; }
-  .kk-card { padding: 1rem 0.7rem; }
-  .kk-card-name { font-size: 1.15rem; }
+  .kk-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
+  .kk-card { padding: 1.4rem 0.7rem; min-height: 90px; }
+  .kk-card-name { font-size: 1.3rem; }
   .kk-search input { font-size: 0.95rem; }
-  .kk-modal-name { font-size: 1.6rem; }
+  .kk-modal-name { font-size: 2rem; }
+  .kk-btn { padding: 1.8rem 1rem; font-size: 1.3rem; }
   .kk-success-name { font-size: 2.2rem; }
 }
 
