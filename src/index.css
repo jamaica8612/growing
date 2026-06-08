@@ -3539,11 +3539,11 @@ textarea.form-control {
 .kk-search input { flex: 1; background: none; border: none; outline: none; color: #fff; font-family: inherit; font-size: 1.1rem; }
 .kk-search input::placeholder { color: rgba(255,255,255,0.4); }
 .kk-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; align-content: start; }
-.kk-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.55rem; padding: 2rem 1.2rem; background: #0f3223; border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; color: #fff; transition: all 0.13s; cursor: pointer; font-family: inherit; width: 100%; min-height: 110px; }
+.kk-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.7rem; padding: 0 1.2rem; background: #0f3223; border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; color: #fff; transition: all 0.13s; cursor: pointer; font-family: inherit; width: 100%; min-height: 220px; }
 .kk-card:hover { background: #13442f; transform: translateY(-2px); }
 .kk-card:active { transform: scale(0.96); }
-.kk-card-name { font-size: 1.7rem; font-weight: 800; }
-.kk-card-sub { font-size: 0.92rem; color: #a3b8b0; }
+.kk-card-name { font-size: 2.1rem; font-weight: 800; }
+.kk-card-sub { font-size: 1.05rem; color: #a3b8b0; }
 .kk-empty { grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; color: rgba(255,255,255,0.4); }
 .kk-foot { padding: 0.9rem; text-align: center; background: #081c13; font-size: 0.82rem; color: #849b90; border-top: 1px solid rgba(255,255,255,0.05); }
 .kk-modal-bg { position: absolute; inset: 0; background: rgba(5,15,11,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 20; }
@@ -3566,9 +3566,8 @@ textarea.form-control {
   .kk-spk { display: none; }
   .kk-body { padding: 1rem; }
   .kk-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
-  .kk-card { padding: 1.4rem 0.7rem; min-height: 90px; }
-  .kk-card-name { font-size: 1.3rem; }
-  .kk-search input { font-size: 0.95rem; }
+  .kk-card { padding: 0 0.7rem; min-height: 180px; }
+  .kk-card-name { font-size: 1.7rem; }
   .kk-modal-name { font-size: 2rem; }
   .kk-btn { padding: 1.8rem 1rem; font-size: 1.3rem; }
   .kk-success-name { font-size: 2.2rem; }
