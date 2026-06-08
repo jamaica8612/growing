@@ -56,6 +56,11 @@ const makeSecret = () => {
 
 export function KakaoManager({ students, channels, links, requests, events, onUpdateRequestStatus, onSaveChannel }: KakaoManagerProps) {
   const [activeTab, setActiveTab] = useState<'inbox' | 'links' | 'settings'>('inbox');
+  const [autoReply, setAutoReply] = useState(() => localStorage.getItem('ka_auto_reply') !== 'off');
+  const toggleAutoReply = (val: boolean) => {
+    setAutoReply(val);
+    localStorage.setItem('ka_auto_reply', val ? 'on' : 'off');
+  };
   const primaryChannel = channels[0];
   const [channelName, setChannelName] = useState(primaryChannel?.channelName || '그로잉영어 카카오 채널');
   const [skillSecret, setSkillSecret] = useState(primaryChannel?.skillSecret || '');
@@ -214,6 +219,23 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
             <span>이 채널 사용</span>
           </label>
         </div>
+        <div className="ka-auto-toggle">
+          <div className="ka-auto-tx">
+            <b>출결·숙제 자동응답</b>
+            <span className="ka-auto-note">
+              {autoReply ? '출결/숙제 문의는 DB 조회 후 즉시 답변합니다.' : '모든 문의를 요청 큐에서 수동 처리합니다.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={`ka-switch${autoReply ? ' on' : ''}`}
+            onClick={() => toggleAutoReply(!autoReply)}
+            aria-pressed={autoReply}
+            aria-label="자동응답 켜기/끄기"
+          >
+            <span className="ka-auto-dot" />
+          </button>
+        </div>
         <div className="kakao-actions" style={{ marginTop: '0.9rem' }}>
           <button
             className="pay-btn primary"
@@ -320,7 +342,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
             {requests.map(request => {
               const student = request.studentId ? studentById.get(request.studentId) : undefined;
               return (
-                <article key={request.id} className="ka-req">
+                <article key={request.id} className={`ka-req${request.status === 'resolved' && (request.requestType === 'attendance' || request.requestType === 'homework') ? ' answered' : ''}`}>
                   <div className="ka-req-ic">
                     <MessageCircle size={18} />
                   </div>
@@ -332,6 +354,9 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
                   </div>
                   <div className="ka-req-acts">
                     <span className={statusPillClass[request.status]}>{requestStatusLabel[request.status]}</span>
+                    {request.status === 'resolved' && (request.requestType === 'attendance' || request.requestType === 'homework') && (
+                      <span className="ka-done-pill">자동 처리됨</span>
+                    )}
                     <button className="pay-btn ghost sm" disabled={request.status === 'drafted'} onClick={() => onUpdateRequestStatus(request.id, 'drafted')}>
                       답변 준비
                     </button>
