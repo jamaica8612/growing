@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { Student, CounselLog, CounselLogType } from '../types';
-import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X, Copy, Check, Download } from 'lucide-react';
+import type { Attendance, Payment, Class } from '../types';
+import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X, Copy, Check, Download, TrendingUp, Printer } from 'lucide-react';
+import { getStudentReportSummary } from '../lib/reportSummary';
 
 interface CounselLogsProps {
   counselLogs: CounselLog[];
@@ -8,6 +10,9 @@ interface CounselLogsProps {
   onAddCounselLog: (log: Omit<CounselLog, 'id'>) => void;
   onDeleteCounselLog: (id: string) => void;
   onSendDraftToMessaging?: (content: string) => void;
+  attendance?: Attendance[];
+  payments?: Payment[];
+  classes?: Class[];
 }
 
 export const CounselLogs: React.FC<CounselLogsProps> = ({
@@ -15,11 +20,19 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
   students,
   onAddCounselLog,
   onDeleteCounselLog,
+  attendance = [],
+  payments = [],
+  classes = [],
 }) => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<CounselLogType | 'all'>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
+
+  // Report Modal States
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportStudentId, setReportStudentId] = useState('');
+  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   // Form Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -143,6 +156,14 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     .filter(log => students.find(s => s.id === log.studentId)?.status !== 'inactive')
     .slice(0, 6);
 
+  const reportSummary = reportOpen && reportStudentId
+    ? (() => {
+        const student = students.find(s => s.id === reportStudentId);
+        if (!student) return null;
+        return getStudentReportSummary({ student, classes, attendance, payments, counselLogs, month: reportMonth });
+      })()
+    : null;
+
   return (
     <div className="gd-root">
       {/* ── 툴바 ── */}
@@ -162,6 +183,9 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
         </select>
         <span className="cl-count">{filteredLogs.length}건</span>
         <div className="cl-tools-right">
+          <button className="pay-btn ghost" onClick={() => { setReportStudentId(students[0]?.id || ''); setReportOpen(true); }}>
+            <TrendingUp size={14} /> 월간 리포트
+          </button>
           <button className="pay-btn ghost" onClick={handleExport}><Download size={14} /> 내보내기</button>
           <button className="pay-btn primary" onClick={handleOpenAdd}><Plus size={14} /> 일지 등록</button>
         </div>
@@ -273,6 +297,60 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal: Monthly Report */}
+      {reportOpen && (
+        <div className="modal-overlay rp-bg" onClick={e => { if (e.target === e.currentTarget) setReportOpen(false); }}>
+          <div className="rp" style={{ maxWidth: 540 }}>
+            <div className="rp-head">
+              <span className="rp-tag">월간 리포트</span>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>학생 성장 리포트</h2>
+              <button className="rp-x" onClick={() => setReportOpen(false)}>×</button>
+            </div>
+            <div className="rp-body">
+              <div className="rp-pick" style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.2rem' }}>
+                <select className="gd-field" value={reportStudentId} onChange={e => setReportStudentId(e.target.value)}>
+                  <option value="">학생 선택</option>
+                  {students.filter(s => s.status !== 'inactive').map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <input type="month" className="gd-field" value={reportMonth} onChange={e => setReportMonth(e.target.value)} style={{ maxWidth: 140 }} />
+              </div>
+              {reportSummary ? (
+                <>
+                  <div className="rp-kpis">
+                    <div className="rp-kpi"><span>출석률</span><b>{reportSummary.attendance.rate}%</b></div>
+                    <div className="rp-kpi"><span>결석</span><b>{reportSummary.attendance.absent}회</b></div>
+                    <div className="rp-kpi"><span>숙제 완료</span><b>{reportSummary.homework.done}회</b></div>
+                    <div className="rp-kpi"><span>상담/진도</span><b>{reportSummary.logs.length}건</b></div>
+                  </div>
+                  {reportSummary.logs.length > 0 && (
+                    <div className="rp-sec">
+                      <h4>이달 기록 하이라이트</h4>
+                      {reportSummary.logs.slice(0, 3).map(log => (
+                        <div key={log.id} className="rp-row">
+                          <b>{log.title}</b>
+                          <span>{log.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="rp-note">{reportSummary.draft}</div>
+                </>
+              ) : (
+                <div className="rp-empty">학생과 월을 선택하세요.</div>
+              )}
+            </div>
+            <div className="rp-foot" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', padding: '0.9rem 1.2rem', borderTop: '1px solid var(--color-border)' }}>
+              <button className="pay-btn ghost" onClick={() => setReportOpen(false)}>닫기</button>
+              <button className="pay-btn primary" onClick={() => window.print()} disabled={!reportSummary}>
+                <Printer size={14} /> 인쇄
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

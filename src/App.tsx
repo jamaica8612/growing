@@ -313,6 +313,9 @@ function AcademyApp({ session }: { session: Session }) {
           <CounselLogs
             counselLogs={counselLogs}
             students={students}
+            attendance={attendance}
+            payments={payments}
+            classes={classes}
             onAddCounselLog={data.handleAddCounselLog}
             onDeleteCounselLog={data.handleDeleteCounselLog}
             onSendDraftToMessaging={handleAssistantDraftToMessaging}
