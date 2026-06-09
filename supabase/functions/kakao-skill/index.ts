@@ -542,9 +542,7 @@ Deno.serve(async req => {
         aiAnswer = await callGemini(geminiKey, context, utterance);
       } catch (aiErr) {
         const msg = aiErr instanceof Error ? aiErr.message : '';
-        aiAnswer = msg.includes('429')
-          ? 'AI 서비스 이용량이 초과되었습니다. 잠시 후 다시 시도해 주세요. 🙏'
-          : '죄송해요, AI 답변을 가져오지 못했습니다. 학원에 직접 문의해 주세요.';
+        aiAnswer = '지금은 답변이 어려워요. 학원에 직접 문의해 주시면 친절히 안내해 드리겠습니다. 😊';
         await logEvent(supabase, payload, link.owner_id, `ask_ai_error:${msg.slice(0, 80)}`, skillText(aiAnswer, MENU_REPLIES)).catch(() => {});
       }
 
