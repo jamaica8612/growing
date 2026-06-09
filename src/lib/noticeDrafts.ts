@@ -56,8 +56,8 @@ const buildMakeupLine = (record: Attendance) => {
 
 const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
   const attendance = rows.map(row => attendanceStatusLabel(row.status)).join(', ') || '기록 없음';
-  const checkIn = rows.map(row => row.checkInTime).filter(Boolean).join(', ') || '-';
-  const checkOut = rows.map(row => row.checkOutTime).filter(Boolean).join(', ') || '-';
+  const checkIn = [...new Set(rows.map(row => row.checkInTime).filter(Boolean))].join(', ') || '-';
+  const checkOut = [...new Set(rows.map(row => row.checkOutTime).filter(Boolean))].join(', ') || '-';
   const homework = rows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ') || '기록 없음';
   const makeup = includeMakeup
     ? rows.map(buildMakeupLine).filter(Boolean).join(', ') || '해당 없음'

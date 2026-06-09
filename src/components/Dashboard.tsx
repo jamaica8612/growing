@@ -130,11 +130,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === selectedDate);
 
   const handleArrival = (studentId: string, classId: string) => {
-    onSaveAttendance({ studentId, classId, date: selectedDate, status: 'present', checkInTime: getCurrentTimeStr() });
+    const record = getRecordForSelectedDate(studentId, classId);
+    onSaveAttendance({ studentId, classId, date: selectedDate, status: record?.status ?? 'present', checkInTime: getCurrentTimeStr() });
   };
 
   const handleDeparture = (studentId: string, classId: string) => {
-    onSaveAttendance({ studentId, classId, date: selectedDate, status: 'present', checkOutTime: getCurrentTimeStr() });
+    const record = getRecordForSelectedDate(studentId, classId);
+    onSaveAttendance({ studentId, classId, date: selectedDate, status: record?.status ?? 'present', checkOutTime: getCurrentTimeStr() });
   };
 
   const handleTimeChange = (studentId: string, classId: string, field: 'checkInTime' | 'checkOutTime', value: string) => {
