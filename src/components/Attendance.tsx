@@ -31,6 +31,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
+  const [makeupBookings, setMakeupBookings] = useState<Record<string, string>>({});
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
@@ -355,10 +356,42 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                 </div>
                               );
                             })()}
-                            {/* 결석 선택 시: 보강 완료 여부 */}
+                            {/* 결석 선택 시: 보강예약 토글 */}
                             {currentStatus === 'absent' && (() => {
-                              const linked = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === record?.date);
-                              return linked ? <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: 'var(--color-accent-mint)' }}>보강 완료 ({linked.date})</div> : null;
+                              const linkedMakeup = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === record?.date);
+                              const bookingKey = `${studentId}-${cls.id}`;
+                              const bookingDate = makeupBookings[bookingKey] ?? '';
+                              return (
+                                <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    className={`gd-seg-b at-secondary-toggle ${linkedMakeup ? 'sel info' : ''}`}
+                                    onClick={() => {
+                                      if (linkedMakeup) {
+                                        onDeleteAttendance(linkedMakeup.id);
+                                        setMakeupBookings(prev => ({ ...prev, [bookingKey]: '' }));
+                                      }
+                                    }}
+                                  >
+                                    {linkedMakeup ? '✓ 보강예약' : '+ 보강예약'}
+                                  </button>
+                                  {!linkedMakeup && (
+                                    <input
+                                      type="date"
+                                      className="form-control"
+                                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }}
+                                      value={bookingDate}
+                                      onChange={e => {
+                                        const date = e.target.value;
+                                        setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
+                                        if (date) {
+                                          onSaveAttendance({ studentId, classId: cls.id, date, status: 'makeup', memo: '', makeupForDate: selectedDate });
+                                        }
+                                      }}
+                                    />
+                                  )}
+                                  {linkedMakeup && <span style={{ fontSize: '0.72rem', color: 'var(--color-info, #0369a1)' }}>{linkedMakeup.date}</span>}
+                                </div>
+                              );
                             })()}
                           </div>
 
