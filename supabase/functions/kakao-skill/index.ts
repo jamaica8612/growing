@@ -518,7 +518,17 @@ Deno.serve(async req => {
     }
 
     if (action === 'ask_ai') {
-      const question = payload.userRequest?.utterance?.trim() || '이 학생의 최근 출결과 보강 현황을 요약해줘';
+      const utterance = payload.userRequest?.utterance?.trim() ?? '';
+      // 버튼 클릭으로 들어온 트리거 문구는 실제 질문이 아님 → 입력 유도
+      const isTriggerPhrase = !utterance || ['아이비에게 질문', '아이비', '질문', 'ask_ai'].includes(utterance.toLowerCase());
+      if (isTriggerPhrase) {
+        const response = skillText(
+          `${student.name} 학생에 대해 궁금한 점을 자유롭게 입력해 주세요.\n\n예) 이번 달 출결 어때요?\n예) 보강 몇 번 남았나요?\n예) 숙제 잘 하고 있나요?`,
+        );
+        await logEvent(supabase, payload, link.owner_id, 'ask_ai_prompt', response);
+        return jsonResponse(response);
+      }
+
       const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
       if (!geminiKey) {
         const response = skillText('AI 서비스가 아직 준비 중입니다. 학원에 직접 문의해 주세요.', MENU_REPLIES);
@@ -527,7 +537,7 @@ Deno.serve(async req => {
       }
 
       const context = await buildStudentContext(supabase, student.id, link.owner_id, student.name);
-      const aiAnswer = await callGemini(geminiKey, context, question);
+      const aiAnswer = await callGemini(geminiKey, context, utterance);
 
       const response = skillText(aiAnswer, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'ask_ai_ok', response);
