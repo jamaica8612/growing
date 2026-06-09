@@ -16,7 +16,7 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
   const [showExitModal, setShowExitModal] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [successState, setSuccessState] = useState<{ active: boolean; type: 'in' | 'out'; name: string } | null>(null);
-  const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id ?? '');
   useEffect(() => {
     // Try to lock the OS rotation to landscape. Works when the PWA is installed
     // (display: standalone). Falls back to CSS rotation below when unsupported.
@@ -28,7 +28,7 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
-  const displayStudents = selectedClassId === 'all'
+  const displayStudents = !selectedClassId
     ? activeStudents
     : activeStudents.filter(s => classes.find(c => c.id === selectedClassId)?.studentIds.includes(s.id) ?? false);
 
@@ -100,7 +100,7 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
     // Find class of student for today
     const studentClasses = classes.filter(c => c.studentIds.includes(selectedStudent.id));
     // Prefer the currently selected class if the student is in it
-    const classId = (selectedClassId !== 'all' && studentClasses.some(c => c.id === selectedClassId))
+    const classId = (selectedClassId && studentClasses.some(c => c.id === selectedClassId))
       ? selectedClassId
       : studentClasses[0]?.id || '';
 
@@ -164,12 +164,6 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
       <div className="kk-body">
         {/* 반 선택 */}
         <div className="kk-class-bar">
-          <button
-            className={`kk-class-chip${selectedClassId === 'all' ? ' on' : ''}`}
-            onClick={() => setSelectedClassId('all')}
-          >
-            전체 반
-          </button>
           {classes.map(cls => (
             <button
               key={cls.id}
