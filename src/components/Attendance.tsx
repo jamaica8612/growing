@@ -104,7 +104,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           ...(shouldStampCheckIn ? { checkInTime: getCurrentTimeStr() } : {}),
         });
       } else {
-        // 보충 토글 on → supplement로 변경 (출석 기록 위에 덮어씀)
+        // 보충 토글 on → supplement로 변경 (출석 기록 위에 덮어씀, 등하원 시간 유지)
         onSaveAttendance({
           studentId,
           classId,
@@ -113,8 +113,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           memo: currentMemo,
           homeworkStatus: record?.homeworkStatus ?? '',
           supplementMinutes: record?.supplementMinutes ?? 30,
-          checkInTime: '',
-          checkOutTime: '',
         });
       }
     }
@@ -128,8 +126,21 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       date: selectedDate,
       status: 'supplement',
       memo: attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '',
-      checkInTime: '',
       supplementMinutes: minutes,
+    });
+  };
+
+  const handleTimeEdit = (studentId: string, classId: string, field: 'checkInTime' | 'checkOutTime', value: string) => {
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    if (!record) return;
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: record.status,
+      memo: record.memo,
+      homeworkStatus: record.homeworkStatus ?? '',
+      [field]: value,
     });
   };
 
@@ -291,14 +302,34 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
                           {/* 등하원 */}
                           <div className="at-cell at-io">
-                            <button className={`gd-io ${record?.checkInTime ? 'on-in' : ''}`} onClick={() => handleArrival(studentId, cls.id)}>
-                              <span className="gd-io-lbl">🌱 등원</span>
-                              <span className="gd-io-t">{record?.checkInTime || '—'}</span>
-                            </button>
-                            <button className={`gd-io ${record?.checkOutTime ? 'on-out' : ''}`} onClick={() => handleDeparture(studentId, cls.id)}>
-                              <span className="gd-io-lbl">🏡 하원</span>
-                              <span className="gd-io-t">{record?.checkOutTime || '—'}</span>
-                            </button>
+                            <div className="at-io-group">
+                              <button className={`gd-io ${record?.checkInTime ? 'on-in' : ''}`} onClick={() => handleArrival(studentId, cls.id)}>
+                                <span className="gd-io-lbl">🌱 등원</span>
+                                <span className="gd-io-t">{record?.checkInTime || '—'}</span>
+                              </button>
+                              {record && (
+                                <input
+                                  type="time"
+                                  className="at-time-edit"
+                                  value={record.checkInTime || ''}
+                                  onChange={e => handleTimeEdit(studentId, cls.id, 'checkInTime', e.target.value)}
+                                />
+                              )}
+                            </div>
+                            <div className="at-io-group">
+                              <button className={`gd-io ${record?.checkOutTime ? 'on-out' : ''}`} onClick={() => handleDeparture(studentId, cls.id)}>
+                                <span className="gd-io-lbl">🏡 하원</span>
+                                <span className="gd-io-t">{record?.checkOutTime || '—'}</span>
+                              </button>
+                              {record && (
+                                <input
+                                  type="time"
+                                  className="at-time-edit"
+                                  value={record.checkOutTime || ''}
+                                  onChange={e => handleTimeEdit(studentId, cls.id, 'checkOutTime', e.target.value)}
+                                />
+                              )}
+                            </div>
                           </div>
 
                           {/* 출결 세그먼트 */}
