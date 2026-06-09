@@ -39,7 +39,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinStatus, setPinStatus] = useState<string | null>(null);
-  const [settingsTab, setSettingsTab] = useState<'data' | 'files' | 'kiosk' | 'ai'>('data');
+  const [settingsTab, setSettingsTab] = useState<'data' | 'files' | 'kiosk' | 'ai' | 'manual'>('data');
 
   // ---- 파일 보관함 (Supabase Storage) ----
   interface StoredFile { name: string; size: number; updated_at: string; }
@@ -393,6 +393,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           ['files', '파일·백업'],
           ['kiosk', '키오스크'],
           ['ai', '알림·AI'],
+          ['manual', '사용 매뉴얼'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -699,6 +700,98 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         />
       </div>
       </>
+      )}
+
+      {settingsTab === 'manual' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="gd-card">
+            <h4 className="set-h"><BookOpen size={18} /> 그로잉영어 사용 매뉴얼</h4>
+            <p className="set-p">주요 기능별 사용 방법을 안내합니다.</p>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">1. 학생 관리</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>학생 추가</b> — 학생 탭 → 학생 추가 버튼 → 이름·학년·학교·학부모 연락처 입력 후 저장</p>
+              <p className="set-p"><b>상태 변경</b> — 학생 카드의 상태 버튼으로 <span className="manual-pill active">재원</span> / <span className="manual-pill paused">휴원</span> / <span className="manual-pill inactive">퇴원</span> 전환</p>
+              <p className="set-p"><b>학생 삭제</b> — 학생 상세 화면 하단의 삭제 버튼 (삭제 시 관련 출결·수납 기록도 함께 삭제됩니다)</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">2. 반 관리</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>반 만들기</b> — 반 탭 → 반 추가 → 반 이름·수업 요일·시간 설정</p>
+              <p className="set-p"><b>학생 배정</b> — 반 상세 → 학생 추가 버튼으로 재원 중인 학생을 반에 배정</p>
+              <p className="set-p">한 학생이 여러 반에 동시에 속할 수 있습니다. 각 반별로 독립적인 출결이 기록됩니다.</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">3. 출결 기록</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>날짜 선택</b> — 출결 탭 상단 날짜 버튼 또는 화살표로 날짜 이동</p>
+              <p className="set-p"><b>출결 상태</b></p>
+              <ul className="manual-list">
+                <li><span className="manual-pill present">출석</span> — 정상 출석. 처음 클릭 시 현재 시각이 등원 시간으로 자동 기록됩니다.</li>
+                <li><span className="manual-pill absent">결석</span> — 결석 처리. 등·하원 시간이 초기화되고 보강 필요 목록에 추가됩니다.</li>
+                <li><span className="manual-pill makeup">보강</span> — 이전 결석분을 보강한 날. 보강 탭에서 원래 결석일과 연결할 수 있습니다.</li>
+                <li><span className="manual-pill supplement">보충</span> — 정규 수업 외 추가 수업.</li>
+                <li><span className="manual-pill late">지각</span> — 지각 처리.</li>
+              </ul>
+              <p className="set-p"><b>숙제 상태</b> — 출결 상태 아래 숙제 완료·미흡·미제출 버튼으로 기록</p>
+              <p className="set-p"><b>등·하원 시간</b> — 출석 첫 클릭 시 자동 입력, 수동 수정도 가능</p>
+              <p className="set-p"><b>메모</b> — 학생별 수업 메모 입력 가능 (저장 버튼 필요)</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">4. 보강·보충 관리</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>보강 처리</b> — 보강 탭 → 보강 필요 목록에서 해당 학생의 보강 처리 버튼 클릭 → 보강 날짜·반 선택 후 저장</p>
+              <p className="set-p">추천 보강 후보가 자동으로 표시됩니다 (학생 수업 스케줄 기반).</p>
+              <p className="set-p"><b>보충 기록</b> — 보강 탭 → 보충관리 전환 → 날짜·학생·반·분량 입력 후 저장</p>
+              <p className="set-p">결석 처리 시 자동으로 보강 필요 목록에 추가되고, 보강이 완료되면 목록에서 제거됩니다.</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">5. 수납 관리</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>청구 추가</b> — 수납 탭 → 수납 추가 → 학생·청구월·금액 입력</p>
+              <p className="set-p"><b>납부 처리</b> — 미납 항목에서 납부 완료 버튼 → 납부일·납부 방법 선택</p>
+              <p className="set-p"><b>월별 일괄 청구</b> — 수납 탭 상단에서 청구월 선택 후 학생 전체 일괄 추가 가능</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">6. 키오스크 (자율 출결)</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>키오스크 모드 진입</b> — 대시보드 또는 출결 탭의 키오스크 버튼 클릭</p>
+              <p className="set-p"><b>반 선택</b> — 키오스크 화면 상단 칩으로 반을 선택하면 해당 반 학생만 표시</p>
+              <p className="set-p"><b>학생 출결</b> — 학생 카드를 한 번 탭하면 등원 처리, 두 번 탭하면 하원 처리</p>
+              <p className="set-p"><b>관리자 화면으로 복귀</b> — 화면 하단의 잠금 해제 버튼 → 설정에서 지정한 PIN 입력</p>
+              <p className="set-p">키오스크 복귀 PIN은 설정 → 키오스크 탭에서 변경할 수 있습니다 (기본값: 1234).</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">7. 알림장 발송</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>알림장 탭</b> — 날짜 선택 → 발송할 학생 선택 → 출결·과제·보강 포함 여부 체크 → 미리보기 확인 → 발송</p>
+              <p className="set-p">당일 출결·과제 정보가 자동으로 채워집니다. 보강/보충이 있는 날에는 포함 여부를 선택할 수 있습니다.</p>
+            </div>
+          </div>
+
+          <div className="gd-card">
+            <h4 className="set-h">8. AI 아이비</h4>
+            <div className="manual-section">
+              <p className="set-p"><b>아이비 탭</b> — 학원 데이터를 기반으로 질문에 답하거나 학부모 안내문을 작성해 줍니다.</p>
+              <p className="set-p">예: "이번 달 미납 학생 알려줘", "김민준 이번주 출결 어때?", "보강 필요한 학생 정리해줘"</p>
+              <p className="set-p"><b>아이비 기억 설정</b> — 설정 → 알림·AI 탭에서 아이비가 참고할 말투·운영 기준 등록 가능</p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Danger Zone Reset Data */}

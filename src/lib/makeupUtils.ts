@@ -21,8 +21,8 @@ export interface MakeupSummary {
   completed: MakeupCompletedItem[];
 }
 
-export const hasMakeupForAbsence = (attendance: Attendance[], studentId: string, absentDate: string) =>
-  attendance.some(record => record.studentId === studentId && record.status === 'makeup' && record.makeupForDate === absentDate);
+export const hasMakeupForAbsence = (attendance: Attendance[], studentId: string, classId: string, absentDate: string) =>
+  attendance.some(record => record.studentId === studentId && record.classId === classId && record.status === 'makeup' && record.makeupForDate === absentDate);
 
 export const getMakeupSummary = (students: Student[], classes: Class[], attendance: Attendance[]): MakeupSummary => {
   const studentsById = new Map(students.map(student => [student.id, student]));

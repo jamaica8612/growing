@@ -3554,6 +3554,20 @@ textarea.form-control {
   .set-danger-btn { width: 100%; }
 }
 
+/* ── 사용 매뉴얼 (manual-*) ── */
+.manual-section { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.5rem; }
+.manual-list { margin: 0.3rem 0 0.3rem 1.2rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.manual-list li { font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.55; }
+.manual-pill { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; vertical-align: middle; }
+.manual-pill.active { background: #d1fae5; color: #065f46; }
+.manual-pill.paused { background: #fef3c7; color: #92400e; }
+.manual-pill.inactive { background: #fee2e2; color: #991b1b; }
+.manual-pill.present { background: #d1fae5; color: #065f46; }
+.manual-pill.absent { background: #fee2e2; color: #991b1b; }
+.manual-pill.makeup { background: #dbeafe; color: #1e40af; }
+.manual-pill.supplement { background: #fef3c7; color: #92400e; }
+.manual-pill.late { background: #ede9fe; color: #5b21b6; }
+
 /* ── 로그인 (lg-*) ── */
 .lg-root { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
 .lg-aside { position: relative; overflow: hidden; background: linear-gradient(160deg, #0f3023, #1b4b36 60%, #2c6f52); color: #fff; padding: 3rem; display: flex; align-items: center; }
