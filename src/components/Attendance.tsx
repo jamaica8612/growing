@@ -71,12 +71,12 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
       const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
       const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
-      const checkInTime = status === 'absent' ? '' : shouldStampCheckIn ? getCurrentTimeStr() : undefined;
       // 결석 선택 시 등하원 시간이 있으면 경고창으로 확인 요청
       if (status === 'absent' && (record?.checkInTime || record?.checkOutTime)) {
         setPendingAbsent({ studentId, classId });
         return;
       }
+      // 결석만 등하원 초기화, 나머지는 현재 값 유지 (명시적으로 전달해 stale closure 방지)
       onSaveAttendance({
         studentId,
         classId,
@@ -86,8 +86,8 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         homeworkStatus: record?.homeworkStatus ?? '',
         makeupForDate: makeupForDate || undefined,
         supplementMinutes: undefined,
-        ...(checkInTime !== undefined ? { checkInTime } : {}),
-        ...(status === 'absent' ? { checkOutTime: '' } : {}),
+        checkInTime: status === 'absent' ? '' : shouldStampCheckIn ? getCurrentTimeStr() : record?.checkInTime,
+        checkOutTime: status === 'absent' ? '' : record?.checkOutTime,
       });
       return;
     }
