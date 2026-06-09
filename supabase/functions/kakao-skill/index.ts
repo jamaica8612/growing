@@ -536,8 +536,17 @@ Deno.serve(async req => {
         return jsonResponse(response);
       }
 
-      const context = await buildStudentContext(supabase, student.id, link.owner_id, student.name);
-      const aiAnswer = await callGemini(geminiKey, context, utterance);
+      let aiAnswer: string;
+      try {
+        const context = await buildStudentContext(supabase, student.id, link.owner_id, student.name);
+        aiAnswer = await callGemini(geminiKey, context, utterance);
+      } catch (aiErr) {
+        const msg = aiErr instanceof Error ? aiErr.message : '';
+        aiAnswer = msg.includes('429')
+          ? 'AI 서비스 이용량이 초과되었습니다. 잠시 후 다시 시도해 주세요. 🙏'
+          : '죄송해요, AI 답변을 가져오지 못했습니다. 학원에 직접 문의해 주세요.';
+        await logEvent(supabase, payload, link.owner_id, `ask_ai_error:${msg.slice(0, 80)}`, skillText(aiAnswer, MENU_REPLIES)).catch(() => {});
+      }
 
       const response = skillText(aiAnswer, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'ask_ai_ok', response);
@@ -566,6 +575,6 @@ Deno.serve(async req => {
   } catch (error) {
     const response = skillText('처리 중 오류가 발생했습니다. 학원으로 문의해 주세요.');
     await logEvent(supabase, payload, channelOwnerId, `error:${error instanceof Error ? error.message : 'unknown'}`, response).catch(() => {});
-    return jsonResponse(response, 500);
+    return jsonResponse(response);
   }
 });
