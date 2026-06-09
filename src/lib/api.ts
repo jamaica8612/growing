@@ -176,6 +176,7 @@ const toKakaoChannelConfig = (r: Row): KakaoChannelConfig => ({
   skillSecret: s(r.skill_secret),
   eventSecret: (r.event_secret as string) ?? undefined,
   enabled: Boolean(r.enabled),
+  autoReply: r.auto_reply !== false,
   createdAt: s(r.created_at),
   updatedAt: s(r.updated_at),
 });
@@ -562,7 +563,7 @@ export const api = {
 
   async saveKakaoChannelConfig(
     ownerId: string,
-    config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean }
+    config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }
   ): Promise<KakaoChannelConfig> {
     const payload = {
       owner_id: ownerId,
@@ -570,6 +571,7 @@ export const api = {
       skill_secret: config.skillSecret,
       event_secret: config.eventSecret || null,
       enabled: config.enabled,
+      auto_reply: config.autoReply,
       updated_at: new Date().toISOString(),
     };
     const query = config.id

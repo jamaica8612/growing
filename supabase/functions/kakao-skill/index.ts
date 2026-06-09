@@ -61,6 +61,7 @@ const statusLabel: Record<string, string> = {
   present: '출석',
   absent: '결석',
   makeup: '보강',
+  supplement: '보충',
 };
 
 const homeworkLabel: Record<string, string> = {
@@ -187,16 +188,18 @@ async function findActiveLink(supabase: ReturnType<typeof createClient>, ownerId
   return data as ParentLinkRow | null;
 }
 
-async function resolveChannelOwner(supabase: ReturnType<typeof createClient>, skillSecret: string): Promise<string | null> {
+async function resolveChannel(supabase: ReturnType<typeof createClient>, skillSecret: string): Promise<{ ownerId: string; autoReply: boolean } | null> {
   if (!skillSecret) return null;
   const { data, error } = await supabase
     .from('growing_kakao_channels')
-    .select('owner_id, enabled')
+    .select('owner_id, enabled, auto_reply')
     .eq('skill_secret', skillSecret)
     .eq('enabled', true)
     .maybeSingle();
   if (error) throw error;
-  return (data as KakaoChannelRow | null)?.owner_id ?? null;
+  const row = data as (KakaoChannelRow & { auto_reply: boolean | null }) | null;
+  if (!row) return null;
+  return { ownerId: row.owner_id, autoReply: row.auto_reply !== false };
 }
 
 async function getStudent(supabase: ReturnType<typeof createClient>, studentId: string): Promise<StudentRow | null> {
@@ -234,10 +237,12 @@ Deno.serve(async req => {
 
   const supabase = createClient(requiredEnv('SUPABASE_URL'), requiredEnv('SUPABASE_SERVICE_ROLE_KEY'));
   const skillSecret = getSkillSecret(req);
-  const channelOwnerId = await resolveChannelOwner(supabase, skillSecret);
-  if (!channelOwnerId) {
+  const channel = await resolveChannel(supabase, skillSecret);
+  if (!channel) {
     return jsonResponse({ error: 'Unauthorized channel' }, 401);
   }
+  const channelOwnerId = channel.ownerId;
+  const autoReply = channel.autoReply;
 
   let payload: KakaoSkillPayload;
 
@@ -324,6 +329,15 @@ Deno.serve(async req => {
     }
 
     if (action === 'attendance_today') {
+      if (!autoReply) {
+        await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'attendance', '출결 확인 요청', payload);
+        const response = skillText(`${student.name} 학생 출결 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, [
+          { label: '숙제 확인', action: 'homework_today' },
+          { label: '상담 요청', action: 'counsel_request' },
+        ]);
+        await logEvent(supabase, payload, link.owner_id, 'attendance_queued', response);
+        return jsonResponse(response);
+      }
       const today = kstToday();
       const { data, error } = await supabase
         .from('growing_attendance')
@@ -348,6 +362,15 @@ Deno.serve(async req => {
     }
 
     if (action === 'homework_today') {
+      if (!autoReply) {
+        await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'homework', '숙제 확인 요청', payload);
+        const response = skillText(`${student.name} 학생 숙제 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, [
+          { label: '오늘 출결 확인', action: 'attendance_today' },
+          { label: '상담 요청', action: 'counsel_request' },
+        ]);
+        await logEvent(supabase, payload, link.owner_id, 'homework_queued', response);
+        return jsonResponse(response);
+      }
       const today = kstToday();
       const { data, error } = await supabase
         .from('growing_attendance')

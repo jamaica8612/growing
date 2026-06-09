@@ -9,7 +9,7 @@ interface KakaoManagerProps {
   requests: KakaoParentRequest[];
   events: KakaoEventLog[];
   onUpdateRequestStatus: (id: string, status: KakaoParentRequestStatus) => void;
-  onSaveChannel: (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean }) => void;
+  onSaveChannel: (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }) => void;
 }
 
 const requestTypeLabel: Record<KakaoParentRequest['requestType'], string> = {
@@ -56,12 +56,8 @@ const makeSecret = () => {
 
 export function KakaoManager({ students, channels, links, requests, events, onUpdateRequestStatus, onSaveChannel }: KakaoManagerProps) {
   const [activeTab, setActiveTab] = useState<'inbox' | 'links' | 'settings'>('inbox');
-  const [autoReply, setAutoReply] = useState(() => localStorage.getItem('ka_auto_reply') !== 'off');
-  const toggleAutoReply = (val: boolean) => {
-    setAutoReply(val);
-    localStorage.setItem('ka_auto_reply', val ? 'on' : 'off');
-  };
   const primaryChannel = channels[0];
+  const [autoReply, setAutoReply] = useState(primaryChannel?.autoReply ?? true);
   const [channelName, setChannelName] = useState(primaryChannel?.channelName || '그로잉영어 카카오 채널');
   const [skillSecret, setSkillSecret] = useState(primaryChannel?.skillSecret || '');
   const [eventSecret, setEventSecret] = useState(primaryChannel?.eventSecret || '');
@@ -83,8 +79,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
       <div className="ka-intro">
         <span className="ka-k">K</span>
         <p>
-          카카오 채널봇 연결과 테스트를 관리합니다. Skill/Event URL을 관리자센터에 연결한 뒤,
-          학생 연결 상태와 상담 요청 큐, 최근 요청 로그를 확인합니다.
+          카카오 채널봇 연결을 관리합니다. 학생 연결 상태와 상담 요청 큐, 최근 요청 로그를 확인합니다.
         </p>
       </div>
 
@@ -229,7 +224,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           <button
             type="button"
             className={`ka-switch${autoReply ? ' on' : ''}`}
-            onClick={() => toggleAutoReply(!autoReply)}
+            onClick={() => setAutoReply(!autoReply)}
             aria-pressed={autoReply}
             aria-label="자동응답 켜기/끄기"
           >
@@ -247,6 +242,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
               skillSecret: skillSecret.trim(),
               eventSecret: eventSecret.trim(),
               enabled,
+              autoReply,
             })}
           >
             채널 설정 저장
@@ -378,7 +374,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
         <div className="kakao-card-head">
           <div>
             <h3>최근 카카오 요청 로그</h3>
-            <p>승인 전에는 테스트 payload로 Skill API 응답과 로그 저장만 확인합니다.</p>
+            <p>학부모가 채널봇으로 보낸 요청 기록입니다.</p>
           </div>
           <Clock3 size={20} />
         </div>
