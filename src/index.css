@@ -3359,6 +3359,11 @@ textarea.form-control {
 .kk-search { position: relative; max-width: 460px; width: 100%; margin: 0 auto 1.5rem; display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem 1.1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5); }
 .kk-search input { flex: 1; background: none; border: none; outline: none; color: #fff; font-family: inherit; font-size: 1.1rem; }
 .kk-search input::placeholder { color: rgba(255,255,255,0.4); }
+.kk-class-bar { display: flex; gap: 0.55rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+.kk-class-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.5rem 1.1rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.65); font-size: 0.95rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
+.kk-class-chip:hover { background: rgba(255,255,255,0.09); }
+.kk-class-chip.on { background: rgba(16,185,129,0.2); border-color: #10b981; color: #10b981; }
+.kk-class-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .kk-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; align-content: start; }
 .kk-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.7rem; padding: 0 1.2rem; background: #0f3223; border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; color: #fff; transition: all 0.13s; cursor: pointer; font-family: inherit; width: 100%; min-height: 220px; }
 .kk-card:hover { background: #13442f; transform: translateY(-2px); }
