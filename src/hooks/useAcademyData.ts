@@ -162,7 +162,7 @@ export function useAcademyData(userId: string) {
   const handleSaveAttendance = (data: Omit<Attendance, 'id' | 'memo'> & { memo?: string }) =>
     guard(async () => {
       const existing = attendance.find(
-        a => a.studentId === data.studentId && a.classId === (data.classId ?? '') && a.date === data.date
+        a => a.studentId === data.studentId && a.classId === data.classId && a.date === data.date
       );
       // 보강(makeup)일 때만 "원래 결석일" 연결을 유지한다. 다른 상태로 바뀌면
       // 비워서, 이전 보강일이 DB에 stale 값으로 남거나 잘못 복원되지 않게 한다.
