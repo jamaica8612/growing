@@ -135,15 +135,13 @@ function getAction(payload: KakaoSkillPayload): SkillAction {
   if (ev.includes('counsel') || ev.includes('상담')) return 'counsel_request';
   if (ev.includes('ask_ai') || ev.includes('아이비') || ev.includes('질문')) return 'ask_ai';
 
-  // Utterance-level pattern matching for button-less flows
+  // 자유 입력 텍스트 → 상담은 명시적 키워드만, 나머지는 AI로
   const utterance = (payload.userRequest?.utterance ?? '').trim();
   const uv = utterance.toLowerCase();
-  if (uv.includes('출결') || uv.includes('등원') || uv.includes('하원')) return 'attendance_today';
-  if (uv.includes('숙제')) return 'homework_today';
-  if (uv.includes('상담')) return 'counsel_request';
+  if (uv === '상담' || uv === '상담 요청' || uv === '💬 상담 요청') return 'counsel_request';
 
-  // Non-trivial free-form input → route to AI
-  const isMenuWord = ['메뉴', '처음', '시작', 'start', '안녕', '안녕하세요'].includes(uv);
+  // 3자 초과 자유 입력은 AI로 라우팅 (출결/숙제 포함)
+  const isMenuWord = ['메뉴', '처음', '시작', 'start', '안녕', '안녕하세요', '하이'].includes(uv);
   if (utterance.length > 3 && !isMenuWord) return 'ask_ai';
 
   return 'menu';
@@ -335,10 +333,10 @@ ${completedLines}`;
 }
 
 async function callGemini(apiKey: string, context: string, question: string): Promise<string> {
-  const systemPrompt = `너는 그로잉영어 학원의 AI 비서 아이비야.
-학부모가 카카오톡으로 자녀 학원 생활을 물어보면 친절하고 짧게 답해줘.
-아래 학생 데이터만 근거로 답하고, 데이터에 없는 내용은 "학원에 직접 문의 주세요"라고만 해.
-카카오톡 메시지이므로 답변은 150자 이내로 간결하게 써줘. 불필요한 인사말 생략.
+  const systemPrompt = `너는 그로잉영어 학원의 AI 비서 아이비야. 학부모가 카카오톡으로 자녀 학원 생활을 물어보면 따뜻하고 친절하게 답해줘.
+아래 학생 데이터만 근거로 답하고, 데이터에 없는 내용은 "학원에 직접 문의해 주시면 자세히 안내해 드릴게요 😊"라고 해.
+날짜 계산 시 기준일을 반드시 참고해서 '어제', '이번 달', '이번 주' 등을 정확히 계산해줘.
+카카오톡 메시지이므로 답변은 200자 이내로 자연스럽게 써줘. 딱딱한 시스템 메시지 말투 금지.
 
 ${context}`;
 
@@ -350,7 +348,7 @@ ${context}`;
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: 'user', parts: [{ text: question }] }],
-        generationConfig: { maxOutputTokens: 300, temperature: 0.3 },
+        generationConfig: { maxOutputTokens: 600, temperature: 0.4 },
       }),
     }
   );
