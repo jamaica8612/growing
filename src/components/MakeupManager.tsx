@@ -96,7 +96,6 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
       status: 'supplement',
       memo: `보충 ${supplementMinutes}분`,
       homeworkStatus: '',
-      checkInTime: '',
       supplementMinutes,
     });
   };

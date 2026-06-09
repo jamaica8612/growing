@@ -186,7 +186,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
     targetClasses.forEach(cls => {
       cls.studentIds.filter(id => activeStudentIds.has(id)).forEach(id => {
         const r = getAttendanceRecord(id, cls.id, selectedDate);
-        if (!r || (!r.checkInTime && r.status !== 'absent' && r.status !== 'makeup' && r.status !== 'supplement')) s.unchecked++;
+        if (!r || (!r.checkInTime && r.status !== 'absent' && r.status !== 'makeup' && r.status !== 'supplement' && r.status !== 'late')) s.unchecked++;
         else if (r.status === 'absent') s.absent++;
         else if (r.status === 'makeup') s.makeup++;
         else if (r.status === 'supplement') s.supplement++;
@@ -446,6 +446,8 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                         setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
                                         if (date) {
                                           onSaveAttendance({ studentId, classId: cls.id, date, status: 'makeup', memo: '', makeupForDate: selectedDate });
+                                          // 저장 완료 후 입력값 초기화 (linkedMakeup이 나타나면 input은 숨겨지지만 stale 방지)
+                                          setMakeupBookings(prev => ({ ...prev, [bookingKey]: '' }));
                                         }
                                       }}
                                     />
@@ -493,13 +495,14 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       {/* ── 결석 경고 모달 ── */}
       {pendingAbsent && (() => {
         const s = students.find(st => st.id === pendingAbsent.studentId);
+        const cls = classes.find(c => c.id === pendingAbsent.classId);
         return (
           <div className="at-absent-modal-bg" onClick={() => setPendingAbsent(null)}>
             <div className="at-absent-modal" onClick={e => e.stopPropagation()}>
               <div className="at-absent-modal-icon">⚠️</div>
               <h3 className="at-absent-modal-title">결석 처리 확인</h3>
               <p className="at-absent-modal-body">
-                <strong>{s?.name}</strong> 학생의 등하원 시간이 초기화됩니다.<br />결석으로 변경할까요?
+                <strong>{s?.name}</strong>{cls ? ` (${cls.name})` : ''} 학생의<br />등하원 시간이 초기화됩니다.<br />결석으로 변경할까요?
               </p>
               <div className="at-absent-modal-btns">
                 <button className="at-absent-btn cancel" onClick={() => setPendingAbsent(null)}>취소</button>
