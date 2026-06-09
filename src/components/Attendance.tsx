@@ -32,6 +32,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
   const [makeupBookings, setMakeupBookings] = useState<Record<string, string>>({});
+  const [confirmAbsent, setConfirmAbsent] = useState<Record<string, boolean>>({});
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
@@ -71,6 +72,11 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
       const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
       const checkInTime = status === 'absent' ? '' : shouldStampCheckIn ? getCurrentTimeStr() : undefined;
+      // 결석 선택 시 등하원 시간이 있으면 확인 요청
+      if (status === 'absent' && (record?.checkInTime || record?.checkOutTime)) {
+        setConfirmAbsent(prev => ({ ...prev, [`${studentId}-${classId}`]: true }));
+        return;
+      }
       onSaveAttendance({
         studentId,
         classId,
@@ -331,6 +337,36 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               )}
                             </div>
                           </div>
+                          {confirmAbsent[`${studentId}-${cls.id}`] && (
+                            <div className="at-confirm-absent">
+                              <span>등하원 시간이 초기화됩니다</span>
+                              <button
+                                className="pay-btn danger sm"
+                                onClick={() => {
+                                  setConfirmAbsent(prev => ({ ...prev, [`${studentId}-${cls.id}`]: false }));
+                                  const rec = getAttendanceRecord(studentId, cls.id, selectedDate);
+                                  onSaveAttendance({
+                                    studentId,
+                                    classId: cls.id,
+                                    date: selectedDate,
+                                    status: 'absent',
+                                    memo: attendanceMemos[`${studentId}-${cls.id}`] ?? rec?.memo ?? '',
+                                    homeworkStatus: rec?.homeworkStatus ?? '',
+                                    checkInTime: '',
+                                    checkOutTime: '',
+                                  });
+                                }}
+                              >
+                                확인
+                              </button>
+                              <button
+                                className="pay-btn ghost sm"
+                                onClick={() => setConfirmAbsent(prev => ({ ...prev, [`${studentId}-${cls.id}`]: false }))}
+                              >
+                                취소
+                              </button>
+                            </div>
+                          )}
 
                           {/* 출결 세그먼트 */}
                           <div className="at-cell">
