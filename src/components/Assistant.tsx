@@ -9,6 +9,8 @@ import { sendAssistantMessage, executeAction, type ChatMessage, type PendingActi
 
 interface AssistantProps {
   onSendToMessaging?: (content: string) => void;
+  counselNotification?: { studentName: string; message: string } | null;
+  onCounselNotificationConsumed?: () => void;
 }
 
 const ATTENDANCE_KO: Record<string, string> = {
@@ -184,7 +186,7 @@ function ConfirmationCard({ action, status, onApprove, onReject, disabled }: Con
   );
 }
 
-export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
+export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counselNotification, onCounselNotificationConsumed }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -193,11 +195,21 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [activeSuggestionGroup, setActiveSuggestionGroup] = useState(SUGGESTION_GROUPS[0].title);
   const [toast, setToast] = useState<string | null>(null);
+  const [hasUnread, setHasUnread] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
+
+  // 새 상담 요청 알림 → 아이비 채팅에 자동 주입
+  useEffect(() => {
+    if (!counselNotification) return;
+    const text = `📨 **새 상담 요청이 들어왔어요!**\n\n**${counselNotification.studentName}** 학부모님: "${counselNotification.message}"\n\n카카오 관리 탭에서 확인하고 답변해 주세요.`;
+    setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+    setHasUnread(true);
+    onCounselNotificationConsumed?.();
+  }, [counselNotification]);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -295,11 +307,12 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging }) => {
       {!open && (
         <button
           className="ivy-fab"
-          onClick={() => setOpen(true)}
+          onClick={() => { setOpen(true); setHasUnread(false); }}
           aria-label="AI 비서 아이비 열기"
         >
           <IvyAvatar size={34} />
           <span className="ivy-fab-dot" />
+          {hasUnread && <span className="ivy-fab-unread" />}
         </button>
       )}
 
