@@ -108,7 +108,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
   };
 
   const handleProcess = () => {
-    if (!processingItem || !makeupDate) return;
+    if (!processingItem || !makeupDate || !makeupClassId) return;
     if (hasMakeupForAbsence(attendance, processingItem.student.id, processingItem.absentRecord.date)) {
       showToast('이미 이 결석일에 연결된 보강 기록이 있습니다.');
       setProcessingItem(null);
