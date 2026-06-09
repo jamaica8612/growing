@@ -339,7 +339,6 @@ Deno.serve(async req => {
       const message = attendance
         ? `${student.name} 학생의 오늘 출결은 ${statusLabel[attendance.status] ?? attendance.status}입니다.\n등원: ${attendance.check_in_time ?? '기록 없음'}\n하원: ${attendance.check_out_time ?? '기록 없음'}`
         : `${student.name} 학생의 오늘 출결 기록은 아직 없습니다.`;
-      await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'attendance', '오늘 출결 확인', payload);
       const response = skillText(message, [
         { label: '숙제 확인', action: 'homework_today' },
         { label: '상담 요청', action: 'counsel_request' },
@@ -362,7 +361,6 @@ Deno.serve(async req => {
 
       const attendance = data as AttendanceRow | null;
       const homeworkStatus = attendance?.homework_status ?? '';
-      await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'homework', '오늘 숙제 확인', payload);
       const response = skillText(`${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[homeworkStatus] ?? '기록 없음'}입니다.`, [
         { label: '오늘 출결 확인', action: 'attendance_today' },
         { label: '상담 요청', action: 'counsel_request' },
@@ -372,8 +370,18 @@ Deno.serve(async req => {
     }
 
     if (action === 'counsel_request') {
-      const message = payload.userRequest?.utterance || getParam(payload, 'message', '문의내용') || '상담 요청';
-      await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'counsel', message, payload);
+      // 파라미터 '문의내용'으로 수집된 내용 우선, 없으면 utterance 사용
+      const rawMessage = getParam(payload, 'message', '문의내용') || payload.userRequest?.utterance || '';
+      const isPlaceholder = !rawMessage || rawMessage.trim() === '상담 요청';
+
+      if (isPlaceholder) {
+        // 내용 없이 버튼만 눌렀을 때 — 챗봇 빌더에서 '문의내용' 파라미터를 필수로 설정하면 여기까지 안 옴
+        const response = skillText('어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊');
+        await logEvent(supabase, payload, link.owner_id, 'counsel_prompt', response);
+        return jsonResponse(response);
+      }
+
+      await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'counsel', rawMessage.trim(), payload);
       const response = skillText(`${student.name} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`, [
         { label: '오늘 출결 확인', action: 'attendance_today' },
         { label: '숙제 확인', action: 'homework_today' },
