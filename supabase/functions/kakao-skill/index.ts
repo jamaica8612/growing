@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-type SkillAction = 'connect_student' | 'attendance_today' | 'homework_today' | 'counsel_request' | 'menu';
+type SkillAction = 'connect_student' | 'attendance_today' | 'homework_today' | 'counsel_request' | 'ask_ai' | 'menu';
 
 interface KakaoSkillPayload {
   intent?: { name?: string };
@@ -46,10 +46,12 @@ interface AttendanceRow {
   id: string;
   student_id: string;
   date: string;
-  status: 'present' | 'absent' | 'makeup';
+  status: 'present' | 'absent' | 'makeup' | 'supplement' | 'late';
   homework_status: 'done' | 'incomplete' | 'undone' | '' | null;
   check_in_time: string | null;
   check_out_time: string | null;
+  makeup_for_date?: string | null;
+  class_id?: string | null;
 }
 
 interface KakaoChannelRow {
@@ -62,6 +64,7 @@ const statusLabel: Record<string, string> = {
   absent: '결석',
   makeup: '보강',
   supplement: '보충',
+  late: '지각',
 };
 
 const homeworkLabel: Record<string, string> = {
@@ -94,7 +97,7 @@ function getSkillSecret(req: Request): string {
   );
 }
 
-function skillText(text: string, quickReplies: { label: string; action: SkillAction; messageText?: string }[] = []) {
+function skillText(text: string, quickReplies: { label: string; action: string; messageText?: string }[] = []) {
   return {
     version: '2.0',
     template: {
@@ -119,17 +122,30 @@ function kstToday(): string {
 }
 
 function getAction(payload: KakaoSkillPayload): SkillAction {
-  const raw =
+  // Explicit action from button/block params
+  const explicit =
     payload.action?.clientExtra?.action ||
     payload.action?.params?.action ||
     payload.intent?.name ||
-    payload.userRequest?.utterance ||
     '';
-  const value = raw.toLowerCase();
-  if (value.includes('connect') || value.includes('연결')) return 'connect_student';
-  if (value.includes('attendance') || value.includes('출결') || value.includes('등원')) return 'attendance_today';
-  if (value.includes('homework') || value.includes('숙제')) return 'homework_today';
-  if (value.includes('counsel') || value.includes('상담')) return 'counsel_request';
+  const ev = explicit.toLowerCase();
+  if (ev.includes('connect') || ev.includes('연결')) return 'connect_student';
+  if (ev.includes('attendance') || ev.includes('출결') || ev.includes('등원')) return 'attendance_today';
+  if (ev.includes('homework') || ev.includes('숙제')) return 'homework_today';
+  if (ev.includes('counsel') || ev.includes('상담')) return 'counsel_request';
+  if (ev.includes('ask_ai') || ev.includes('아이비') || ev.includes('질문')) return 'ask_ai';
+
+  // Utterance-level pattern matching for button-less flows
+  const utterance = (payload.userRequest?.utterance ?? '').trim();
+  const uv = utterance.toLowerCase();
+  if (uv.includes('출결') || uv.includes('등원') || uv.includes('하원')) return 'attendance_today';
+  if (uv.includes('숙제')) return 'homework_today';
+  if (uv.includes('상담')) return 'counsel_request';
+
+  // Non-trivial free-form input → route to AI
+  const isMenuWord = ['메뉴', '처음', '시작', 'start', '안녕', '안녕하세요'].includes(uv);
+  if (utterance.length > 3 && !isMenuWord) return 'ask_ai';
+
   return 'menu';
 }
 
@@ -231,6 +247,131 @@ async function createParentRequest(
   });
 }
 
+// ── AI 질문 처리 ──────────────────────────────────────────────
+
+async function buildStudentContext(
+  supabase: ReturnType<typeof createClient>,
+  studentId: string,
+  ownerId: string,
+  studentName: string,
+): Promise<string> {
+  const today = kstToday();
+  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const [{ data: records }, { data: classes }] = await Promise.all([
+    supabase
+      .from('growing_attendance')
+      .select('date, status, homework_status, check_in_time, check_out_time, makeup_for_date, class_id')
+      .eq('student_id', studentId)
+      .gte('date', since)
+      .lte('date', today)
+      .order('date', { ascending: false })
+      .limit(60),
+    supabase
+      .from('growing_classes')
+      .select('id, name')
+      .eq('owner_id', ownerId)
+      .contains('student_ids', [studentId]),
+  ]);
+
+  const rows = (records ?? []) as AttendanceRow[];
+  const classMap = Object.fromEntries(
+    ((classes ?? []) as { id: string; name: string }[]).map(c => [c.id, c.name])
+  );
+  const classNames = Object.values(classMap).join(', ') || '미지정';
+
+  // 최근 30일 출결 요약
+  const recent30 = rows.slice(0, 30);
+  const attendanceLines = recent30.map(r => {
+    const st = statusLabel[r.status] ?? r.status;
+    const hw = r.homework_status && r.homework_status !== ''
+      ? ` 숙제:${homeworkLabel[r.homework_status] ?? r.homework_status}`
+      : '';
+    const time = (r.check_in_time || r.check_out_time)
+      ? ` 등원:${r.check_in_time ?? '-'} 하원:${r.check_out_time ?? '-'}`
+      : '';
+    return `${r.date} ${st}${time}${hw}`;
+  }).join('\n') || '기록 없음';
+
+  // 숙제 통계
+  const hwRows = recent30.filter(r => r.homework_status && r.homework_status !== '');
+  const hwDone = hwRows.filter(r => r.homework_status === 'done').length;
+  const hwIncomplete = hwRows.filter(r => r.homework_status === 'incomplete').length;
+  const hwUndone = hwRows.filter(r => r.homework_status === 'undone').length;
+
+  // 보강 현황
+  const absences = rows.filter(r => r.status === 'absent').map(r => r.date);
+  const completedMakeupDates = rows
+    .filter(r => r.status === 'makeup' && r.makeup_for_date)
+    .map(r => r.makeup_for_date!);
+  const pendingAbsences = absences.filter(d => !completedMakeupDates.includes(d));
+  const completedPairs = rows
+    .filter(r => r.status === 'makeup' && r.makeup_for_date)
+    .slice(0, 10)
+    .map(r => `결석:${r.makeup_for_date} → 보강완료:${r.date}`);
+
+  const pendingLines = pendingAbsences.length > 0
+    ? pendingAbsences.map(d => `- ${d} 결석 (보강 미완료)`).join('\n')
+    : '없음';
+  const completedLines = completedPairs.length > 0
+    ? completedPairs.map(p => `- ${p}`).join('\n')
+    : '없음';
+
+  return `학생: ${studentName}
+수업 반: ${classNames}
+기준일: ${today}
+
+[최근 30일 출결]
+${attendanceLines}
+
+[숙제 (최근 30일 기록 ${hwRows.length}회)]
+완료:${hwDone}회 미흡:${hwIncomplete}회 미제출:${hwUndone}회
+
+[보강 현황]
+미완료 보강 ${pendingAbsences.length}건:
+${pendingLines}
+완료된 보강 ${completedPairs.length}건:
+${completedLines}`;
+}
+
+async function callGemini(apiKey: string, context: string, question: string): Promise<string> {
+  const systemPrompt = `너는 그로잉영어 학원의 AI 비서 아이비야.
+학부모가 카카오톡으로 자녀 학원 생활을 물어보면 친절하고 짧게 답해줘.
+아래 학생 데이터만 근거로 답하고, 데이터에 없는 내용은 "학원에 직접 문의 주세요"라고만 해.
+카카오톡 메시지이므로 답변은 150자 이내로 간결하게 써줘. 불필요한 인사말 생략.
+
+${context}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: question }] }],
+        generationConfig: { maxOutputTokens: 300, temperature: 0.3 },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`Gemini error ${res.status}: ${err}`);
+  }
+  const json = await res.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  return text || '죄송해요, 답변을 생성하지 못했습니다.';
+}
+
+// ─────────────────────────────────────────────────────────────
+
+const MENU_REPLIES = [
+  { label: '오늘 출결 확인', action: 'attendance_today' },
+  { label: '숙제 확인', action: 'homework_today' },
+  { label: '아이비에게 질문', action: 'ask_ai', messageText: '아이비에게 질문' },
+  { label: '상담 요청', action: 'counsel_request' },
+];
+
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
@@ -303,11 +444,7 @@ Deno.serve(async req => {
         blocked_at: null,
       }, { onConflict: 'owner_id,kakao_user_key,student_id' });
 
-      const response = skillText(`${student.name} 학생 보호자로 연결되었습니다.\n이제 오늘 출결 확인, 숙제 확인, 상담 요청을 이용할 수 있어요.`, [
-        { label: '오늘 출결 확인', action: 'attendance_today' },
-        { label: '숙제 확인', action: 'homework_today' },
-        { label: '상담 요청', action: 'counsel_request' },
-      ]);
+      const response = skillText(`${student.name} 학생 보호자로 연결되었습니다.\n이제 출결 확인, 숙제 확인, 아이비 질문, 상담 요청을 이용할 수 있어요.`, MENU_REPLIES);
       await logEvent(supabase, payload, channelOwnerId, 'connect_success', response);
       return jsonResponse(response);
     }
@@ -331,10 +468,7 @@ Deno.serve(async req => {
     if (action === 'attendance_today') {
       if (!autoReply) {
         await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'attendance', '출결 확인 요청', payload);
-        const response = skillText(`${student.name} 학생 출결 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, [
-          { label: '숙제 확인', action: 'homework_today' },
-          { label: '상담 요청', action: 'counsel_request' },
-        ]);
+        const response = skillText(`${student.name} 학생 출결 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, MENU_REPLIES.filter(r => r.action !== 'attendance_today'));
         await logEvent(supabase, payload, link.owner_id, 'attendance_queued', response);
         return jsonResponse(response);
       }
@@ -353,10 +487,7 @@ Deno.serve(async req => {
       const message = attendance
         ? `${student.name} 학생의 오늘 출결은 ${statusLabel[attendance.status] ?? attendance.status}입니다.\n등원: ${attendance.check_in_time ?? '기록 없음'}\n하원: ${attendance.check_out_time ?? '기록 없음'}`
         : `${student.name} 학생의 오늘 출결 기록은 아직 없습니다.`;
-      const response = skillText(message, [
-        { label: '숙제 확인', action: 'homework_today' },
-        { label: '상담 요청', action: 'counsel_request' },
-      ]);
+      const response = skillText(message, MENU_REPLIES.filter(r => r.action !== 'attendance_today'));
       await logEvent(supabase, payload, link.owner_id, 'attendance_ok', response);
       return jsonResponse(response);
     }
@@ -364,10 +495,7 @@ Deno.serve(async req => {
     if (action === 'homework_today') {
       if (!autoReply) {
         await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'homework', '숙제 확인 요청', payload);
-        const response = skillText(`${student.name} 학생 숙제 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, [
-          { label: '오늘 출결 확인', action: 'attendance_today' },
-          { label: '상담 요청', action: 'counsel_request' },
-        ]);
+        const response = skillText(`${student.name} 학생 숙제 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, MENU_REPLIES.filter(r => r.action !== 'homework_today'));
         await logEvent(supabase, payload, link.owner_id, 'homework_queued', response);
         return jsonResponse(response);
       }
@@ -384,40 +512,45 @@ Deno.serve(async req => {
 
       const attendance = data as AttendanceRow | null;
       const homeworkStatus = attendance?.homework_status ?? '';
-      const response = skillText(`${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[homeworkStatus] ?? '기록 없음'}입니다.`, [
-        { label: '오늘 출결 확인', action: 'attendance_today' },
-        { label: '상담 요청', action: 'counsel_request' },
-      ]);
+      const response = skillText(`${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[homeworkStatus] ?? '기록 없음'}입니다.`, MENU_REPLIES.filter(r => r.action !== 'homework_today'));
       await logEvent(supabase, payload, link.owner_id, 'homework_ok', response);
       return jsonResponse(response);
     }
 
+    if (action === 'ask_ai') {
+      const question = payload.userRequest?.utterance?.trim() || '이 학생의 최근 출결과 보강 현황을 요약해줘';
+      const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
+      if (!geminiKey) {
+        const response = skillText('AI 서비스가 아직 준비 중입니다. 학원에 직접 문의해 주세요.', MENU_REPLIES);
+        await logEvent(supabase, payload, link.owner_id, 'ask_ai_no_key', response);
+        return jsonResponse(response);
+      }
+
+      const context = await buildStudentContext(supabase, student.id, link.owner_id, student.name);
+      const aiAnswer = await callGemini(geminiKey, context, question);
+
+      const response = skillText(aiAnswer, MENU_REPLIES);
+      await logEvent(supabase, payload, link.owner_id, 'ask_ai_ok', response);
+      return jsonResponse(response);
+    }
+
     if (action === 'counsel_request') {
-      // 파라미터 '문의내용'으로 수집된 내용 우선, 없으면 utterance 사용
       const rawMessage = getParam(payload, 'message', '문의내용') || payload.userRequest?.utterance || '';
       const isPlaceholder = !rawMessage || rawMessage.trim() === '상담 요청';
 
       if (isPlaceholder) {
-        // 내용 없이 버튼만 눌렀을 때 — 챗봇 빌더에서 '문의내용' 파라미터를 필수로 설정하면 여기까지 안 옴
         const response = skillText('어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊');
         await logEvent(supabase, payload, link.owner_id, 'counsel_prompt', response);
         return jsonResponse(response);
       }
 
       await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'counsel', rawMessage.trim(), payload);
-      const response = skillText(`${student.name} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`, [
-        { label: '오늘 출결 확인', action: 'attendance_today' },
-        { label: '숙제 확인', action: 'homework_today' },
-      ]);
+      const response = skillText(`${student.name} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`, MENU_REPLIES.filter(r => r.action !== 'counsel_request'));
       await logEvent(supabase, payload, link.owner_id, 'counsel_queued', response);
       return jsonResponse(response);
     }
 
-    const response = skillText('원하시는 메뉴를 선택해 주세요.', [
-      { label: '오늘 출결 확인', action: 'attendance_today' },
-      { label: '숙제 확인', action: 'homework_today' },
-      { label: '상담 요청', action: 'counsel_request' },
-    ]);
+    const response = skillText('원하시는 메뉴를 선택해 주세요.', MENU_REPLIES);
     await logEvent(supabase, payload, link.owner_id, 'menu', response);
     return jsonResponse(response);
   } catch (error) {
