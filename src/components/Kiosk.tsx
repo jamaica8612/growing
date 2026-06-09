@@ -16,6 +16,7 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
   const [showExitModal, setShowExitModal] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [successState, setSuccessState] = useState<{ active: boolean; type: 'in' | 'out'; name: string } | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
   useEffect(() => {
     // Try to lock the OS rotation to landscape. Works when the PWA is installed
     // (display: standalone). Falls back to CSS rotation below when unsupported.
@@ -26,6 +27,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+  const displayStudents = selectedClassId === 'all'
+    ? activeStudents
+    : activeStudents.filter(s => classes.find(c => c.id === selectedClassId)?.studentIds.includes(s.id) ?? false);
 
 
   // Web Audio API Chime sound generator (Fully self-contained, works offline!)
@@ -94,8 +99,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
 
     // Find class of student for today
     const studentClasses = classes.filter(c => c.studentIds.includes(selectedStudent.id));
-    // Default to first class if enrolled in multiple; empty => no class (null in DB)
-    const classId = studentClasses[0]?.id || '';
+    // Prefer the currently selected class if the student is in it
+    const classId = (selectedClassId !== 'all' && studentClasses.some(c => c.id === selectedClassId))
+      ? selectedClassId
+      : studentClasses[0]?.id || '';
 
     // 등원/하원 시각을 정식 필드에 기록 (반대쪽 값은 useAcademyData가 유지)
     onSaveAttendance({
@@ -155,13 +162,37 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
 
       {/* ── 본문 ── */}
       <div className="kk-body">
-        <div className="kk-grid">
-          {activeStudents.map(student => (
-            <button key={student.id} className="kk-card" onClick={() => setSelectedStudent(student)}>
-              <span className="kk-card-name">{student.name}</span>
-              <span className="kk-card-sub">{student.school || '교습소'} {student.grade.split(' ')[1] || student.grade}</span>
+        {/* 반 선택 */}
+        <div className="kk-class-bar">
+          <button
+            className={`kk-class-chip${selectedClassId === 'all' ? ' on' : ''}`}
+            onClick={() => setSelectedClassId('all')}
+          >
+            전체 반
+          </button>
+          {classes.map(cls => (
+            <button
+              key={cls.id}
+              className={`kk-class-chip${selectedClassId === cls.id ? ' on' : ''}`}
+              onClick={() => setSelectedClassId(cls.id)}
+            >
+              {cls.color && <span className="kk-class-dot" style={{ background: cls.color }} />}
+              {cls.name}
             </button>
           ))}
+        </div>
+
+        <div className="kk-grid">
+          {displayStudents.length === 0 ? (
+            <div className="kk-empty">이 반에 등록된 학생이 없습니다.</div>
+          ) : (
+            displayStudents.map(student => (
+              <button key={student.id} className="kk-card" onClick={() => setSelectedStudent(student)}>
+                <span className="kk-card-name">{student.name}</span>
+                <span className="kk-card-sub">{student.school || '교습소'} {student.grade.split(' ')[1] || student.grade}</span>
+              </button>
+            ))
+          )}
         </div>
       </div>
 
