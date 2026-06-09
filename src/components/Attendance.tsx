@@ -15,6 +15,7 @@ interface AttendanceProps {
 const PRIMARY_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [
   { value: 'present', label: '출석', tone: 'ok' },
   { value: 'absent', label: '결석', tone: 'danger' },
+  { value: 'makeup', label: '보강', tone: 'info' },
 ];
 
 const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
@@ -370,8 +371,8 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                           {/* 출결 세그먼트 */}
                           <div className="at-cell">
                             <span className="at-clabel">출결</span>
-                            {/* 1단계: 출석 / 결석 */}
-                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                            {/* 1단계: 출석 / 결석 / 보강 */}
+                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
                               {PRIMARY_STATUS_OPTIONS.map(option => {
                                 const isActive =
                                   currentStatus === option.value ||
