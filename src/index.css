@@ -4023,6 +4023,17 @@ textarea.form-control {
   background: #84cc16;
   border: 2px solid #0f2e21;
 }
+.ivy-fab-unread {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #0f2e21;
+  animation: ivyBreathe 1.4s ease-in-out infinite;
+}
 
 .ivy-panel {
   position: fixed;

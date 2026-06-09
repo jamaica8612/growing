@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { useAcademyData } from './hooks/useAcademyData';
@@ -161,6 +161,35 @@ function AcademyApp({ session }: { session: Session }) {
     kakaoEventLogs,
     kioskPin,
   } = data;
+
+  // 미처리 상담 요청 수 (카카오 탭 배지)
+  const pendingCounselCount = kakaoParentRequests.filter(
+    r => r.requestType === 'counsel' && r.status === 'pending'
+  ).length;
+
+  // 아이비 상담 알림 상태
+  const [counselNotification, setCounselNotification] = useState<{ studentName: string; message: string } | null>(null);
+  const studentsRef = useRef(students);
+  studentsRef.current = students;
+
+  // Supabase Realtime — 새 상담 요청 감지 → 아이비 알림
+  useEffect(() => {
+    const channel = supabase
+      .channel('counsel-notify')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'growing_parent_requests',
+        filter: `owner_id=eq.${session.user.id}`,
+      }, (payload) => {
+        const rec = payload.new as { request_type: string; message: string; student_id: string };
+        if (rec.request_type !== 'counsel') return;
+        const student = studentsRef.current.find(s => s.id === rec.student_id);
+        setCounselNotification({ studentName: student?.name ?? '학부모', message: rec.message });
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [session.user.id]);
 
   const handleLogout = () => {
     void supabase.auth.signOut();
@@ -400,7 +429,11 @@ function AcademyApp({ session }: { session: Session }) {
                   icon={item.icon}
                   label={item.label}
                   onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
-                  badge={item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length || undefined : undefined}
+                  badge={
+                    item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length || undefined
+                    : item.id === 'kakao' ? pendingCounselCount || undefined
+                    : undefined
+                  }
                   kioskStyle={item.kind === 'kiosk'}
                 />
               ))}
@@ -592,7 +625,9 @@ function AcademyApp({ session }: { session: Session }) {
       <nav className="mobile-bottom-nav m-tabs" aria-label="빠른 이동">
         {mobileQuickNavItems.map(item => {
           const Icon = item.icon;
-          const badge = item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length : 0;
+          const badge = item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length
+                      : item.id === 'kakao' ? pendingCounselCount
+                      : 0;
           return (
             <button
               key={item.id}
@@ -620,7 +655,13 @@ function AcademyApp({ session }: { session: Session }) {
       </nav>
 
       {/* AI 비서 아이비 — 평가 관리에서는 전용 AI 편집 UI와 겹치므로 숨긴다. */}
-      {activeTab !== 'exams' && <Assistant onSendToMessaging={handleAssistantDraftToMessaging} />}
+      {activeTab !== 'exams' && (
+        <Assistant
+          onSendToMessaging={handleAssistantDraftToMessaging}
+          counselNotification={counselNotification}
+          onCounselNotificationConsumed={() => setCounselNotification(null)}
+        />
+      )}
     </div>
   );
 }
