@@ -366,10 +366,10 @@ ${context}`;
 // ─────────────────────────────────────────────────────────────
 
 const MENU_REPLIES = [
-  { label: '오늘 출결 확인', action: 'attendance_today' },
-  { label: '숙제 확인', action: 'homework_today' },
-  { label: '아이비에게 질문', action: 'ask_ai', messageText: '아이비에게 질문' },
-  { label: '상담 요청', action: 'counsel_request' },
+  { label: '📅 오늘 출결', action: 'attendance_today' },
+  { label: '📝 숙제 확인', action: 'homework_today' },
+  { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문' },
+  { label: '💬 상담 요청', action: 'counsel_request' },
 ];
 
 Deno.serve(async req => {
@@ -468,7 +468,7 @@ Deno.serve(async req => {
     if (action === 'attendance_today') {
       if (!autoReply) {
         await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'attendance', '출결 확인 요청', payload);
-        const response = skillText(`${student.name} 학생 출결 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, MENU_REPLIES.filter(r => r.action !== 'attendance_today'));
+        const response = skillText(`${student.name} 학생 출결 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, MENU_REPLIES);
         await logEvent(supabase, payload, link.owner_id, 'attendance_queued', response);
         return jsonResponse(response);
       }
@@ -487,7 +487,7 @@ Deno.serve(async req => {
       const message = attendance
         ? `${student.name} 학생의 오늘 출결은 ${statusLabel[attendance.status] ?? attendance.status}입니다.\n등원: ${attendance.check_in_time ?? '기록 없음'}\n하원: ${attendance.check_out_time ?? '기록 없음'}`
         : `${student.name} 학생의 오늘 출결 기록은 아직 없습니다.`;
-      const response = skillText(message, MENU_REPLIES.filter(r => r.action !== 'attendance_today'));
+      const response = skillText(message, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'attendance_ok', response);
       return jsonResponse(response);
     }
@@ -495,7 +495,7 @@ Deno.serve(async req => {
     if (action === 'homework_today') {
       if (!autoReply) {
         await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'homework', '숙제 확인 요청', payload);
-        const response = skillText(`${student.name} 학생 숙제 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, MENU_REPLIES.filter(r => r.action !== 'homework_today'));
+        const response = skillText(`${student.name} 학생 숙제 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, MENU_REPLIES);
         await logEvent(supabase, payload, link.owner_id, 'homework_queued', response);
         return jsonResponse(response);
       }
@@ -512,13 +512,23 @@ Deno.serve(async req => {
 
       const attendance = data as AttendanceRow | null;
       const homeworkStatus = attendance?.homework_status ?? '';
-      const response = skillText(`${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[homeworkStatus] ?? '기록 없음'}입니다.`, MENU_REPLIES.filter(r => r.action !== 'homework_today'));
+      const response = skillText(`${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[homeworkStatus] ?? '기록 없음'}입니다.`, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'homework_ok', response);
       return jsonResponse(response);
     }
 
     if (action === 'ask_ai') {
-      const question = payload.userRequest?.utterance?.trim() || '이 학생의 최근 출결과 보강 현황을 요약해줘';
+      const utterance = payload.userRequest?.utterance?.trim() ?? '';
+      // 버튼 클릭으로 들어온 트리거 문구는 실제 질문이 아님 → 입력 유도
+      const isTriggerPhrase = !utterance || ['아이비에게 질문', '아이비', '질문', 'ask_ai'].includes(utterance.toLowerCase());
+      if (isTriggerPhrase) {
+        const response = skillText(
+          `${student.name} 학생에 대해 궁금한 점을 자유롭게 입력해 주세요.\n\n예) 이번 달 출결 어때요?\n예) 보강 몇 번 남았나요?\n예) 숙제 잘 하고 있나요?`,
+        );
+        await logEvent(supabase, payload, link.owner_id, 'ask_ai_prompt', response);
+        return jsonResponse(response);
+      }
+
       const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
       if (!geminiKey) {
         const response = skillText('AI 서비스가 아직 준비 중입니다. 학원에 직접 문의해 주세요.', MENU_REPLIES);
@@ -527,7 +537,7 @@ Deno.serve(async req => {
       }
 
       const context = await buildStudentContext(supabase, student.id, link.owner_id, student.name);
-      const aiAnswer = await callGemini(geminiKey, context, question);
+      const aiAnswer = await callGemini(geminiKey, context, utterance);
 
       const response = skillText(aiAnswer, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'ask_ai_ok', response);
@@ -545,7 +555,7 @@ Deno.serve(async req => {
       }
 
       await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'counsel', rawMessage.trim(), payload);
-      const response = skillText(`${student.name} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`, MENU_REPLIES.filter(r => r.action !== 'counsel_request'));
+      const response = skillText(`${student.name} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'counsel_queued', response);
       return jsonResponse(response);
     }
