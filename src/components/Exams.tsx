@@ -120,11 +120,6 @@ const TYPE_META: Record<QType, { label: string; cls: string }> = {
   writing: { label: '서술형', cls: 'badge-writing' },
 };
 
-const SAMPLE_TEXT = `Lesson 4. My Future Dream
-
-Everyone has a dream about the future. Some students want to become doctors, while others dream of being artists or scientists. Jiwon wants to be a marine biologist. She is interested in the ocean and the animals that live in it. To achieve her dream, she studies science hard and reads many books about sea life. "If you work hard, you can make your dream come true," she always says.
-
-[Words] dream, future, marine biologist, ocean, achieve, come true, scientist, interested`;
 
 // 텍스트 붙여넣기로 추가되는 자료 풀
 const TEXT_MATERIALS: Omit<Material, 'label'>[] = [
@@ -374,7 +369,7 @@ function CreateExam({ classes, onGenerate }: { classes: Class[]; onGenerate: (m:
   // 지금 단계에서는 텍스트 자료만 받는다.
   const [tab, setTab] = useState<MaterialKind>('text');
   const [mats, setMats] = useState<Material[]>([]);
-  const [pasteText, setPasteText] = useState(SAMPLE_TEXT);
+  const [pasteText, setPasteText] = useState('');
   const [optOpen, setOptOpen] = useState(true);
 
   const [clsId, setClsId] = useState(classes[0]?.id ?? '');
