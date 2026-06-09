@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus } from '../types';
 import { Calendar, Clock } from 'lucide-react';
 import { AttendanceCalendar } from './AttendanceCalendar';
@@ -32,8 +32,16 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
   const [makeupBookings, setMakeupBookings] = useState<Record<string, string>>({});
-  const [pendingAbsent, setPendingAbsent] = useState<{ studentId: string; classId: string } | null>(null);
+  const [pendingAbsent, setPendingAbsent] = useState<{ studentId: string; classId: string; date: string } | null>(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
+
+  // 날짜 바뀌면 날짜 종속 로컬 상태 초기화 (이전 날 데이터가 새 날짜 기록에 섞이지 않도록)
+  useEffect(() => {
+    setAttendanceMemos({});
+    setMakeupForDates({});
+    setMakeupBookings({});
+    setPendingAbsent(null);
+  }, [selectedDate]);
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
 
@@ -73,7 +81,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
       // 결석 선택 시 등하원 시간이 있으면 경고창으로 확인 요청
       if (status === 'absent' && (record?.checkInTime || record?.checkOutTime)) {
-        setPendingAbsent({ studentId, classId });
+        setPendingAbsent({ studentId, classId, date: selectedDate });
         return;
       }
       // 결석만 등하원 초기화, 나머지는 현재 값 유지 (명시적으로 전달해 stale closure 방지)
@@ -214,12 +222,12 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const confirmAbsentAction = () => {
     if (!pendingAbsent) return;
-    const { studentId, classId } = pendingAbsent;
-    const rec = getAttendanceRecord(studentId, classId, selectedDate);
+    const { studentId, classId, date } = pendingAbsent;
+    const rec = getAttendanceRecord(studentId, classId, date);
     onSaveAttendance({
       studentId,
       classId,
-      date: selectedDate,
+      date,
       status: 'absent',
       memo: attendanceMemos[`${studentId}-${classId}`] ?? rec?.memo ?? '',
       homeworkStatus: rec?.homeworkStatus ?? '',
