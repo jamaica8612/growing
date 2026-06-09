@@ -332,14 +332,14 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           </div>
           <MessageCircle size={20} />
         </div>
-        {requests.length === 0 ? (
+        {requests.filter(r => r.requestType === 'counsel').length === 0 ? (
           <div className="gd-empty">
             <MessageCircle size={28} />
-            <span>접수된 카카오 요청이 없습니다.</span>
+            <span>접수된 상담 요청이 없습니다.</span>
           </div>
         ) : (
           <div className="ka-inbox">
-            {requests.map(request => {
+            {requests.filter(r => r.requestType === 'counsel').map(request => {
               const student = request.studentId ? studentById.get(request.studentId) : undefined;
               return (
                 <article key={request.id} className={`ka-req${request.status === 'resolved' && (request.requestType === 'attendance' || request.requestType === 'homework') ? ' answered' : ''}`}>
