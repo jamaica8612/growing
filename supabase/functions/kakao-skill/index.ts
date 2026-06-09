@@ -449,10 +449,39 @@ Deno.serve(async req => {
       return jsonResponse(response);
     }
 
+    // 상담 요청은 학생 연결 없이도 가능
+    if (action === 'counsel_request') {
+      const rawMessage = getParam(payload, 'message', '문의내용') || payload.userRequest?.utterance || '';
+      const isPlaceholder = !rawMessage || ['상담 요청', '💬 상담 요청'].includes(rawMessage.trim());
+
+      if (isPlaceholder) {
+        const response = skillText('어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊');
+        await logEvent(supabase, payload, channelOwnerId, 'counsel_prompt', response);
+        return jsonResponse(response);
+      }
+
+      const link = await findActiveLink(supabase, channelOwnerId, kakaoUserKey);
+      const studentId = link?.student_id ?? null;
+      const studentName = studentId ? (await getStudent(supabase, studentId))?.name ?? null : null;
+      const ownerId = link?.owner_id ?? channelOwnerId;
+      const confirmMsg = studentName
+        ? `${studentName} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`
+        : '상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.';
+
+      await createParentRequest(supabase, ownerId, studentId, kakaoUserKey, 'counsel', rawMessage.trim(), payload);
+      const response = skillText(confirmMsg, link ? MENU_REPLIES : [
+        { label: '학생 연결', action: 'connect_student' },
+        { label: '💬 상담 요청', action: 'counsel_request' },
+      ]);
+      await logEvent(supabase, payload, ownerId, 'counsel_queued', response);
+      return jsonResponse(response);
+    }
+
     const link = await findActiveLink(supabase, channelOwnerId, kakaoUserKey);
     if (!link) {
-      const response = skillText('먼저 학생 연결이 필요합니다.\n학생 이름과 보호자 휴대폰 뒤 4자리를 입력해 주세요.\n예: 김서윤 1234', [
+      const response = skillText('안녕하세요! 그로잉영어입니다. 😊\n재원생 학부모님은 학생 연결 후 출결·숙제 확인을 이용하실 수 있어요.', [
         { label: '학생 연결', action: 'connect_student' },
+        { label: '💬 상담 요청', action: 'counsel_request' },
       ]);
       await logEvent(supabase, payload, channelOwnerId, 'unverified', response);
       return jsonResponse(response);
@@ -548,22 +577,6 @@ Deno.serve(async req => {
 
       const response = skillText(aiAnswer, MENU_REPLIES);
       await logEvent(supabase, payload, link.owner_id, 'ask_ai_ok', response);
-      return jsonResponse(response);
-    }
-
-    if (action === 'counsel_request') {
-      const rawMessage = getParam(payload, 'message', '문의내용') || payload.userRequest?.utterance || '';
-      const isPlaceholder = !rawMessage || rawMessage.trim() === '상담 요청';
-
-      if (isPlaceholder) {
-        const response = skillText('어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊');
-        await logEvent(supabase, payload, link.owner_id, 'counsel_prompt', response);
-        return jsonResponse(response);
-      }
-
-      await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'counsel', rawMessage.trim(), payload);
-      const response = skillText(`${student.name} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`, MENU_REPLIES);
-      await logEvent(supabase, payload, link.owner_id, 'counsel_queued', response);
       return jsonResponse(response);
     }
 
