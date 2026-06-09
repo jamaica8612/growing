@@ -32,7 +32,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
   const [makeupBookings, setMakeupBookings] = useState<Record<string, string>>({});
-  const [confirmAbsent, setConfirmAbsent] = useState<Record<string, boolean>>({});
+  const [pendingAbsent, setPendingAbsent] = useState<{ studentId: string; classId: string } | null>(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
@@ -71,12 +71,12 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
       const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
       const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
-      const checkInTime = status === 'absent' ? '' : shouldStampCheckIn ? getCurrentTimeStr() : undefined;
-      // 결석 선택 시 등하원 시간이 있으면 확인 요청
+      // 결석 선택 시 등하원 시간이 있으면 경고창으로 확인 요청
       if (status === 'absent' && (record?.checkInTime || record?.checkOutTime)) {
-        setConfirmAbsent(prev => ({ ...prev, [`${studentId}-${classId}`]: true }));
+        setPendingAbsent({ studentId, classId });
         return;
       }
+      // 결석만 등하원 초기화, 나머지는 현재 값 유지 (명시적으로 전달해 stale closure 방지)
       onSaveAttendance({
         studentId,
         classId,
@@ -86,8 +86,8 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         homeworkStatus: record?.homeworkStatus ?? '',
         makeupForDate: makeupForDate || undefined,
         supplementMinutes: undefined,
-        ...(checkInTime !== undefined ? { checkInTime } : {}),
-        ...(status === 'absent' ? { checkOutTime: '' } : {}),
+        checkInTime: status === 'absent' ? '' : shouldStampCheckIn ? getCurrentTimeStr() : record?.checkInTime,
+        checkOutTime: status === 'absent' ? '' : record?.checkOutTime,
       });
       return;
     }
@@ -211,6 +211,23 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   };
   const monthlyReport = getMonthlyReportData();
   const activeAttendance = attendance.filter(a => activeStudentIds.has(a.studentId));
+
+  const confirmAbsentAction = () => {
+    if (!pendingAbsent) return;
+    const { studentId, classId } = pendingAbsent;
+    const rec = getAttendanceRecord(studentId, classId, selectedDate);
+    onSaveAttendance({
+      studentId,
+      classId,
+      date: selectedDate,
+      status: 'absent',
+      memo: attendanceMemos[`${studentId}-${classId}`] ?? rec?.memo ?? '',
+      homeworkStatus: rec?.homeworkStatus ?? '',
+      checkInTime: '',
+      checkOutTime: '',
+    });
+    setPendingAbsent(null);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -337,37 +354,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               )}
                             </div>
                           </div>
-                          {confirmAbsent[`${studentId}-${cls.id}`] && (
-                            <div className="at-confirm-absent">
-                              <span>등하원 시간이 초기화됩니다</span>
-                              <button
-                                className="pay-btn danger sm"
-                                onClick={() => {
-                                  setConfirmAbsent(prev => ({ ...prev, [`${studentId}-${cls.id}`]: false }));
-                                  const rec = getAttendanceRecord(studentId, cls.id, selectedDate);
-                                  onSaveAttendance({
-                                    studentId,
-                                    classId: cls.id,
-                                    date: selectedDate,
-                                    status: 'absent',
-                                    memo: attendanceMemos[`${studentId}-${cls.id}`] ?? rec?.memo ?? '',
-                                    homeworkStatus: rec?.homeworkStatus ?? '',
-                                    checkInTime: '',
-                                    checkOutTime: '',
-                                  });
-                                }}
-                              >
-                                확인
-                              </button>
-                              <button
-                                className="pay-btn ghost sm"
-                                onClick={() => setConfirmAbsent(prev => ({ ...prev, [`${studentId}-${cls.id}`]: false }))}
-                              >
-                                취소
-                              </button>
-                            </div>
-                          )}
-
                           {/* 출결 세그먼트 */}
                           <div className="at-cell">
                             <span className="at-clabel">출결</span>
@@ -495,6 +481,26 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           );
         })
       )}
+
+      {/* ── 결석 경고 모달 ── */}
+      {pendingAbsent && (() => {
+        const s = students.find(st => st.id === pendingAbsent.studentId);
+        return (
+          <div className="at-absent-modal-bg" onClick={() => setPendingAbsent(null)}>
+            <div className="at-absent-modal" onClick={e => e.stopPropagation()}>
+              <div className="at-absent-modal-icon">⚠️</div>
+              <h3 className="at-absent-modal-title">결석 처리 확인</h3>
+              <p className="at-absent-modal-body">
+                <strong>{s?.name}</strong> 학생의 등하원 시간이 초기화됩니다.<br />결석으로 변경할까요?
+              </p>
+              <div className="at-absent-modal-btns">
+                <button className="at-absent-btn cancel" onClick={() => setPendingAbsent(null)}>취소</button>
+                <button className="at-absent-btn confirm" onClick={confirmAbsentAction}>결석 처리</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="at-monthly-grid">
       {/* ── 월간 출결 캘린더 ── */}
