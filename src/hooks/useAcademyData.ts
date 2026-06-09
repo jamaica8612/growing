@@ -362,7 +362,7 @@ export function useAcademyData(userId: string) {
       setKakaoParentRequests(prev => prev.map(req => (req.id === updated.id ? updated : req)));
     });
 
-  const handleSaveKakaoChannel = (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean }) =>
+  const handleSaveKakaoChannel = (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }) =>
     guard(async () => {
       const saved = await api.saveKakaoChannelConfig(userId, config);
       setKakaoChannels(prev => {

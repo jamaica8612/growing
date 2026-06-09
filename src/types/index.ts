@@ -160,6 +160,7 @@ export interface KakaoChannelConfig {
   skillSecret: string;
   eventSecret?: string;
   enabled: boolean;
+  autoReply: boolean;
   createdAt: string;
   updatedAt: string;
 }
