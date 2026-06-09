@@ -12,11 +12,10 @@ interface AttendanceProps {
   onDeleteAttendance: (attendanceId: string) => void;
 }
 
-const ATTENDANCE_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [
+const PRIMARY_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [
   { value: 'present', label: '출석', tone: 'ok' },
   { value: 'absent', label: '결석', tone: 'danger' },
   { value: 'makeup', label: '보강', tone: 'info' },
-  { value: 'supplement', label: '보충', tone: 'warn' },
 ];
 
 const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
@@ -57,33 +56,67 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const handleStatusChange = (studentId: string, classId: string, status: EditableAttendanceStatus) => {
     const record = getAttendanceRecord(studentId, classId, selectedDate);
     const currentStatus = record ? normalizeAttendanceStatus(record.status) : undefined;
-    if (record && currentStatus === status) {
-      onDeleteAttendance(record.id);
+
+    // Primary button clicked (출석/결석/보강)
+    if (status === 'present' || status === 'absent' || status === 'makeup') {
+      const isPrimaryActive =
+        currentStatus === status ||
+        (status === 'present' && currentStatus === 'supplement');
+      if (record && isPrimaryActive) {
+        onDeleteAttendance(record.id);
+        return;
+      }
+      const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
+      const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
+      const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
+      const checkInTime = status === 'absent' ? '' : shouldStampCheckIn ? getCurrentTimeStr() : undefined;
+      onSaveAttendance({
+        studentId,
+        classId,
+        date: selectedDate,
+        status,
+        memo: currentMemo,
+        homeworkStatus: record?.homeworkStatus ?? '',
+        makeupForDate: makeupForDate || undefined,
+        supplementMinutes: undefined,
+        ...(checkInTime !== undefined ? { checkInTime } : {}),
+        ...(status === 'absent' ? { checkOutTime: '' } : {}),
+      });
       return;
     }
-    const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
-    const shouldStampCheckIn = selectedDate === todayDateStr && status === 'present' && !record?.checkInTime;
-    const makeupForDate = status === 'makeup' ? (makeupForDates[`${studentId}-${classId}`] ?? record?.makeupForDate ?? '') : undefined;
-    const checkInTime =
-      status === 'absent'
-        ? ''
-        : status === 'supplement'
-          ? ''
-          : shouldStampCheckIn
-            ? getCurrentTimeStr()
-            : undefined;
-    onSaveAttendance({
-      studentId,
-      classId,
-      date: selectedDate,
-      status,
-      memo: currentMemo,
-      homeworkStatus: record?.homeworkStatus ?? '',
-      makeupForDate: makeupForDate || undefined,
-      supplementMinutes: status === 'supplement' ? (record?.supplementMinutes ?? 30) : undefined,
-      ...(checkInTime !== undefined ? { checkInTime } : {}),
-      ...(status === 'absent' || status === 'supplement' ? { checkOutTime: '' } : {}),
-    });
+
+    // Secondary toggle: 보충 (출석 상태에서만)
+    if (status === 'supplement') {
+      if (!record || (currentStatus !== 'present' && currentStatus !== 'supplement')) return;
+      const currentMemo = attendanceMemos[`${studentId}-${classId}`] ?? record?.memo ?? '';
+      if (currentStatus === 'supplement') {
+        // 보충 토글 off → 출석으로 복귀
+        const shouldStampCheckIn = selectedDate === todayDateStr && !record?.checkInTime;
+        onSaveAttendance({
+          studentId,
+          classId,
+          date: selectedDate,
+          status: 'present',
+          memo: currentMemo,
+          homeworkStatus: record?.homeworkStatus ?? '',
+          supplementMinutes: undefined,
+          ...(shouldStampCheckIn ? { checkInTime: getCurrentTimeStr() } : {}),
+        });
+      } else {
+        // 보충 토글 on → supplement로 변경 (출석 기록 위에 덮어씀)
+        onSaveAttendance({
+          studentId,
+          classId,
+          date: selectedDate,
+          status: 'supplement',
+          memo: currentMemo,
+          homeworkStatus: record?.homeworkStatus ?? '',
+          supplementMinutes: record?.supplementMinutes ?? 30,
+          checkInTime: '',
+          checkOutTime: '',
+        });
+      }
+    }
   };
 
   const handleSupplementMinutesChange = (studentId: string, classId: string, minutes: number) => {
@@ -270,28 +303,47 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                           {/* 출결 세그먼트 */}
                           <div className="at-cell">
                             <span className="at-clabel">출결</span>
-                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-                              {ATTENDANCE_STATUS_OPTIONS.map(option => (
-                                <button key={option.value} className={`gd-seg-b ${currentStatus === option.value ? 'sel ' + option.tone : ''}`} onClick={() => handleStatusChange(studentId, cls.id, option.value)}>
-                                  {option.label}
-                                </button>
-                              ))}
+                            {/* 1단계: 출석 / 결석 / 보강 */}
+                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                              {PRIMARY_STATUS_OPTIONS.map(option => {
+                                const isActive =
+                                  currentStatus === option.value ||
+                                  (option.value === 'present' && currentStatus === 'supplement');
+                                return (
+                                  <button
+                                    key={option.value}
+                                    className={`gd-seg-b ${isActive ? 'sel ' + option.tone : ''}`}
+                                    onClick={() => handleStatusChange(studentId, cls.id, option.value)}
+                                  >
+                                    {option.label}
+                                  </button>
+                                );
+                              })}
                             </div>
-                            {currentStatus === 'supplement' && (
-                              <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.73rem' }}>
-                                <span style={{ color: 'var(--color-text-muted)' }}>보충 분량</span>
-                                <select
-                                  className="form-control"
-                                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '96px' }}
-                                  value={record?.supplementMinutes ?? 30}
-                                  onChange={e => handleSupplementMinutesChange(studentId, cls.id, Number(e.target.value))}
+                            {/* 2단계: 보충 토글 (출석 선택 시) */}
+                            {(currentStatus === 'present' || currentStatus === 'supplement') && (
+                              <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <button
+                                  className={`gd-seg-b at-secondary-toggle ${currentStatus === 'supplement' ? 'sel warn' : ''}`}
+                                  onClick={() => handleStatusChange(studentId, cls.id, 'supplement')}
                                 >
-                                  {SUPPLEMENT_MINUTE_OPTIONS.map(minutes => (
-                                    <option key={minutes} value={minutes}>{minutes}분</option>
-                                  ))}
-                                </select>
+                                  + 보충
+                                </button>
+                                {currentStatus === 'supplement' && (
+                                  <select
+                                    className="form-control"
+                                    style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '96px' }}
+                                    value={record?.supplementMinutes ?? 30}
+                                    onChange={e => handleSupplementMinutesChange(studentId, cls.id, Number(e.target.value))}
+                                  >
+                                    {SUPPLEMENT_MINUTE_OPTIONS.map(minutes => (
+                                      <option key={minutes} value={minutes}>{minutes}분</option>
+                                    ))}
+                                  </select>
+                                )}
                               </div>
                             )}
+                            {/* 보강 선택 시: 결석일 연결 */}
                             {currentStatus === 'makeup' && (() => {
                               const linkedDate = makeupForDates[`${studentId}-${cls.id}`] ?? record?.makeupForDate ?? '';
                               const hasAbsence = !!linkedDate && attendance.some(a => a.studentId === studentId && a.date === linkedDate && a.status === 'absent');
@@ -303,6 +355,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                 </div>
                               );
                             })()}
+                            {/* 결석 선택 시: 보강 완료 여부 */}
                             {currentStatus === 'absent' && (() => {
                               const linked = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === record?.date);
                               return linked ? <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: 'var(--color-accent-mint)' }}>보강 완료 ({linked.date})</div> : null;

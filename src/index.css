@@ -2476,6 +2476,8 @@ textarea.form-control {
 .gd-seg-b.sel.ok { color: #0c7a55; }
 .gd-seg-b.sel.warn { color: #b4710a; }
 .gd-seg-b.sel.danger { color: var(--color-danger); }
+.gd-seg-b.sel.info { color: var(--color-info, #0369a1); }
+.at-secondary-toggle { background: #eef2f0; padding: 0.25rem 0.65rem; border-radius: 6px; font-size: 0.72rem; font-weight: 700; }
 
 /* payments helper */
 .gd-pay-desc { font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 1rem; line-height: 1.5; }
