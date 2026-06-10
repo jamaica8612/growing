@@ -186,10 +186,11 @@ function AcademyApp({ session }: { session: Session }) {
         if (rec.request_type !== 'counsel') return;
         const student = studentsRef.current.find(s => s.id === rec.student_id);
         setCounselNotification({ studentName: student?.name ?? '학부모', message: rec.message });
+        void reload(); // 배지 카운트 즉시 갱신
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [session.user.id]);
+  }, [session.user.id, reload]);
 
   const handleLogout = () => {
     void supabase.auth.signOut();
