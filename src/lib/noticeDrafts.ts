@@ -55,7 +55,16 @@ const buildMakeupLine = (record: Attendance) => {
 };
 
 const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
-  const attendance = rows.map(row => attendanceStatusLabel(row.status)).join(', ') || '기록 없음';
+  const attendance = rows.map(row => {
+    if (row.status === 'supplement') {
+      const mins = row.supplementMinutes ? ` ${row.supplementMinutes}분` : '';
+      return `출석 (보충${mins})`;
+    }
+    if (row.status === 'makeup') {
+      return row.makeupForDate ? `보강 (${formatDate(row.makeupForDate)} 결석분)` : '보강';
+    }
+    return attendanceStatusLabel(row.status);
+  }).join(', ') || '기록 없음';
   const checkIn = [...new Set(rows.map(row => row.checkInTime).filter(Boolean))].join(', ') || '-';
   const checkOut = [...new Set(rows.map(row => row.checkOutTime).filter(Boolean))].join(', ') || '-';
   const homework = rows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ') || '기록 없음';
