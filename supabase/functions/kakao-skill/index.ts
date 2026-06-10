@@ -540,7 +540,7 @@ Deno.serve(async req => {
           return jsonResponse(response);
         }
       }
-      const response = skillText('안녕하세요! 그로잉영어입니다. 😊\n재원생 학부모님은 학생 연결 후 출결·숙제 확인을 이용하실 수 있어요.', [
+      const response = skillText('안녕하세요! 그로잉영어입니다. 😊\n\n카카오톡 하나로 이런 게 다 돼요! 👇\n✅ 오늘 우리 아이 출석했는지 바로 확인\n✅ 숙제 했는지 실시간 체크\n✅ "이번 달 결석 몇 번이에요?" "보강 남은 거 있어요?" — AI가 24시간 답변\n✅ 상담 요청도 한 번에\n\n재원생 학부모님은 학생 연결 후 바로 이용하세요.\n입학 문의는 상담 요청 버튼을 눌러주세요! 🙌', [
         { label: '학생 연결', action: 'connect_student' },
         { label: '💬 상담 요청', action: 'counsel_request' },
       ]);
