@@ -130,6 +130,7 @@ function makeMenuReplies(studentId?: string, showSwitch = false): QuickReplyDef[
   ];
   if (showSwitch) replies.push({ label: '🔄 자녀 전환', action: 'student_menu' });
   replies.push({ label: '➕ 학생 추가 연결', action: 'connect_student' });
+  if (studentId) replies.push({ label: '🔗 연결 해제', action: 'unlink_student', studentId });
   return replies;
 }
 
