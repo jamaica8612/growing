@@ -4,6 +4,7 @@ import { BarChart3, Bell, Check, CheckCircle2, ExternalLink, PieChart, Plus, Sea
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 import { parsePayssamExcel, type PayssamRow } from '../lib/payssam';
 import { getClassPaymentStats, getPaymentMethodStats, classifyUnpaidMonths } from '../lib/paymentStats';
+import { localToday, localMonth } from '../lib/dateUtils';
 
 type MatchedRow = PayssamRow & { studentId: string };
 
@@ -62,7 +63,7 @@ export const Payments: React.FC<PaymentsProps> = ({
   onImportPayssam,
   onNavigate,
 }) => {
-  const [selectedMonth, setSelectedMonth] = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; });
+  const [selectedMonth, setSelectedMonth] = useState(localMonth);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'all'>('all');
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -78,7 +79,7 @@ export const Payments: React.FC<PaymentsProps> = ({
   const [importResult, setImportResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [recordingPaymentId, setRecordingPaymentId] = useState<string | null>(null);
-  const [payDate, setPayDate] = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; });
+  const [payDate, setPayDate] = useState(localToday);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('card');
 
   const monthPayments = useMemo(
@@ -122,7 +123,7 @@ export const Payments: React.FC<PaymentsProps> = ({
   }, [monthPayments]);
 
   // 미납 기간 맵 (useMemo) — 연체 개월은 "선택 월"이 아니라 "오늘 월" 기준
-  const currentMonth = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; })();
+  const currentMonth = localMonth();
   const unpaidMonthsMap = useMemo(() => {
     const map: Record<string, ReturnType<typeof classifyUnpaidMonths>> = {};
     monthPayments.forEach(p => {
@@ -138,7 +139,7 @@ export const Payments: React.FC<PaymentsProps> = ({
     const today = new Date();
     for (let i = 4; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      months.push(localMonth(d));
     }
     return months.map(m => ({
       label: `${Number(m.split('-')[1])}월`,
@@ -152,7 +153,7 @@ export const Payments: React.FC<PaymentsProps> = ({
 
   const handleOpenRecordPayment = (paymentId: string) => {
     setRecordingPaymentId(paymentId);
-    setPayDate((() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })());
+    setPayDate(localToday());
     setPayMethod('card');
     setIsRecordModalOpen(true);
   };
