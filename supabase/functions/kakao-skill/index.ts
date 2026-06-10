@@ -127,7 +127,6 @@ function makeMenuReplies(studentId?: string, showSwitch = false): QuickReplyDef[
     { label: '📝 숙제 확인', action: 'homework_today', studentId },
     { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문', studentId },
     { label: '💬 상담 요청', action: 'counsel_request', studentId },
-    { label: '➕ 학생 추가 연결', action: 'connect_student' },
   ];
   if (showSwitch) replies.push({ label: '🔄 자녀 전환', action: 'student_menu' });
   replies.push({ label: '➕ 학생 추가 연결', action: 'connect_student' });
