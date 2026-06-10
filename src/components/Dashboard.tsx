@@ -43,7 +43,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  });
 
   const getKoreanDayOfWeek = (dateStr: string): DayOfWeek => {
     const days: DayOfWeek[] = ['일', '월', '화', '수', '목', '금', '토'];
@@ -59,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     getSchedulesForDay(cls, selectedDay).map(schedule => ({ cls, schedule }))
   ).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
 
-  const currentMonthStr = new Date().toISOString().substring(0, 7);
+  const currentMonthStr = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; })();
   const currentMonthPayments = payments.filter(p => p.billingMonth === currentMonthStr);
   const unpaidCount = currentMonthPayments.filter(p => p.status === 'unpaid').length;
   const totalUnpaid = currentMonthPayments.filter(p => p.status === 'unpaid').reduce((sum, p) => sum + p.amount, 0);
@@ -121,6 +124,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setCopiedId(item.paymentId);
       setToast(`${item.studentName} 학부모님 안내 메시지를 복사했어요`);
       setTimeout(() => setCopiedId(null), 1800);
+      setTimeout(() => setToast(null), 2400);
+    }).catch(() => {
+      setToast('클립보드 복사에 실패했습니다. 직접 선택해 복사해 주세요.');
       setTimeout(() => setToast(null), 2400);
     });
   };
@@ -470,7 +476,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="gd-pay-item" key={item.paymentId}>
                   <div className="gd-pay-row">
                     <div className="gd-pay-who">
-                      <span className="gd-pay-name">{item.studentName} 어머니</span>
+                      <span className="gd-pay-name">{item.studentName} 학부모님</span>
                       <span className="gd-pay-phone">📞 {item.parentContact}</span>
                     </div>
                     <button
