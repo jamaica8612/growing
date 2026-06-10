@@ -159,10 +159,10 @@ function getAction(payload: KakaoSkillPayload): SkillAction {
   if (ev.includes('ask_ai') || ev.includes('아이비') || ev.includes('질문')) return 'ask_ai';
   if (ev.includes('student_menu')) return 'student_menu';
 
-  // 자유 입력 텍스트 → 상담은 명시적 키워드만, 나머지는 AI로
+  // 자유 입력 텍스트 → 상담 관련 단어 포함 시 counsel로, 나머지는 AI로
   const utterance = (payload.userRequest?.utterance ?? '').trim();
   const uv = utterance.toLowerCase();
-  if (uv === '상담' || uv === '상담 요청' || uv === '💬 상담 요청') return 'counsel_request';
+  if (uv.includes('상담')) return 'counsel_request';
 
   // 3자 초과 자유 입력은 AI로 라우팅 (출결/숙제 포함)
   const isMenuWord = ['메뉴', '처음', '시작', 'start', '안녕', '안녕하세요', '하이'].includes(uv);
