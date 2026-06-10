@@ -527,6 +527,19 @@ Deno.serve(async req => {
     }
 
     if (links.length === 0) {
+      // 자유 텍스트 입력이면 상담으로 자동 접수
+      if (action === 'ask_ai') {
+        const rawMessage = payload.userRequest?.utterance?.trim() ?? '';
+        if (rawMessage) {
+          await createParentRequest(supabase, channelOwnerId, null, kakaoUserKey, 'counsel', rawMessage, payload);
+          const response = skillText('상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.', [
+            { label: '학생 연결', action: 'connect_student' },
+            { label: '💬 상담 요청', action: 'counsel_request' },
+          ]);
+          await logEvent(supabase, payload, channelOwnerId, 'counsel_queued_unlinked', response);
+          return jsonResponse(response);
+        }
+      }
       const response = skillText('안녕하세요! 그로잉영어입니다. 😊\n재원생 학부모님은 학생 연결 후 출결·숙제 확인을 이용하실 수 있어요.', [
         { label: '학생 연결', action: 'connect_student' },
         { label: '💬 상담 요청', action: 'counsel_request' },
