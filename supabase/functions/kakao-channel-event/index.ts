@@ -78,7 +78,7 @@ Deno.serve(async req => {
   const eventType = payload.event ?? 'channel_event';
 
   const now = new Date().toISOString();
-  if (eventType.includes('block') || eventType.includes('unlink')) {
+  if (eventType.includes('block') || eventType.includes('unlink') || eventType.includes('unfollow')) {
     await supabase
       .from('growing_kakao_parent_links')
       .update({ blocked_at: now })

@@ -127,7 +127,6 @@ function makeMenuReplies(studentId?: string, showSwitch = false): QuickReplyDef[
     { label: '📝 숙제 확인', action: 'homework_today', studentId },
     { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문', studentId },
     { label: '💬 상담 요청', action: 'counsel_request', studentId },
-    { label: '➕ 학생 추가 연결', action: 'connect_student' },
   ];
   if (showSwitch) replies.push({ label: '🔄 자녀 전환', action: 'student_menu' });
   replies.push({ label: '➕ 학생 추가 연결', action: 'connect_student' });
@@ -463,7 +462,7 @@ Deno.serve(async req => {
       }
 
       const student = matches[0];
-      await supabase.from('growing_kakao_parent_links').upsert({
+      const { error: upsertError } = await supabase.from('growing_kakao_parent_links').upsert({
         owner_id: channelOwnerId,
         student_id: student.id,
         kakao_user_key: kakaoUserKey,
@@ -473,6 +472,7 @@ Deno.serve(async req => {
         consent_at: new Date().toISOString(),
         blocked_at: null,
       }, { onConflict: 'owner_id,kakao_user_key,student_id' });
+      if (upsertError) throw upsertError;
 
       const allLinks = await findActiveLinks(supabase, channelOwnerId, kakaoUserKey);
       let connectResponse;
@@ -483,7 +483,7 @@ Deno.serve(async req => {
           .map(s => ({ label: s.name, action: 'student_menu', studentId: s.id }));
         connectResponse = skillText(`${student.name} 학생이 추가 연결되었습니다. 자녀를 선택해 주세요.`, pickerReplies);
       } else {
-        connectResponse = skillText(`${student.name} 학생 보호자로 연결되었습니다.\n이제 출결 확인, 숙제 확인, 아이비 질문, 상담 요청을 이용할 수 있어요.`, makeMenuReplies(student.id, links.length > 1));
+        connectResponse = skillText(`${student.name} 학생 보호자로 연결되었습니다.\n이제 출결 확인, 숙제 확인, 아이비 질문, 상담 요청을 이용할 수 있어요.`, makeMenuReplies(student.id, allLinks.length > 1));
       }
       await logEvent(supabase, payload, channelOwnerId, 'connect_success', connectResponse);
       return jsonResponse(connectResponse);
@@ -653,8 +653,15 @@ Deno.serve(async req => {
       if (error) throw error;
 
       const attendance = data as AttendanceRow | null;
-      const homeworkStatus = attendance?.homework_status ?? '';
-      const response = skillText(`${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[homeworkStatus] ?? '기록 없음'}입니다.`, makeMenuReplies(student.id, links.length > 1));
+      let hwMessage: string;
+      if (!attendance) {
+        hwMessage = `${student.name} 학생의 오늘 출결 기록이 없어 숙제 상태를 확인할 수 없습니다.`;
+      } else if (!attendance.homework_status) {
+        hwMessage = `${student.name} 학생의 오늘 숙제 상태가 아직 기록되지 않았습니다.`;
+      } else {
+        hwMessage = `${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[attendance.homework_status] ?? attendance.homework_status}입니다.`;
+      }
+      const response = skillText(hwMessage, makeMenuReplies(student.id, links.length > 1));
       await logEvent(supabase, payload, link.owner_id, 'homework_ok', response);
       return jsonResponse(response);
     }
@@ -686,7 +693,9 @@ Deno.serve(async req => {
       } catch (aiErr) {
         const msg = aiErr instanceof Error ? aiErr.message : '';
         aiAnswer = '지금은 답변이 어려워요. 학원에 직접 문의해 주시면 친절히 안내해 드리겠습니다. 😊';
-        await logEvent(supabase, payload, link.owner_id, `ask_ai_error:${msg.slice(0, 80)}`, skillText(aiAnswer, makeMenuReplies(student.id, links.length > 1))).catch(() => {});
+        const errResponse = skillText(aiAnswer, makeMenuReplies(student.id, links.length > 1));
+        await logEvent(supabase, payload, link.owner_id, `ask_ai_error:${msg.slice(0, 80)}`, errResponse).catch(() => {});
+        return jsonResponse(errResponse);
       }
 
       const response = skillText(aiAnswer, makeMenuReplies(student.id, links.length > 1));
