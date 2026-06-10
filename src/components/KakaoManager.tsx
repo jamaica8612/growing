@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, Copy, KeyRound, Link2, MessageCircle, ShieldCheck, UserX } from 'lucide-react';
 import type { KakaoChannelConfig, KakaoEventLog, KakaoParentLink, KakaoParentRequest, KakaoParentRequestStatus, Student } from '../types';
 
@@ -62,6 +62,16 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
   const [skillSecret, setSkillSecret] = useState(primaryChannel?.skillSecret || '');
   const [eventSecret, setEventSecret] = useState(primaryChannel?.eventSecret || '');
   const [enabled, setEnabled] = useState(primaryChannel?.enabled ?? true);
+  // 저장 후 props 변경 시 폼 상태 동기화
+  useEffect(() => {
+    if (!primaryChannel) return;
+    setChannelName(primaryChannel.channelName || '그로잉영어 카카오 채널');
+    setSkillSecret(primaryChannel.skillSecret || '');
+    setEventSecret(primaryChannel.eventSecret || '');
+    setEnabled(primaryChannel.enabled ?? true);
+    setAutoReply(primaryChannel.autoReply ?? true);
+  }, [primaryChannel]);
+
   const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
   const skillUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/kakao-skill` : 'Supabase URL 설정 필요';
   const eventUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/kakao-channel-event` : 'Supabase URL 설정 필요';
@@ -70,7 +80,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
   const studentById = new Map(students.map(student => [student.id, student]));
   const linkedStudentIds = new Set(links.filter(link => !link.blockedAt).map(link => link.studentId));
   const unlinkedStudents = students.filter(student => student.status === 'active' && student.parentContact && !linkedStudentIds.has(student.id));
-  const pendingRequests = requests.filter(request => request.status === 'pending');
+  const pendingRequests = requests.filter(request => request.requestType === 'counsel' && request.status === 'pending');
   const activeLinks = links.filter(link => !link.blockedAt);
   const blockedLinks = links.filter(link => link.blockedAt);
 
@@ -301,7 +311,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
             </div>
           ) : (
             <div className="ka-links">
-              {unlinkedStudents.slice(0, 8).map(student => (
+              {unlinkedStudents.map(student => (
                 <div key={student.id} className="ka-link">
                   <span className="ka-av">{student.name[0]}</span>
                   <div>

@@ -2470,7 +2470,7 @@ textarea.form-control {
 .gd-st-hw { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
 .gd-hw-lbl { font-size: 0.72rem; font-weight: 800; color: var(--color-text-secondary); flex-shrink: 0; }
 .gd-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.25rem; flex: 1; background: #eef2f0; padding: 0.2rem; border-radius: var(--radius-sm); }
-.gd-seg-b { border: none; background: none; font-size: 0.74rem; font-weight: 700; color: var(--color-text-secondary); padding: 0.3rem 0; border-radius: 6px; transition: all 0.12s; cursor: pointer; font-family: inherit; }
+.gd-seg-b { border: none; background: none; font-size: 0.74rem; font-weight: 700; color: var(--color-text-secondary); padding: 0.55rem 0.3rem; min-height: 36px; border-radius: 6px; transition: all 0.12s; cursor: pointer; font-family: inherit; }
 .gd-seg-b:hover { color: var(--color-text-primary); }
 .gd-seg-b.sel { background: #fff; box-shadow: var(--shadow-sm); }
 .gd-seg-b.sel.ok { color: #0c7a55; }
