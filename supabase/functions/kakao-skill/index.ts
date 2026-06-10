@@ -557,7 +557,7 @@ Deno.serve(async req => {
         return jsonResponse(response);
       }
 
-      const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
+      const geminiKey = Deno.env.get('GEMINI_API_KEY_CHATBOT') ?? Deno.env.get('GEMINI_API_KEY') ?? '';
       if (!geminiKey) {
         const response = skillText('AI 서비스가 아직 준비 중입니다. 학원에 직접 문의해 주세요.', MENU_REPLIES);
         await logEvent(supabase, payload, link.owner_id, 'ask_ai_no_key', response);
