@@ -55,7 +55,15 @@ const buildMakeupLine = (record: Attendance) => {
 };
 
 const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
-  const attendance = rows.map(row => attendanceStatusLabel(row.status)).join(', ') || '기록 없음';
+  const attendance = rows.map(row => {
+    const base = attendanceStatusLabel(row.status);
+    const makeupDetail = buildMakeupLine(row);
+    // 보강/보충은 출결 라인에 상세 포함, 별도 항목 중복 표시 방지
+    if ((row.status === 'makeup' || row.status === 'supplement') && makeupDetail && makeupDetail !== base) {
+      return makeupDetail;
+    }
+    return base;
+  }).join(', ') || '기록 없음';
   const checkIn = [...new Set(rows.map(row => row.checkInTime).filter(Boolean))].join(', ') || '-';
   const checkOut = [...new Set(rows.map(row => row.checkOutTime).filter(Boolean))].join(', ') || '-';
   const homework = rows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ') || '기록 없음';
