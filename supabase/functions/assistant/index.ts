@@ -208,7 +208,7 @@ const TOOL_DECLARATIONS = [
     parameters: {
       type: 'OBJECT',
       properties: {
-        studentName: { type: 'STRING', description: '특정 학생 이름(부분 검색). 생략 시 학원 전반(academy) 노트 반환.' },
+        studentName: { type: 'STRING', description: '특정 학생 이름(부분 검색). 생략 시 학원+학생 메모 전체 반환.' },
         query: { type: 'STRING', description: '내용 부분 검색어(선택)' },
       },
     },
@@ -614,8 +614,16 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         const rows = data ?? [];
         const amount = rows.reduce((sum, p: Json) => sum + (p.amount as number), 0);
         const targetLabel = student ? `${norm(student.name)} 학부모님` : '학부모님';
+        // 대량 발송용 학생 이름 목록 (AI가 누구에게 보낼지 알 수 있도록)
+        const unpaidStudentNames = student
+          ? [norm(student.name)]
+          : (() => {
+            const byId = new Map(students.map((s: Json) => [s.id, norm(s.name)]));
+            return [...new Set(rows.map((p: Json) => byId.get(p.student_id) ?? '(알수없음)'))];
+          })();
         return {
           found: true, kind, month, unpaidCount: rows.length, unpaidAmount: amount,
+          unpaidStudents: unpaidStudentNames,
           draft: compactLines([
             `${targetLabel}, 안녕하세요. 그로잉영어입니다.`,
             rows.length > 0
@@ -677,12 +685,22 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         studentId = matched[0].id as string;
       }
 
+      // 완전 일치 중복 체크
       let existingQb = sb
         .from('growing_assistant_notes').select('id')
         .eq('scope', scope).eq('content', content);
       existingQb = studentId ? existingQb.eq('student_id', studentId) : existingQb.is('student_id', null);
       const { data: existing } = await existingQb.maybeSingle();
       if (existing) return { saved: false, reason: '이미 동일한 내용이 저장되어 있습니다.' };
+
+      // 의미 유사 중복 체크 (90% 이상 유사하면 저장 생략)
+      try {
+        const { matches: similar } = await semanticSearchNotes(sb, content, studentId);
+        const tooSimilar = similar.find(m => Number(m.similarity) >= 0.90);
+        if (tooSimilar) {
+          return { saved: false, reason: '유사한 메모가 이미 존재합니다.', similar: tooSimilar.content };
+        }
+      } catch { /* 임베딩 실패 시 중복 체크 건너뜀 */ }
 
       const { data: inserted, error } = await sb.from('growing_assistant_notes').insert({
         scope, category, content,
@@ -703,12 +721,11 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
         if (matched.length === 0) return { found: false, notes: [], message: `'${studentName}' 학생 노트가 없습니다.` };
         const ids = matched.map((s: Json) => s.id as string);
         qb = qb.in('student_id', ids).eq('scope', 'student');
-      } else {
-        qb = qb.eq('scope', 'academy');
       }
+      // studentName 없으면 academy + student 전체 반환 (scope 필드 포함)
       const { data, error } = await qb;
       if (error) throw error;
-      let notes = (data ?? []).map((r: Json) => ({ category: r.category, content: r.content, createdAt: r.created_at }));
+      let notes = (data ?? []).map((r: Json) => ({ scope: r.scope, category: r.category, content: r.content, createdAt: r.created_at }));
       if (query) notes = notes.filter(n => matchName(n.content as string, query));
       return { found: true, count: notes.length, notes };
     }
@@ -730,13 +747,20 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       }
 
       const { matches, backfilled } = await semanticSearchNotes(sb, query, studentId);
+      // student_id → 이름 변환 (AI가 UUID만으로 답변 불가 문제 해결)
+      const studentIdsInMatches = [...new Set(matches.map(r => r.student_id).filter(Boolean) as string[])];
+      let matchNameById = new Map<string, string>();
+      if (studentIdsInMatches.length > 0) {
+        const students = await fetchStudents(sb);
+        matchNameById = new Map(students.map((s: Json) => [s.id as string, s.name as string]));
+      }
       return {
         found: matches.length > 0,
         count: matches.length,
         backfilled,
         matches: matches.map(r => ({
           scope: r.scope,
-          studentId: r.student_id,
+          studentName: r.student_id ? (matchNameById.get(r.student_id as string) ?? null) : null,
           category: r.category,
           content: r.content,
           createdAt: r.created_at,
@@ -813,13 +837,17 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       }
 
       const student = matched[0] as Json;
+      // status 필터 없이 조회 — 이미 완납된 경우도 정확한 메시지 제공
       const { data: payData, error: payErr } = await sb
         .from('growing_payments').select('*')
-        .eq('student_id', student.id).eq('billing_month', billingMonth).eq('status', 'unpaid').maybeSingle();
+        .eq('student_id', student.id).eq('billing_month', billingMonth).maybeSingle();
       if (payErr) throw payErr;
 
       if (!payData) {
-        return { action_proposed: false, message: `${student.name} 학생의 ${billingMonth} 미납 수납 기록을 찾지 못했습니다. 이미 완납 처리됐거나 청구 내역이 없을 수 있습니다.` };
+        return { action_proposed: false, message: `${student.name} 학생의 ${billingMonth} 수납 청구 내역이 없습니다.` };
+      }
+      if ((payData.status as string) === 'paid') {
+        return { action_proposed: false, message: `${student.name} 학생의 ${billingMonth} 수납은 이미 완납 처리되어 있습니다 (납부일: ${payData.payment_date ?? '미기록'}).` };
       }
 
       return {
@@ -900,18 +928,17 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       const tableNames = ((data ?? []) as unknown[])
         .map(row => typeof row === 'string' ? row : norm((row as Json).table_name ?? (row as Json).table))
         .filter(Boolean);
+      // table: query_table에 전달할 실제 테이블명, label: 사용자에게 보여줄 업무용 이름
       return {
-        dataSources: tableNames.map(table => labelDataSource(table)),
-        instruction: '사용자에게는 dataSources의 업무용 이름만 보여준다. 내부 테이블명은 노출하지 않는다.',
+        dataSources: tableNames.map(table => ({ table, label: labelDataSource(table) })),
       };
     }
 
     case 'query_table': {
       const table = (args.table as string) ?? '';
-      // growing_ 접두사만 허용 — 다른 앱 테이블/시스템 카탈로그 접근 차단.
-      // 데이터 격리는 각 테이블의 RLS(로그인 원장 본인 데이터)로 추가 보장된다.
-      if (!table.startsWith('growing_')) {
-        return { error: "growing_ 로 시작하는 학원 테이블만 조회할 수 있습니다." };
+      // DATA_SOURCE_LABELS allowlist — 알려지지 않은 테이블 접근 차단
+      if (!Object.prototype.hasOwnProperty.call(DATA_SOURCE_LABELS, table)) {
+        return { error: "조회할 수 없는 테이블입니다. list_data_sources로 사용 가능한 테이블을 먼저 확인하세요." };
       }
       const limit = Math.min(Math.max(Number(args.limit) || 50, 1), 200);
       const filterColumn = (args.filterColumn as string) ?? '';
@@ -940,9 +967,14 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
 // =====================================================================
 // execute_action: 승인된 action을 실제 DB에 반영
 // =====================================================================
+const VALID_ATTENDANCE_STATUSES = new Set(['present', 'absent', 'makeup']);
+
 async function executeAction(sb: SupabaseClient, action: PendingAction): Promise<Json> {
   switch (action.type) {
     case 'update_attendance': {
+      if (!VALID_ATTENDANCE_STATUSES.has(action.new_status)) {
+        return { success: false, error: '유효하지 않은 출결 상태입니다.' };
+      }
       const { error } = await sb.from('growing_attendance').update({ status: action.new_status }).eq('id', action.attendance_id);
       if (error) throw error;
       const oldKo = ATTENDANCE_KO[action.old_status] ?? action.old_status;
@@ -950,6 +982,9 @@ async function executeAction(sb: SupabaseClient, action: PendingAction): Promise
       return { success: true, message: `${action.student_name} 학생의 ${action.date} 출결을 **${oldKo} → ${newKo}**으로 변경했습니다.` };
     }
     case 'create_attendance': {
+      if (!VALID_ATTENDANCE_STATUSES.has(action.new_status)) {
+        return { success: false, error: '유효하지 않은 출결 상태입니다.' };
+      }
       const { error } = await sb.from('growing_attendance').insert({ student_id: action.student_id, date: action.date, status: action.new_status });
       if (error) throw error;
       const newKo = ATTENDANCE_KO[action.new_status] ?? action.new_status;
@@ -1050,10 +1085,10 @@ async function callGeminiRaw(contents: GeminiContent[], memory: string): Promise
   for (const model of modelChain) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemPrompt(memory) }] },
             contents,
@@ -1126,7 +1161,7 @@ async function runAgent(
       try {
         result = await execTool(sb, fc.name, fc.args ?? {});
         if (fc.name === 'list_data_sources' && Array.isArray(result.dataSources)) {
-          dataSourceNames = result.dataSources.map(item => String(item)).filter(Boolean);
+          dataSourceNames = (result.dataSources as Json[]).map(item => String((item as Json).label ?? item)).filter(Boolean);
         }
         if (result.action_proposed === true && result.action) {
           pendingAction = result.action as PendingAction;
