@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Student, Class, Attendance, Payment, DayOfWeek, HomeworkStatus } from '../types';
 import { Bell, BookOpen, Check, Clock, Copy, CreditCard, RefreshCw } from 'lucide-react';
 import { getSchedulesForDay } from '../lib/classSchedules';
+import { localToday, localMonth } from '../lib/dateUtils';
 
 /* 진행률 도넛 링 */
 function Ring({ value, total, size = 58, stroke = 7 }: { value: number; total: number; size?: number; stroke?: number }) {
@@ -43,10 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  });
+  const [selectedDate, setSelectedDate] = useState(localToday);
 
   const getKoreanDayOfWeek = (dateStr: string): DayOfWeek => {
     const days: DayOfWeek[] = ['일', '월', '화', '수', '목', '금', '토'];
@@ -62,7 +60,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     getSchedulesForDay(cls, selectedDay).map(schedule => ({ cls, schedule }))
   ).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
 
-  const currentMonthStr = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; })();
+  const currentMonthStr = localMonth();
   const currentMonthPayments = payments.filter(p => p.billingMonth === currentMonthStr);
   const unpaidCount = currentMonthPayments.filter(p => p.status === 'unpaid').length;
   const totalUnpaid = currentMonthPayments.filter(p => p.status === 'unpaid').reduce((sum, p) => sum + p.amount, 0);
