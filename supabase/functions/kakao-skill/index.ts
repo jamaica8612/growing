@@ -127,6 +127,7 @@ function makeMenuReplies(studentId?: string): QuickReplyDef[] {
     { label: '📝 숙제 확인', action: 'homework_today', studentId },
     { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문', studentId },
     { label: '💬 상담 요청', action: 'counsel_request', studentId },
+    { label: '➕ 학생 추가 연결', action: 'connect_student' },
   ];
 }
 
@@ -540,9 +541,12 @@ Deno.serve(async req => {
     // 2명 이상 연결이고 student_id 미지정 → 학생 선택 화면
     if (links.length > 1 && !selectedStudentId) {
       const allStudents = await Promise.all(links.map(l => getStudent(supabase, l.student_id)));
-      const pickerReplies = allStudents
-        .filter((s): s is StudentRow => s !== null)
-        .map(s => ({ label: s.name, action: 'student_menu', studentId: s.id }));
+      const pickerReplies: QuickReplyDef[] = [
+        ...allStudents
+          .filter((s): s is StudentRow => s !== null)
+          .map(s => ({ label: s.name, action: 'student_menu', studentId: s.id })),
+        { label: '➕ 학생 추가 연결', action: 'connect_student' },
+      ];
       const response = skillText('어떤 자녀에 대해 문의하시겠어요?', pickerReplies);
       await logEvent(supabase, payload, links[0].owner_id, 'student_picker', response);
       return jsonResponse(response);
