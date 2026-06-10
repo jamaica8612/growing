@@ -241,6 +241,7 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             payments={payments}
             onSaveAttendance={data.handleSaveAttendance}
+            pendingCounselCount={pendingCounselCount}
             onNavigate={(tab) => {
               setActiveTab(tab);
               setIsMobileMenuOpen(false);

@@ -28,7 +28,8 @@ interface DashboardProps {
   attendance: Attendance[];
   payments: Payment[];
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id' | 'memo'> & { memo?: string }) => void;
-  onNavigate?: (tab: 'attendance' | 'makeup' | 'messaging' | 'payments') => void;
+  onNavigate?: (tab: 'attendance' | 'makeup' | 'messaging' | 'payments' | 'kakao') => void;
+  pendingCounselCount?: number;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -38,6 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   payments,
   onSaveAttendance,
   onNavigate,
+  pendingCounselCount = 0,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -204,6 +206,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onChange={e => setSelectedDate(e.target.value)}
         />
       </div>
+
+      {/* ── 미처리 상담 요청 알림 ── */}
+      {pendingCounselCount > 0 && (
+        <button
+          type="button"
+          className="counsel-alert-banner"
+          onClick={() => onNavigate?.('kakao')}
+        >
+          <Bell size={16} />
+          <span>미처리 상담 요청 <strong>{pendingCounselCount}건</strong> — 확인하기</span>
+          <span className="counsel-alert-arrow">›</span>
+        </button>
+      )}
 
       {/* ── 요약 타일 4개 ── */}
       <section className="today-flow">
