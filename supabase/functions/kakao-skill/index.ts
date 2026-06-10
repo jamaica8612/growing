@@ -340,18 +340,19 @@ async function callGemini(apiKey: string, context: string, question: string): Pr
 
 ${context}`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: question }] }],
-        generationConfig: { maxOutputTokens: 600, temperature: 0.4, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    }
-  );
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: 'user', parts: [{ text: question }] }],
+    generationConfig: { maxOutputTokens: 600, temperature: 0.4, thinkingConfig: { thinkingBudget: 0 } },
+  });
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const headers = { 'Content-Type': 'application/json' };
+
+  let res = await fetch(url, { method: 'POST', headers, body });
+  if (res.status === 429) {
+    await new Promise(r => setTimeout(r, 5000));
+    res = await fetch(url, { method: 'POST', headers, body });
+  }
   if (!res.ok) {
     const err = await res.text().catch(() => '');
     throw new Error(`Gemini error ${res.status}: ${err}`);
