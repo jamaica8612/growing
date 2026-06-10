@@ -431,13 +431,27 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
       return {
         count: (classesRes.data ?? []).length,
-        classes: (classesRes.data ?? []).map((c: Json) => ({
-          name: c.name, days: c.days, startTime: c.start_time, endTime: c.end_time,
-          schedules: c.schedules ?? [],
-          tuitionFee: c.tuition_fee,
-          tuitionOverrides: c.tuition_overrides ?? {},
-          students: ((c.student_ids as string[]) ?? []).map(id => nameById.get(id)).filter(Boolean),
-        })),
+        classes: (classesRes.data ?? []).map((c: Json) => {
+          const rawSchedules = (c.schedules as Json[] | null) ?? [];
+          // 요일별 실제 시간을 scheduleByDay 맵으로 제공 — AI가 startTime/endTime(기본값)을 잘못 읽지 않도록 대체
+          const scheduleByDay: Record<string, string> = {};
+          if (rawSchedules.length > 0) {
+            for (const s of rawSchedules) {
+              scheduleByDay[(s as Json).day as string] = `${(s as Json).startTime}~${(s as Json).endTime}`;
+            }
+          } else {
+            for (const d of ((c.days as string[]) ?? [])) {
+              scheduleByDay[d as string] = `${c.start_time}~${c.end_time}`;
+            }
+          }
+          return {
+            name: c.name, days: c.days,
+            scheduleByDay,
+            tuitionFee: c.tuition_fee,
+            tuitionOverrides: c.tuition_overrides ?? {},
+            students: ((c.student_ids as string[]) ?? []).map(id => nameById.get(id)).filter(Boolean),
+          };
+        }),
       };
     }
 
