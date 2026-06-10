@@ -558,8 +558,11 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       const classes = todayClasses.map((c: Json) => {
         const ids = ((c.student_ids as string[]) ?? []).filter(id => activeIds.has(id));
         const recs = att.filter((a: Json) => ids.includes(a.student_id as string));
+        const daySched = ((c.schedules as Json[] | null) ?? []).find((s: Json) => s.day === day);
+        const st = (daySched as Json)?.startTime ?? c.start_time;
+        const et = (daySched as Json)?.endTime ?? c.end_time;
         return {
-          name: c.name, time: `${c.start_time}~${c.end_time}`,
+          name: c.name, time: `${st}~${et}`,
           studentCount: ids.length, checkedCount: recs.length,
           students: ids.map(id => {
             const r = recs.find((a: Json) => a.student_id === id) as Json | undefined;
