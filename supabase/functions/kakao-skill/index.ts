@@ -1,30 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  type KakaoSkillPayload,
+  type QuickReplyDef,
+  cleanPhone,
+  getAction,
+  getParam,
+  isCounselPlaceholder,
+  kstToday,
+  makeMenuReplies,
+  parseConnectInput,
+  skillText,
+} from './logic.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-kakao-skill-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
-type SkillAction = 'connect_student' | 'attendance_today' | 'homework_today' | 'counsel_request' | 'ask_ai' | 'menu' | 'student_menu' | 'unlink_student';
-
-interface KakaoSkillPayload {
-  intent?: { name?: string };
-  action?: {
-    params?: Record<string, string>;
-    clientExtra?: Record<string, string>;
-  };
-  userRequest?: {
-    utterance?: string;
-    user?: {
-      id?: string;
-      properties?: {
-        plusfriendUserKey?: string;
-        isFriend?: boolean;
-      };
-    };
-  };
-}
 
 interface StudentRow {
   id: string;
@@ -97,102 +89,6 @@ function getSkillSecret(req: Request): string {
   );
 }
 
-interface QuickReplyDef {
-  label: string;
-  action: string;
-  messageText?: string;
-  studentId?: string;
-}
-
-function skillText(text: string, quickReplies: QuickReplyDef[] = []) {
-  return {
-    version: '2.0',
-    template: {
-      outputs: [{ simpleText: { text } }],
-      quickReplies: quickReplies.map(reply => ({
-        label: reply.label,
-        action: 'message',
-        messageText: reply.messageText ?? reply.label,
-        extra: reply.studentId
-          ? { action: reply.action, student_id: reply.studentId }
-          : { action: reply.action },
-      })),
-    },
-  };
-}
-
-function makeMenuReplies(studentId?: string, showSwitch = false): QuickReplyDef[] {
-  const replies: QuickReplyDef[] = [
-    { label: '📅 오늘 출결', action: 'attendance_today', studentId },
-    { label: '📝 숙제 확인', action: 'homework_today', studentId },
-    { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문', studentId },
-    { label: '💬 상담 요청', action: 'counsel_request', studentId },
-  ];
-  if (showSwitch) replies.push({ label: '🔄 자녀 전환', action: 'student_menu' });
-  replies.push({ label: '➕ 학생 추가 연결', action: 'connect_student' });
-  if (studentId) replies.push({ label: '🔗 연결 해제', action: 'unlink_student', studentId });
-  return replies;
-}
-
-function cleanPhone(value: string): string {
-  return value.replace(/[^0-9]/g, '');
-}
-
-function kstToday(): string {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  return now.toISOString().slice(0, 10);
-}
-
-function getAction(payload: KakaoSkillPayload): SkillAction {
-  // Explicit action from button/block params
-  const explicit =
-    payload.action?.clientExtra?.action ||
-    payload.action?.params?.action ||
-    payload.intent?.name ||
-    '';
-  const ev = explicit.toLowerCase();
-  if (ev === 'unlink_student') return 'unlink_student';
-  if (ev.includes('connect') || ev.includes('연결')) return 'connect_student';
-  if (ev.includes('attendance') || ev.includes('출결') || ev.includes('등원')) return 'attendance_today';
-  if (ev.includes('homework') || ev.includes('숙제')) return 'homework_today';
-  if (ev.includes('counsel') || ev.includes('상담')) return 'counsel_request';
-  if (ev.includes('ask_ai') || ev.includes('아이비') || ev.includes('질문')) return 'ask_ai';
-  if (ev.includes('student_menu')) return 'student_menu';
-
-  // 자유 입력 텍스트 → 상담 관련 단어 포함 시 counsel로, 나머지는 AI로
-  const utterance = (payload.userRequest?.utterance ?? '').trim();
-  const uv = utterance.toLowerCase();
-  if (uv.includes('상담')) return 'counsel_request';
-
-  // 3자 초과 자유 입력은 AI로 라우팅 (출결/숙제 포함)
-  const isMenuWord = ['메뉴', '처음', '시작', 'start', '안녕', '안녕하세요', '하이'].includes(uv);
-  if (utterance.length > 3 && !isMenuWord) return 'ask_ai';
-
-  return 'menu';
-}
-
-function getParam(payload: KakaoSkillPayload, ...keys: string[]): string {
-  for (const key of keys) {
-    const fromParams = payload.action?.params?.[key];
-    if (fromParams) return String(fromParams).trim();
-    const fromExtra = payload.action?.clientExtra?.[key];
-    if (fromExtra) return String(fromExtra).trim();
-  }
-  return '';
-}
-
-function parseConnectInput(payload: KakaoSkillPayload) {
-  const studentName = getParam(payload, 'studentName', 'student_name', 'name', '학생명');
-  const phone = cleanPhone(getParam(payload, 'phone', 'parentPhone', 'parent_phone', '전화번호'));
-  if (studentName && phone) return { studentName, phone };
-
-  const utterance = payload.userRequest?.utterance ?? '';
-  const phoneMatch = utterance.match(/(\d{4}|\d{10,11})/);
-  const fallbackPhone = phoneMatch ? cleanPhone(phoneMatch[1]) : phone;
-  const fallbackName = studentName || utterance.replace(phoneMatch?.[1] ?? '', '').replace(/학생|연결|전화|번호|휴대폰/g, '').trim();
-  return { studentName: fallbackName, phone: fallbackPhone };
-}
-
 async function logEvent(
   supabase: ReturnType<typeof createClient>,
   payload: KakaoSkillPayload,
@@ -211,19 +107,6 @@ async function logEvent(
     raw_payload: payload,
     response_body: responseBody,
   });
-}
-
-async function findActiveLink(supabase: ReturnType<typeof createClient>, ownerId: string, kakaoUserKey: string): Promise<ParentLinkRow | null> {
-  const { data, error } = await supabase
-    .from('growing_kakao_parent_links')
-    .select('*')
-    .eq('owner_id', ownerId)
-    .eq('kakao_user_key', kakaoUserKey)
-    .is('blocked_at', null)
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data as ParentLinkRow | null;
 }
 
 async function findActiveLinks(supabase: ReturnType<typeof createClient>, ownerId: string, kakaoUserKey: string): Promise<ParentLinkRow[]> {
@@ -400,7 +283,24 @@ ${context}`;
 
 // ─────────────────────────────────────────────────────────────
 
-const MENU_REPLIES = makeMenuReplies();
+/** 직전 응답이 상담 사유 입력 안내였는지 (10분 이내) */
+async function wasRecentlyPromptedForCounsel(
+  supabase: ReturnType<typeof createClient>,
+  ownerId: string,
+  kakaoUserKey: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('growing_kakao_events')
+    .select('status, created_at')
+    .eq('owner_id', ownerId)
+    .eq('kakao_user_key', kakaoUserKey)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const row = data as { status: string; created_at: string } | null;
+  if (!row || row.status !== 'counsel_prompt') return false;
+  return Date.now() - new Date(row.created_at).getTime() < 10 * 60 * 1000;
+}
 
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -423,7 +323,7 @@ Deno.serve(async req => {
     return jsonResponse(skillText('요청 형식이 올바르지 않습니다. 학원으로 문의해 주세요.'), 400);
   }
 
-  const action = getAction(payload);
+  let action = getAction(payload);
   const kakaoUserKey = payload.userRequest?.user?.id ?? '';
   const plusfriendUserKey = payload.userRequest?.user?.properties?.plusfriendUserKey ?? '';
 
@@ -493,6 +393,11 @@ Deno.serve(async req => {
     // 링크 전체 조회 (counsel_request 포함 이후 모든 핸들러에서 사용)
     const links = await findActiveLinks(supabase, channelOwnerId, kakaoUserKey);
 
+    // 직전에 상담 사유 입력을 안내했다면, '상담' 키워드가 없는 자유 입력도 상담 접수로 처리
+    if (action === 'ask_ai' && await wasRecentlyPromptedForCounsel(supabase, channelOwnerId, kakaoUserKey)) {
+      action = 'counsel_request';
+    }
+
     // 보안: clientExtra의 student_id가 이 부모의 링크에 없으면 무시
     const rawSelectedId = payload.action?.clientExtra?.student_id;
     const selectedStudentId = rawSelectedId && links.some(l => l.student_id === rawSelectedId)
@@ -501,9 +406,8 @@ Deno.serve(async req => {
     // 상담 요청은 학생 연결 없이도 가능
     if (action === 'counsel_request') {
       const rawMessage = getParam(payload, 'message', '문의내용') || payload.userRequest?.utterance || '';
-      const isPlaceholder = !rawMessage || ['상담 요청', '💬 상담 요청'].includes(rawMessage.trim());
 
-      if (isPlaceholder) {
+      if (isCounselPlaceholder(rawMessage)) {
         const response = skillText('어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊');
         await logEvent(supabase, payload, channelOwnerId, 'counsel_prompt', response);
         return jsonResponse(response);
