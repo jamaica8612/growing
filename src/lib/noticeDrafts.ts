@@ -56,13 +56,14 @@ const buildMakeupLine = (record: Attendance) => {
 
 const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
   const attendance = rows.map(row => {
-    const base = attendanceStatusLabel(row.status);
-    const makeupDetail = buildMakeupLine(row);
-    // 보강/보충은 출결 라인에 상세 포함, 별도 항목 중복 표시 방지
-    if ((row.status === 'makeup' || row.status === 'supplement') && makeupDetail && makeupDetail !== base) {
-      return makeupDetail;
+    if (row.status === 'supplement') {
+      const mins = row.supplementMinutes ? ` ${row.supplementMinutes}분` : '';
+      return `출석 (보충${mins})`;
     }
-    return base;
+    if (row.status === 'makeup') {
+      return row.makeupForDate ? `보강 (${formatDate(row.makeupForDate)} 결석분)` : '보강';
+    }
+    return attendanceStatusLabel(row.status);
   }).join(', ') || '기록 없음';
   const checkIn = [...new Set(rows.map(row => row.checkInTime).filter(Boolean))].join(', ') || '-';
   const checkOut = [...new Set(rows.map(row => row.checkOutTime).filter(Boolean))].join(', ') || '-';
