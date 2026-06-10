@@ -57,8 +57,7 @@ const buildMakeupLine = (record: Attendance) => {
 const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
   const attendance = rows.map(row => {
     if (row.status === 'supplement') {
-      const mins = row.supplementMinutes ? ` ${row.supplementMinutes}분` : '';
-      return `출석 (보충${mins})`;
+      return '출석';
     }
     if (row.status === 'makeup') {
       return row.makeupForDate ? `보강 (${formatDate(row.makeupForDate)} 결석분)` : '보강';
