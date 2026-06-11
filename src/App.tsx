@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
+import { subscribePushNotifications } from './lib/pushNotifications';
 import { useAcademyData } from './hooks/useAcademyData';
 import { Login } from './components/Login';
 
@@ -171,6 +172,11 @@ function AcademyApp({ session }: { session: Session }) {
   const [counselNotification, setCounselNotification] = useState<{ studentName: string; message: string } | null>(null);
   const studentsRef = useRef(students);
   studentsRef.current = students;
+
+  // PWA 푸시 알림 구독 (원장님 로그인 시 한 번)
+  useEffect(() => {
+    void subscribePushNotifications(session.user.id);
+  }, [session.user.id]);
 
   // Supabase Realtime — 새 상담 요청 감지 → 아이비 알림
   useEffect(() => {

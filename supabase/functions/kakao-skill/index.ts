@@ -302,6 +302,23 @@ async function wasRecentlyPromptedForCounsel(
   return Date.now() - new Date(row.created_at).getTime() < 10 * 60 * 1000;
 }
 
+async function sendPushToOwner(ownerId: string, title: string, body: string): Promise<void> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ owner_id: ownerId, title, body, tag: 'counsel' }),
+    });
+  } catch {
+    // push failures must never interrupt the main response
+  }
+}
+
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
@@ -427,6 +444,11 @@ Deno.serve(async req => {
         : [{ label: '학생 연결', action: 'connect_student' }, { label: '💬 상담 요청', action: 'counsel_request' }];
       const response = skillText(confirmMsg, counselMenuReplies);
       await logEvent(supabase, payload, ownerId, 'counsel_queued', response);
+
+      // 원장님 폰 푸시 알림 (실패해도 응답에 영향 없음)
+      const pushTitle = counselStudentName ? `${counselStudentName} 상담 요청` : '카카오 상담 요청';
+      void sendPushToOwner(ownerId, pushTitle, rawMessage.trim().slice(0, 100));
+
       return jsonResponse(response);
     }
 
@@ -441,6 +463,7 @@ Deno.serve(async req => {
             { label: '💬 상담 요청', action: 'counsel_request' },
           ]);
           await logEvent(supabase, payload, channelOwnerId, 'counsel_queued_unlinked', response);
+          void sendPushToOwner(channelOwnerId, '카카오 상담 요청 (미연결)', rawMessage.slice(0, 100));
           return jsonResponse(response);
         }
       }
