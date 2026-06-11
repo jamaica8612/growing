@@ -362,6 +362,12 @@ export function useAcademyData(userId: string) {
       setKakaoParentRequests(prev => prev.map(req => (req.id === updated.id ? updated : req)));
     });
 
+  const handleDeleteKakaoRequest = (id: string) =>
+    guard(async () => {
+      await api.deleteKakaoParentRequest(id);
+      setKakaoParentRequests(prev => prev.filter(req => req.id !== id));
+    });
+
   const handleSaveKakaoChannel = (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }) =>
     guard(async () => {
       const saved = await api.saveKakaoChannelConfig(userId, config);
@@ -504,6 +510,7 @@ export function useAcademyData(userId: string) {
     handleDismissHomeworkAlert,
     handleClearHomeworkAlerts,
     handleKakaoRequestStatus,
+    handleDeleteKakaoRequest,
     handleSaveKakaoChannel,
     handleChangeKioskPin,
     handleSaveMessageTemplates,

@@ -383,6 +383,7 @@ function AcademyApp({ session }: { session: Session }) {
             requests={kakaoParentRequests}
             events={kakaoEventLogs}
             onUpdateRequestStatus={data.handleKakaoRequestStatus}
+            onDeleteRequest={data.handleDeleteKakaoRequest}
             onSaveChannel={data.handleSaveKakaoChannel}
           />
         );

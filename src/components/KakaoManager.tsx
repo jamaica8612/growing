@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock3, Copy, KeyRound, Link2, MessageCircle, ShieldCheck, UserX } from 'lucide-react';
+import { CheckCircle2, Clock3, Copy, KeyRound, Link2, MessageCircle, ShieldCheck, Trash2, UserX } from 'lucide-react';
 import type { KakaoChannelConfig, KakaoEventLog, KakaoParentLink, KakaoParentRequest, KakaoParentRequestStatus, Student } from '../types';
 
 interface KakaoManagerProps {
@@ -9,6 +9,7 @@ interface KakaoManagerProps {
   requests: KakaoParentRequest[];
   events: KakaoEventLog[];
   onUpdateRequestStatus: (id: string, status: KakaoParentRequestStatus) => void;
+  onDeleteRequest: (id: string) => void;
   onSaveChannel: (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }) => void;
 }
 
@@ -85,8 +86,9 @@ const makeSecret = () => {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
-export function KakaoManager({ students, channels, links, requests, events, onUpdateRequestStatus, onSaveChannel }: KakaoManagerProps) {
+export function KakaoManager({ students, channels, links, requests, events, onUpdateRequestStatus, onDeleteRequest, onSaveChannel }: KakaoManagerProps) {
   const [activeTab, setActiveTab] = useState<'inbox' | 'links' | 'settings'>('inbox');
+  const [showArchived, setShowArchived] = useState(false);
   const primaryChannel = channels[0];
   const [autoReply, setAutoReply] = useState(primaryChannel?.autoReply ?? true);
   const [channelName, setChannelName] = useState(primaryChannel?.channelName || '그로잉영어 카카오 채널');
@@ -367,45 +369,68 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
             <h3>상담/문의 요청 큐</h3>
             <p>상담 요청은 자동 발송하지 않고 원장님이 확인한 뒤 처리합니다.</p>
           </div>
-          <MessageCircle size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              className={`pay-btn ghost sm${showArchived ? ' sel' : ''}`}
+              onClick={() => setShowArchived(v => !v)}
+              style={{ fontSize: '0.78rem' }}
+            >
+              {showArchived ? '대기만 보기' : '완료/보류 포함'}
+            </button>
+            <MessageCircle size={20} />
+          </div>
         </div>
-        {requests.filter(r => r.requestType === 'counsel').length === 0 ? (
-          <div className="gd-empty">
-            <MessageCircle size={28} />
-            <span>접수된 상담 요청이 없습니다.</span>
-          </div>
-        ) : (
-          <div className="ka-inbox">
-            {requests.filter(r => r.requestType === 'counsel').map(request => {
-              const student = request.studentId ? studentById.get(request.studentId) : undefined;
-              return (
-                <article key={request.id} className={`ka-req${request.status === 'resolved' && (request.requestType === 'attendance' || request.requestType === 'homework') ? ' answered' : ''}`}>
-                  <div className="ka-req-ic">
-                    <MessageCircle size={18} />
-                  </div>
-                  <div className="ka-req-id">
-                    <b>{requestTypeLabel[request.requestType]}</b>
-                    <span className="ka-type">{student?.name ?? '미연결 학부모'}</span>
-                    <p>{request.message || '메시지 없음'}</p>
-                    <div className="ka-time">{fmtDateTime(request.createdAt)} · {maskKey(request.kakaoUserKey)}</div>
-                  </div>
-                  <div className="ka-req-acts">
-                    <span className={statusPillClass[request.status]}>{requestStatusLabel[request.status]}</span>
-                    {request.status === 'resolved' && (request.requestType === 'attendance' || request.requestType === 'homework') && (
-                      <span className="ka-done-pill">자동 처리됨</span>
-                    )}
-                    <button className="pay-btn primary sm" disabled={request.status === 'resolved'} onClick={() => onUpdateRequestStatus(request.id, 'resolved')}>
-                      완료
-                    </button>
-                    <button className="pay-btn ghost sm" disabled={request.status === 'dismissed'} onClick={() => onUpdateRequestStatus(request.id, 'dismissed')}>
-                      보류
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+        {(() => {
+          const counselRequests = requests.filter(r => r.requestType === 'counsel');
+          const visibleRequests = showArchived
+            ? counselRequests
+            : counselRequests.filter(r => r.status === 'pending' || r.status === 'drafted');
+          if (counselRequests.length === 0) return (
+            <div className="gd-empty">
+              <MessageCircle size={28} />
+              <span>접수된 상담 요청이 없습니다.</span>
+            </div>
+          );
+          if (visibleRequests.length === 0) return (
+            <div className="gd-empty">
+              <CheckCircle2 size={28} />
+              <span>대기 중인 상담 요청이 없습니다.</span>
+              <button className="pay-btn ghost sm" style={{ marginTop: '0.5rem' }} onClick={() => setShowArchived(true)}>완료/보류 포함해서 보기</button>
+            </div>
+          );
+          return (
+            <div className="ka-inbox">
+              {visibleRequests.map(request => {
+                const student = request.studentId ? studentById.get(request.studentId) : undefined;
+                return (
+                  <article key={request.id} className={`ka-req${request.status === 'resolved' || request.status === 'dismissed' ? ' answered' : ''}`}>
+                    <div className="ka-req-ic">
+                      <MessageCircle size={18} />
+                    </div>
+                    <div className="ka-req-id">
+                      <b>{requestTypeLabel[request.requestType]}</b>
+                      <span className="ka-type">{student?.name ?? '미연결 학부모'}</span>
+                      <p>{request.message || '메시지 없음'}</p>
+                      <div className="ka-time">{fmtDateTime(request.createdAt)} · {maskKey(request.kakaoUserKey)}</div>
+                    </div>
+                    <div className="ka-req-acts">
+                      <span className={statusPillClass[request.status]}>{requestStatusLabel[request.status]}</span>
+                      <button className="pay-btn primary sm" disabled={request.status === 'resolved'} onClick={() => onUpdateRequestStatus(request.id, 'resolved')}>
+                        완료
+                      </button>
+                      <button className="pay-btn ghost sm" disabled={request.status === 'dismissed'} onClick={() => onUpdateRequestStatus(request.id, 'dismissed')}>
+                        보류
+                      </button>
+                      <button className="pay-btn ghost sm" style={{ color: 'var(--color-danger)' }} onClick={() => onDeleteRequest(request.id)} title="삭제">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          );
+        })()}
       </section>
 
       <section className="gd-card">

@@ -561,6 +561,11 @@ export const api = {
     return toKakaoParentRequest(row);
   },
 
+  async deleteKakaoParentRequest(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_parent_requests').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   async saveKakaoChannelConfig(
     ownerId: string,
     config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }
