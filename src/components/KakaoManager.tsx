@@ -401,14 +401,16 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
               <span>상태</span>
               <span>사용자</span>
             </div>
-            {events.map(event => (
-              <div key={event.id} className="kakao-log-row">
-                <span>{fmtDateTime(event.createdAt)}</span>
-                <span>{event.intent || event.eventType}</span>
-                <span>{event.status}</span>
-                <span>{maskKey(event.kakaoUserKey)}</span>
-              </div>
-            ))}
+            <div className="kakao-log-body">
+              {events.map(event => (
+                <div key={event.id} className="kakao-log-row">
+                  <span>{fmtDateTime(event.createdAt)}</span>
+                  <span>{event.intent || event.eventType}</span>
+                  <span>{event.status}</span>
+                  <span>{maskKey(event.kakaoUserKey)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>

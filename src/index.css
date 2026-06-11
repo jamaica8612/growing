@@ -461,6 +461,12 @@
   overflow: hidden;
 }
 
+.kakao-log-body {
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .kakao-log-head,
 .kakao-log-row {
   display: grid;
