@@ -420,7 +420,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                             {/* 출결 상태 무관: 보강예약 토글 */}
                             {(currentStatus === 'absent' || currentStatus === 'present' || currentStatus === 'supplement') && (() => {
                               const isAbsent = currentStatus === 'absent';
-                              // 결석 상태면 현재 날짜가 결석일, 아니면 별도 입력
                               const bookingKey = `${studentId}-${cls.id}`;
                               const bookingDate = makeupBookings[bookingKey] ?? '';
                               const absentDateKey = `absent-${studentId}-${cls.id}`;
