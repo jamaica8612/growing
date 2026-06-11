@@ -120,6 +120,30 @@ export const Classes: React.FC<ClassesProps> = ({
     setFormSchedules(prev => prev.filter((_, i) => i !== index));
   };
 
+  // 요일별 학생 설정 ON/OFF 토글
+  const handleToggleDayStudents = (index: number, enable: boolean) => {
+    setFormSchedules(prev =>
+      prev.map((s, i) =>
+        i === index
+          ? { ...s, studentIds: enable ? [...formStudentIds] : undefined }
+          : s
+      )
+    );
+  };
+
+  // 요일별 학생 체크박스 토글
+  const handleDayStudentToggle = (scheduleIndex: number, studentId: string) => {
+    setFormSchedules(prev =>
+      prev.map((s, i) => {
+        if (i !== scheduleIndex || !s.studentIds) return s;
+        const next = s.studentIds.includes(studentId)
+          ? s.studentIds.filter(id => id !== studentId)
+          : [...s.studentIds, studentId];
+        return { ...s, studentIds: next };
+      })
+    );
+  };
+
   // Toggle student selection
   const handleStudentToggle = (studentId: string) => {
     if (formStudentIds.includes(studentId)) {
@@ -422,50 +446,97 @@ export const Classes: React.FC<ClassesProps> = ({
                   <label>요일별 수업 시간표 *</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.35rem' }}>
                     {formSchedules.map((schedule, index) => (
-                      <div
-                        key={`${schedule.day}-${schedule.startTime}-${index}`}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr auto',
-                          gap: '0.45rem',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <select
-                          className="form-control"
-                          value={schedule.day}
-                          onChange={e => handleScheduleChange(index, { day: e.target.value as DayOfWeek })}
-                          aria-label="수업 요일"
+                      <div key={`${schedule.day}-${schedule.startTime}-${index}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr auto',
+                            gap: '0.45rem',
+                            alignItems: 'center',
+                          }}
                         >
-                          {daysOfWeek.map(day => (
-                            <option key={day} value={day}>{day}요일</option>
-                          ))}
-                        </select>
-                        <input
-                          type="time"
-                          className="form-control"
-                          value={schedule.startTime}
-                          onChange={e => handleScheduleChange(index, { startTime: e.target.value })}
-                          aria-label="시작 시간"
-                          required
-                        />
-                        <input
-                          type="time"
-                          className="form-control"
-                          value={schedule.endTime}
-                          onChange={e => handleScheduleChange(index, { endTime: e.target.value })}
-                          aria-label="종료 시간"
-                          required
-                        />
-                        <button
-                          type="button"
-                          className="btn-icon-only"
-                          title="시간표 삭제"
-                          onClick={() => handleRemoveSchedule(index)}
-                          disabled={formSchedules.length === 1}
-                        >
-                          <X size={16} />
-                        </button>
+                          <select
+                            className="form-control"
+                            value={schedule.day}
+                            onChange={e => handleScheduleChange(index, { day: e.target.value as DayOfWeek })}
+                            aria-label="수업 요일"
+                          >
+                            {daysOfWeek.map(day => (
+                              <option key={day} value={day}>{day}요일</option>
+                            ))}
+                          </select>
+                          <input
+                            type="time"
+                            className="form-control"
+                            value={schedule.startTime}
+                            onChange={e => handleScheduleChange(index, { startTime: e.target.value })}
+                            aria-label="시작 시간"
+                            required
+                          />
+                          <input
+                            type="time"
+                            className="form-control"
+                            value={schedule.endTime}
+                            onChange={e => handleScheduleChange(index, { endTime: e.target.value })}
+                            aria-label="종료 시간"
+                            required
+                          />
+                          <button
+                            type="button"
+                            className="btn-icon-only"
+                            title="시간표 삭제"
+                            onClick={() => handleRemoveSchedule(index)}
+                            disabled={formSchedules.length === 1}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        {/* 요일별 학생 설정 */}
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--color-text-secondary)', cursor: 'pointer', paddingLeft: '0.1rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={schedule.studentIds !== undefined}
+                            onChange={e => handleToggleDayStudents(index, e.target.checked)}
+                            style={{ accentColor: 'var(--color-primary)' }}
+                          />
+                          {schedule.day}요일 학생 따로 설정
+                          {schedule.studentIds !== undefined && (
+                            <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
+                              ({schedule.studentIds.length}명)
+                            </span>
+                          )}
+                        </label>
+
+                        {schedule.studentIds !== undefined && (
+                          <div style={{
+                            marginLeft: '1.2rem',
+                            padding: '0.6rem 0.75rem',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-md)',
+                            background: '#f7faf8',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '0.4rem 1rem',
+                            fontSize: '0.82rem',
+                          }}>
+                            {activeStudents.length === 0 ? (
+                              <span style={{ color: 'var(--color-text-muted)' }}>재원생 없음</span>
+                            ) : (
+                              activeStudents.map(student => (
+                                <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={schedule.studentIds!.includes(student.id)}
+                                    onChange={() => handleDayStudentToggle(index, student.id)}
+                                    style={{ accentColor: 'var(--color-primary)' }}
+                                  />
+                                  {student.name}
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                     <button type="button" className="btn btn-secondary" onClick={handleAddSchedule} style={{ alignSelf: 'flex-start' }}>

@@ -33,6 +33,7 @@ export interface ClassSchedule {
   day: DayOfWeek;
   startTime: string;
   endTime: string;
+  studentIds?: string[]; // 설정 시 이 요일에만 적용; 미설정이면 Class.studentIds 상속
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'makeup' | 'supplement';
