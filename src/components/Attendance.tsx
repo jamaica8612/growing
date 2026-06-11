@@ -338,7 +338,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                 <span className="gd-io-lbl">🌱 등원</span>
                                 <span className="gd-io-t">{record?.checkInTime || '—'}</span>
                               </button>
-                              {record && (
+                              {record && currentStatus !== 'absent' && currentStatus !== 'makeup' && (
                                 <input
                                   type="time"
                                   className="at-time-edit"
@@ -352,7 +352,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                 <span className="gd-io-lbl">🏡 하원</span>
                                 <span className="gd-io-t">{record?.checkOutTime || '—'}</span>
                               </button>
-                              {record && (
+                              {record && currentStatus !== 'absent' && currentStatus !== 'makeup' && (
                                 <input
                                   type="time"
                                   className="at-time-edit"
