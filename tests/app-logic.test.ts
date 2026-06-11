@@ -104,6 +104,7 @@ describe('알림장 (noticeDrafts)', () => {
     expect(draft).toContain('보강 예약: 6월 15일');
   });
 
+
   it('보강 예약은 include.makeup이 false면 표시되지 않는다', () => {
     const draft = buildParentNoticeDraft(noticeInput([
       att({ status: 'absent' }),
