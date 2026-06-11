@@ -418,7 +418,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               );
                             })()}
                             {/* 출석/결석 선택 시: 보강예약 토글 */}
-                            {currentStatus === 'absent' && (() => {
+                            {(currentStatus === 'absent' || currentStatus === 'present' || currentStatus === 'supplement') && (() => {
                               const linkedMakeup = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === record?.date);
                               const bookingKey = `${studentId}-${cls.id}`;
                               const bookingDate = makeupBookings[bookingKey] ?? '';
