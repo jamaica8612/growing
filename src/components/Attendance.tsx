@@ -417,11 +417,17 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                 </div>
                               );
                             })()}
-                            {/* 결석 선택 시: 보강예약 토글 */}
-                            {currentStatus === 'absent' && (() => {
-                              const linkedMakeup = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === record?.date);
+                            {/* 출결 상태 무관: 보강예약 토글 */}
+                            {(currentStatus === 'absent' || currentStatus === 'present' || currentStatus === 'supplement') && (() => {
+                              const isAbsent = currentStatus === 'absent';
+                              // 결석 상태면 현재 날짜가 결석일, 아니면 별도 입력
                               const bookingKey = `${studentId}-${cls.id}`;
                               const bookingDate = makeupBookings[bookingKey] ?? '';
+                              const absentDateKey = `absent-${studentId}-${cls.id}`;
+                              const bookingAbsentDate = makeupBookings[absentDateKey] ?? '';
+                              const effectiveAbsentDate = isAbsent ? selectedDate : bookingAbsentDate;
+                              const linkedMakeup = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === (isAbsent ? record?.date : bookingAbsentDate));
+                              const canSave = bookingDate && effectiveAbsentDate;
                               return (
                                 <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   <button
@@ -429,28 +435,44 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                     onClick={() => {
                                       if (linkedMakeup) {
                                         onDeleteAttendance(linkedMakeup.id);
-                                        setMakeupBookings(prev => ({ ...prev, [bookingKey]: '' }));
+                                        setMakeupBookings(prev => ({ ...prev, [bookingKey]: '', [absentDateKey]: '' }));
                                       }
                                     }}
                                   >
                                     {linkedMakeup ? '✓ 보강예약' : '+ 보강예약'}
                                   </button>
                                   {!linkedMakeup && (
-                                    <input
-                                      type="date"
-                                      className="form-control"
-                                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }}
-                                      value={bookingDate}
-                                      onChange={e => {
-                                        const date = e.target.value;
-                                        setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
-                                        if (date) {
-                                          onSaveAttendance({ studentId, classId: cls.id, date, status: 'makeup', memo: '', makeupForDate: selectedDate });
-                                          // 저장 완료 후 입력값 초기화 (linkedMakeup이 나타나면 input은 숨겨지지만 stale 방지)
-                                          setMakeupBookings(prev => ({ ...prev, [bookingKey]: '' }));
-                                        }
-                                      }}
-                                    />
+                                    <>
+                                      {!isAbsent && (
+                                        <input
+                                          type="date"
+                                          className="form-control"
+                                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }}
+                                          max={selectedDate}
+                                          value={bookingAbsentDate}
+                                          placeholder="결석일"
+                                          title="결석했던 날짜"
+                                          onChange={e => setMakeupBookings(prev => ({ ...prev, [absentDateKey]: e.target.value }))}
+                                        />
+                                      )}
+                                      <input
+                                        type="date"
+                                        className="form-control"
+                                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }}
+                                        min={selectedDate}
+                                        value={bookingDate}
+                                        placeholder="보강일"
+                                        title="보강 예정 날짜"
+                                        onChange={e => {
+                                          const date = e.target.value;
+                                          setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
+                                          if (canSave || (isAbsent && date)) {
+                                            onSaveAttendance({ studentId, classId: cls.id, date, status: 'makeup', memo: '', makeupForDate: effectiveAbsentDate });
+                                            setMakeupBookings(prev => ({ ...prev, [bookingKey]: '', [absentDateKey]: '' }));
+                                          }
+                                        }}
+                                      />
+                                    </>
                                   )}
                                   {linkedMakeup && <span style={{ fontSize: '0.72rem', color: 'var(--color-info, #0369a1)' }}>{linkedMakeup.date}</span>}
                                 </div>
