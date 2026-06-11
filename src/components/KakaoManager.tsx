@@ -21,16 +21,47 @@ const requestTypeLabel: Record<KakaoParentRequest['requestType'], string> = {
 
 const requestStatusLabel: Record<KakaoParentRequestStatus, string> = {
   pending: '대기',
-  drafted: '답변 준비',
+  drafted: '대기',
   resolved: '처리 완료',
   dismissed: '보류',
 };
 
 const statusPillClass: Record<KakaoParentRequestStatus, string> = {
   pending: 'at-pill warn',
-  drafted: 'at-pill info',
+  drafted: 'at-pill warn',
   resolved: 'at-pill ok',
   dismissed: 'at-pill info',
+};
+
+const intentLabel: Record<string, string> = {
+  connect_student: '학생 연결',
+  unlink_student: '연결 해제',
+  attendance_today: '출결 확인',
+  homework_today: '숙제 확인',
+  counsel_request: '상담 요청',
+  ask_ai: '아이비 질문',
+  student_menu: '학생 메뉴',
+};
+
+const eventStatusLabel = (status: string): string => {
+  const map: Record<string, string> = {
+    connect_success: '연결 완료',
+    connect_failed: '연결 실패',
+    counsel_prompt: '상담 안내',
+    counsel_queued: '상담 접수',
+    counsel_queued_unlinked: '상담 접수(미연결)',
+    attendance_queued: '출결 답변',
+    homework_queued: '숙제 답변',
+    unverified: '미인증',
+    missing_user: '사용자 없음',
+    student_missing: '학생 없음',
+    unlink_student: '연결 해제',
+    ask_ai_no_key: 'AI 키 없음',
+  };
+  if (map[status]) return map[status];
+  if (status.startsWith('ask_ai_error')) return 'AI 오류';
+  if (status.startsWith('error:')) return '오류';
+  return status;
 };
 
 const fmtDateTime = (iso?: string) => {
@@ -363,9 +394,6 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
                     {request.status === 'resolved' && (request.requestType === 'attendance' || request.requestType === 'homework') && (
                       <span className="ka-done-pill">자동 처리됨</span>
                     )}
-                    <button className="pay-btn ghost sm" disabled={request.status === 'drafted'} onClick={() => onUpdateRequestStatus(request.id, 'drafted')}>
-                      답변 준비
-                    </button>
                     <button className="pay-btn primary sm" disabled={request.status === 'resolved'} onClick={() => onUpdateRequestStatus(request.id, 'resolved')}>
                       완료
                     </button>
@@ -402,14 +430,19 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
               <span>사용자</span>
             </div>
             <div className="kakao-log-body">
-              {events.map(event => (
-                <div key={event.id} className="kakao-log-row">
-                  <span>{fmtDateTime(event.createdAt)}</span>
-                  <span>{event.intent || event.eventType}</span>
-                  <span>{event.status}</span>
-                  <span>{maskKey(event.kakaoUserKey)}</span>
-                </div>
-              ))}
+              {events.map(event => {
+                const linkedUser = links.find(l => l.kakaoUserKey === event.kakaoUserKey);
+                const linkedStudent = linkedUser ? studentById.get(linkedUser.studentId) : undefined;
+                const userLabel = linkedStudent ? linkedStudent.name + ' 학부모' : maskKey(event.kakaoUserKey);
+                return (
+                  <div key={event.id} className="kakao-log-row">
+                    <span>{fmtDateTime(event.createdAt)}</span>
+                    <span>{intentLabel[event.intent ?? ''] || event.intent || event.eventType}</span>
+                    <span>{eventStatusLabel(event.status)}</span>
+                    <span>{userLabel}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
