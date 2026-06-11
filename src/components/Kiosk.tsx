@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import type { Student, Class } from '../types';
+import type { Student, Class, DayOfWeek } from '../types';
 import { Sprout, Home, Lock, CheckCircle, Volume2 } from 'lucide-react';
+import { getStudentIdsForDay } from '../lib/classSchedules';
 
 interface KioskProps {
   students: Student[];
@@ -24,13 +25,18 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
     return () => { try { screen.orientation.unlock(); } catch { /* ignore */ } };
   }, []);
 
+  const todayDayOfWeek = (['일', '월', '화', '수', '목', '금', '토'] as DayOfWeek[])[new Date().getDay()];
+
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
   const displayStudents = !selectedClassId
     ? activeStudents
-    : activeStudents.filter(s => classes.find(c => c.id === selectedClassId)?.studentIds.includes(s.id) ?? false);
+    : activeStudents.filter(s => {
+        const cls = classes.find(c => c.id === selectedClassId);
+        return cls ? getStudentIdsForDay(cls, todayDayOfWeek).includes(s.id) : false;
+      });
 
 
   // Web Audio API Chime sound generator (Fully self-contained, works offline!)
@@ -97,8 +103,8 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
       hour12: false,
     });
 
-    // Find class of student for today
-    const studentClasses = classes.filter(c => c.studentIds.includes(selectedStudent.id));
+    // Find class of student for today (per-day student assignment aware)
+    const studentClasses = classes.filter(c => getStudentIdsForDay(c, todayDayOfWeek).includes(selectedStudent.id));
     // Prefer the currently selected class if the student is in it
     const classId = (selectedClassId && studentClasses.some(c => c.id === selectedClassId))
       ? selectedClassId
