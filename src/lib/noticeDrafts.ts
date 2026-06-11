@@ -54,7 +54,7 @@ const buildMakeupLine = (record: Attendance) => {
   return record.supplementMinutes ? `보충 ${record.supplementMinutes}분` : '';
 };
 
-const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) => {
+const summarizeDailyNoticeFields = (rows: Attendance[], scheduledMakeupRows: Attendance[], includeMakeup: boolean) => {
   const attendance = rows.map(row => {
     if (row.status === 'supplement') {
       return '출석';
@@ -67,16 +67,28 @@ const summarizeDailyNoticeFields = (rows: Attendance[], includeMakeup: boolean) 
   const checkIn = [...new Set(rows.map(row => row.checkInTime).filter(Boolean))].join(', ') || '-';
   const checkOut = [...new Set(rows.map(row => row.checkOutTime).filter(Boolean))].join(', ') || '-';
   const homework = rows.map(row => homeworkLabel(row.homeworkStatus)).filter(label => label !== '기록 없음').join(', ') || '기록 없음';
-  const makeup = includeMakeup
-    ? rows.map(buildMakeupLine).filter(Boolean).join(', ') || '해당 없음'
-    : '해당 없음';
+
+  let makeup = '해당 없음';
+  if (includeMakeup) {
+    const parts: string[] = rows.map(buildMakeupLine).filter(Boolean);
+    if (scheduledMakeupRows.length > 0) {
+      parts.push(...scheduledMakeupRows.map(row => `보강 예약: ${formatDate(row.date)}`));
+    }
+    makeup = parts.length > 0 ? parts.join(', ') : '해당 없음';
+  }
 
   return { attendance, checkIn, checkOut, homework, makeup };
 };
 
 export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): NoticeDraftMeta => {
   const todayRows = input.attendance.filter(row => row.studentId === input.student.id && row.date === input.today);
-  const fields = summarizeDailyNoticeFields(todayRows, true);
+  const scheduledMakeupRows = input.attendance.filter(row =>
+    row.studentId === input.student.id &&
+    row.status === 'makeup' &&
+    row.makeupForDate === input.today &&
+    row.date > input.today
+  );
+  const fields = summarizeDailyNoticeFields(todayRows, scheduledMakeupRows, true);
 
   return {
     attendance: fields.attendance,
@@ -88,7 +100,13 @@ export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): No
 export const buildParentNoticeDraft = (input: NoticeDraftInput): string => {
   const { student, attendance, today, include } = input;
   const todayRows = attendance.filter(row => row.studentId === student.id && row.date === today);
-  const fields = summarizeDailyNoticeFields(todayRows, include.makeup);
+  const scheduledMakeupRows = attendance.filter(row =>
+    row.studentId === student.id &&
+    row.status === 'makeup' &&
+    row.makeupForDate === today &&
+    row.date > today
+  );
+  const fields = summarizeDailyNoticeFields(todayRows, scheduledMakeupRows, include.makeup);
   const lines = [
     '[그로잉영어]',
     `${student.name} 학생의 ${formatDate(today)} 일일 종합알림장입니다.`,
