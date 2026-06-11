@@ -2609,9 +2609,9 @@ textarea.form-control {
 .at-class-head { display: flex; align-items: center; gap: 0.55rem; margin-bottom: 0.9rem; }
 .at-table-head { display: grid; grid-template-columns: 100px 140px 164px 142px minmax(180px, 240px); gap: 0.5rem; padding: 0 0.7rem 0.5rem; font-size: 0.72rem; font-weight: 800; color: var(--color-text-muted); letter-spacing: 0.02em; border-bottom: 1px solid var(--color-border); }
 .at-rows { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.55rem; }
-.at-row { display: grid; grid-template-columns: 100px 140px 164px 142px minmax(180px, 240px); gap: 0.5rem; align-items: center; padding: 0.6rem 0.7rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: #fbfcfb; transition: border-color 0.15s, background 0.15s; }
+.at-row { display: grid; grid-template-columns: 100px 140px 164px 142px minmax(180px, 240px); gap: 0.5rem; align-items: start; padding: 0.65rem 0.7rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: #fbfcfb; transition: border-color 0.15s, background 0.15s; }
 .at-row.done { border-color: #cfe7da; background: #f7fcf9; }
-.at-cell { min-width: 0; }
+.at-cell { min-width: 0; padding-top: 0.1rem; }
 .at-who { display: flex; flex-direction: column; gap: 0.15rem; }
 .at-name { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; font-weight: 800; color: var(--color-primary-dark); flex-wrap: wrap; }
 .at-meta { font-size: 0.72rem; color: var(--color-text-muted); }
@@ -2620,7 +2620,7 @@ textarea.form-control {
 .at-pill.warn { color: #b4710a; background: #fef3c7; }
 .at-pill.danger { color: var(--color-danger); background: #fdeaea; }
 .at-pill.info { color: var(--color-info); background: #e7f0fb; }
-.at-io { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; }
+.at-io { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; align-items: start; }
 .at-seg { background: #eef2f0; }
 .at-actions { display: flex; gap: 0.3rem; }
 .at-act { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.4rem 0.35rem; font-size: 0.7rem; font-weight: 700; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: #fff; color: var(--color-text-secondary); flex: 1; justify-content: center; transition: all 0.15s; cursor: pointer; font-family: inherit; }
