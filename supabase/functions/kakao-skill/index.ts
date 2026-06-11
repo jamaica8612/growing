@@ -3,6 +3,7 @@ import {
   type KakaoSkillPayload,
   type QuickReplyDef,
   cleanPhone,
+  extractPhone,
   getAction,
   getParam,
   isCounselPlaceholder,
@@ -422,9 +423,13 @@ Deno.serve(async req => {
     // 상담 요청은 학생 연결 없이도 가능
     if (action === 'counsel_request') {
       const rawMessage = getParam(payload, 'message', '문의내용') || payload.userRequest?.utterance || '';
+      const isNewInquiry = links.length === 0;
 
       if (isCounselPlaceholder(rawMessage)) {
-        const response = skillText('어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊');
+        const promptText = isNewInquiry
+          ? '어떤 내용으로 상담을 요청하시겠어요?\n연락 가능한 전화번호도 함께 남겨주세요 😊\n\n예: 입학 문의드려요. 010-1234-5678'
+          : '어떤 내용으로 상담을 요청하시겠어요?\n간단히 입력해 주세요. 😊';
+        const response = skillText(promptText);
         await logEvent(supabase, payload, channelOwnerId, 'counsel_prompt', response);
         return jsonResponse(response);
       }
@@ -433,11 +438,20 @@ Deno.serve(async req => {
       const counselStudentName = counselStudentId
         ? (await getStudent(supabase, counselStudentId))?.name ?? null : null;
       const ownerId = links[0]?.owner_id ?? channelOwnerId;
+
+      // 신규 문의: 메시지에서 전화번호 추출해 함께 저장
+      const phone = isNewInquiry ? extractPhone(rawMessage) : '';
+      const savedMessage = phone
+        ? `[연락처: ${phone}] ${rawMessage.trim()}`
+        : rawMessage.trim();
+
       const confirmMsg = counselStudentName
         ? `${counselStudentName} 학생 상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.`
-        : '상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.';
+        : phone
+          ? `상담 요청이 접수되었습니다.\n원장님이 ${phone}으로 연락드리겠습니다.`
+          : '상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.';
 
-      await createParentRequest(supabase, ownerId, counselStudentId, kakaoUserKey, 'counsel', rawMessage.trim(), payload);
+      await createParentRequest(supabase, ownerId, counselStudentId, kakaoUserKey, 'counsel', savedMessage, payload);
       const counselMenuReplies = links.length > 0
         ? makeMenuReplies(counselStudentId ?? undefined, links.length > 1)
         : [{ label: '학생 연결', action: 'connect_student' }, { label: '💬 상담 요청', action: 'counsel_request' }];
@@ -445,8 +459,8 @@ Deno.serve(async req => {
       await logEvent(supabase, payload, ownerId, 'counsel_queued', response);
 
       // 원장님 폰 푸시 알림 (실패해도 응답에 영향 없음)
-      const pushTitle = counselStudentName ? `${counselStudentName} 상담 요청` : '카카오 상담 요청';
-      void sendPushToOwner(ownerId, pushTitle, rawMessage.trim().slice(0, 100));
+      const pushTitle = counselStudentName ? `${counselStudentName} 상담 요청` : isNewInquiry ? '신규 상담 문의' : '카카오 상담 요청';
+      void sendPushToOwner(ownerId, pushTitle, savedMessage.slice(0, 100));
 
       return jsonResponse(response);
     }
@@ -456,13 +470,18 @@ Deno.serve(async req => {
       if (action === 'ask_ai') {
         const rawMessage = payload.userRequest?.utterance?.trim() ?? '';
         if (rawMessage) {
-          await createParentRequest(supabase, channelOwnerId, null, kakaoUserKey, 'counsel', rawMessage, payload);
-          const response = skillText('상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.', [
+          const phone = extractPhone(rawMessage);
+          const savedMessage = phone ? `[연락처: ${phone}] ${rawMessage}` : rawMessage;
+          await createParentRequest(supabase, channelOwnerId, null, kakaoUserKey, 'counsel', savedMessage, payload);
+          const confirmText = phone
+            ? `상담 요청이 접수되었습니다.\n원장님이 ${phone}으로 연락드리겠습니다.`
+            : '상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.\n\n연락처를 남겨주시면 더 빨리 연락드릴 수 있어요 😊';
+          const response = skillText(confirmText, [
             { label: '학생 연결', action: 'connect_student' },
             { label: '💬 상담 요청', action: 'counsel_request' },
           ]);
           await logEvent(supabase, payload, channelOwnerId, 'counsel_queued_unlinked', response);
-          void sendPushToOwner(channelOwnerId, '카카오 상담 요청 (미연결)', rawMessage.slice(0, 100));
+          void sendPushToOwner(channelOwnerId, '신규 상담 문의', savedMessage.slice(0, 100));
           return jsonResponse(response);
         }
       }

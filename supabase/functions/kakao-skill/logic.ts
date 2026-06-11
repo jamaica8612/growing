@@ -69,6 +69,11 @@ export function cleanPhone(value: string): string {
   return value.replace(/[^0-9]/g, '');
 }
 
+export function extractPhone(text: string): string {
+  const match = text.match(/01[0-9][- ]?\d{3,4}[- ]?\d{4}/);
+  return match ? cleanPhone(match[0]) : '';
+}
+
 export function kstToday(): string {
   const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
   return now.toISOString().slice(0, 10);
