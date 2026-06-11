@@ -2459,7 +2459,7 @@ textarea.form-control {
 .gd-st-meta { display: block; font-size: 0.74rem; color: var(--color-text-muted); margin-top: 0.1rem; }
 .gd-st-status { font-size: 0.68rem; font-weight: 800; color: var(--color-accent-mint); background: #e3f6ed; padding: 0.18rem 0.45rem; border-radius: 999px; flex-shrink: 0; }
 .gd-st-inout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.5rem; }
-.gd-io { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.45rem 0.3rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: #fff; transition: all 0.15s; cursor: pointer; font-family: inherit; }
+.gd-io { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.28rem 0.3rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: #fff; transition: all 0.15s; cursor: pointer; font-family: inherit; }
 .gd-io:hover { border-color: var(--color-primary-light); }
 .gd-io-lbl { font-size: 0.74rem; font-weight: 700; color: var(--color-text-secondary); }
 .gd-io-t { font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
