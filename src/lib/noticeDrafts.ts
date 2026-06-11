@@ -61,9 +61,17 @@ const buildReservationLine = (reservation: MakeupReservation) => {
     : reservation.reason === 'supplement'
       ? '추가 보충 '
       : '';
-  const status = reservation.status === 'completed' ? '보강 완료' : '보강 예약';
-  return `${prefix}${formatDate(reservation.scheduledDate)} ${reservation.scheduledTime} ${status}`;
+  return `${prefix}${formatDate(reservation.scheduledDate)} ${reservation.scheduledTime} 보강 예약`;
 };
+
+// 알림장에는 진행 전(scheduled) 예약만 안내한다. 완료된 보강은 보강 당일의
+// 출결(makeup) 기록으로 표시되므로, 여기 포함하면 이후 매일 중복 안내된다.
+const upcomingReservations = (reservations: MakeupReservation[] | undefined, studentId: string, today: string) =>
+  (reservations ?? []).filter(row =>
+    row.studentId === studentId &&
+    row.status === 'scheduled' &&
+    row.scheduledDate >= today
+  );
 
 const buildLegacyScheduledMakeupLine = (record: Attendance) =>
   `보강 예약: ${formatDate(record.date)}`;
@@ -104,11 +112,7 @@ const summarizeDailyNoticeFields = (
 
 export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): NoticeDraftMeta => {
   const todayRows = input.attendance.filter(row => row.studentId === input.student.id && row.date === input.today);
-  const noticeReservations = (input.makeupReservations ?? []).filter(row =>
-    row.studentId === input.student.id &&
-    row.status !== 'cancelled' &&
-    (row.scheduledDate >= input.today || row.status === 'completed')
-  );
+  const noticeReservations = upcomingReservations(input.makeupReservations, input.student.id, input.today);
   const legacyScheduledMakeups = input.attendance.filter(row =>
     row.studentId === input.student.id &&
     row.status === 'makeup' &&
@@ -126,11 +130,7 @@ export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): No
 export const buildParentNoticeDraft = (input: NoticeDraftInput): string => {
   const { student, attendance, today, include } = input;
   const todayRows = attendance.filter(row => row.studentId === student.id && row.date === today);
-  const noticeReservations = (input.makeupReservations ?? []).filter(row =>
-    row.studentId === student.id &&
-    row.status !== 'cancelled' &&
-    (row.scheduledDate >= today || row.status === 'completed')
-  );
+  const noticeReservations = upcomingReservations(input.makeupReservations, student.id, today);
   const legacyScheduledMakeups = attendance.filter(row =>
     row.studentId === student.id &&
     row.status === 'makeup' &&

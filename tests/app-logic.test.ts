@@ -9,7 +9,7 @@ import {
   getClassSchedules,
   getSchedulesForDay,
 } from '../src/lib/classSchedules';
-import type { Attendance, Class, Student } from '../src/types';
+import type { Attendance, Class, MakeupReservation, Student } from '../src/types';
 
 const student: Student = {
   id: 'stu-1',
@@ -33,10 +33,25 @@ const att = (overrides: Partial<Attendance>): Attendance => ({
   ...overrides,
 });
 
-const noticeInput = (rows: Attendance[], includeMakeup = true) => ({
+const reservation = (overrides: Partial<MakeupReservation>): MakeupReservation => ({
+  id: 'res-1',
+  studentId: 'stu-1',
+  classId: 'cls-1',
+  scheduledDate: '2026-06-15',
+  scheduledTime: '17:00',
+  sourceAbsenceDate: '2026-06-10',
+  reason: 'absence',
+  memo: '',
+  status: 'scheduled',
+  createdAt: '2026-06-10T00:00:00Z',
+  ...overrides,
+});
+
+const noticeInput = (rows: Attendance[], includeMakeup = true, makeupReservations: MakeupReservation[] = []) => ({
   student,
   classes: [],
   attendance: rows,
+  makeupReservations,
   payments: [],
   counselLogs: [],
   month: '2026-06',
@@ -111,6 +126,29 @@ describe('알림장 (noticeDrafts)', () => {
     ], false));
     expect(draft).toContain('보강/보충: 해당 없음');
     expect(draft).not.toContain('보강 예약');
+  });
+
+  it('진행 전 보강 예약(MakeupReservation)이 결석일과 함께 표시된다', () => {
+    const draft = buildParentNoticeDraft(noticeInput(
+      [att({ status: 'absent' })],
+      true,
+      [reservation({})],
+    ));
+    expect(draft).toContain('6월 10일 결석분 6월 15일 17:00 보강 예약');
+  });
+
+  it('완료/취소된 예약과 지난 예약은 알림장에 표시되지 않는다', () => {
+    const draft = buildParentNoticeDraft(noticeInput(
+      [att({ status: 'present' })],
+      true,
+      [
+        reservation({ id: 'res-done', status: 'completed', scheduledDate: '2026-05-20', sourceAbsenceDate: '2026-05-15' }),
+        reservation({ id: 'res-cancel', status: 'cancelled' }),
+        reservation({ id: 'res-past', scheduledDate: '2026-06-01', sourceAbsenceDate: '2026-05-28' }),
+      ],
+    ));
+    expect(draft).not.toContain('보강 예약');
+    expect(draft).toContain('보강/보충: 해당 없음');
   });
 });
 

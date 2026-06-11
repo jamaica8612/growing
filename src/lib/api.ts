@@ -20,6 +20,8 @@ import type {
   PaymentStatus,
   CounselLogType,
   MessageLog,
+  MakeupReservation,
+  MakeupReservationStatus,
 } from '../types';
 import { type MessageTemplates, mergeTemplates } from './messageTemplates';
 import { deriveLegacyClassScheduleFields } from './classSchedules';
@@ -99,6 +101,20 @@ const toAttendance = (r: Row): Attendance => ({
   checkOutTime: (r.check_out_time as string) ?? undefined,
   makeupForDate: (r.makeup_for_date as string) ?? undefined,
   supplementMinutes: (r.supplement_minutes as number) ?? undefined,
+});
+
+const toMakeupReservation = (r: Row): MakeupReservation => ({
+  id: r.id as string,
+  studentId: r.student_id as string,
+  classId: (r.class_id as string) ?? '',
+  scheduledDate: r.scheduled_date as string,
+  scheduledTime: s(r.scheduled_time),
+  sourceAbsenceDate: (r.source_absence_date as string) ?? undefined,
+  reason: r.reason as MakeupReservation['reason'],
+  memo: s(r.memo),
+  status: r.status as MakeupReservationStatus,
+  createdAt: s(r.created_at),
+  completedAt: (r.completed_at as string) ?? undefined,
 });
 
 const toPayment = (r: Row): Payment => ({
@@ -401,6 +417,70 @@ export const api = {
 
   async deleteAttendance(id: string): Promise<void> {
     const { error } = await supabase.from('growing_attendance').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // ---- Makeup reservations ----
+  async listMakeupReservations(): Promise<MakeupReservation[]> {
+    const { data, error } = await supabase
+      .from('growing_makeup_reservations')
+      .select('*')
+      .order('scheduled_date');
+    if (error) throw error;
+    return (data ?? []).map(toMakeupReservation);
+  },
+
+  async insertMakeupReservation(r: Omit<MakeupReservation, 'id' | 'createdAt' | 'completedAt'>): Promise<MakeupReservation> {
+    const { data: row, error } = await supabase
+      .from('growing_makeup_reservations')
+      .insert({
+        student_id: r.studentId,
+        class_id: classIdParam(r.classId),
+        scheduled_date: r.scheduledDate,
+        scheduled_time: r.scheduledTime,
+        source_absence_date: orNull(r.sourceAbsenceDate),
+        reason: r.reason,
+        memo: r.memo,
+        status: r.status,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return toMakeupReservation(row);
+  },
+
+  async updateMakeupReservation(
+    id: string,
+    fields: {
+      scheduledDate: string;
+      scheduledTime: string;
+      sourceAbsenceDate?: string;
+      reason: MakeupReservation['reason'];
+      memo: string;
+      status: MakeupReservationStatus;
+      completedAt?: string;
+    }
+  ): Promise<MakeupReservation> {
+    const { data: row, error } = await supabase
+      .from('growing_makeup_reservations')
+      .update({
+        scheduled_date: fields.scheduledDate,
+        scheduled_time: fields.scheduledTime,
+        source_absence_date: orNull(fields.sourceAbsenceDate),
+        reason: fields.reason,
+        memo: fields.memo,
+        status: fields.status,
+        completed_at: orNull(fields.completedAt),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return toMakeupReservation(row);
+  },
+
+  async deleteMakeupReservation(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_makeup_reservations').delete().eq('id', id);
     if (error) throw error;
   },
 

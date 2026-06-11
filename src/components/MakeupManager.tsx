@@ -71,7 +71,21 @@ export function MakeupManager({
     return matchesSearch && matchesStatus && !hasReservation;
   });
 
-  const scheduled = summary.scheduled.filter(item => {
+  // 예약 완료 처리로 생성된 출결(makeup) 기록은 예약 카드로 이미 표시되므로
+  // 레거시(출결 기반) 목록에서 제외해 중복 표시를 막는다.
+  const reservationCoveredAbsences = useMemo(() => new Set(
+    makeupReservations
+      .filter(record => record.status !== 'cancelled' && record.sourceAbsenceDate)
+      .map(record => `${record.studentId}|${record.sourceAbsenceDate}`)
+  ), [makeupReservations]);
+  const isCoveredByReservation = (record: Attendance) =>
+    Boolean(record.makeupForDate) &&
+    reservationCoveredAbsences.has(`${record.studentId}|${record.makeupForDate}`);
+
+  const legacyScheduled = summary.scheduled.filter(item => !isCoveredByReservation(item.makeupRecord));
+  const legacyCompleted = summary.completed.filter(item => !isCoveredByReservation(item.makeupRecord));
+
+  const scheduled = legacyScheduled.filter(item => {
     const matchesSearch =
       !normalizedSearch ||
       (item.student?.name ?? '').toLowerCase().includes(normalizedSearch) ||
@@ -103,7 +117,7 @@ export function MakeupManager({
     .filter(item => item.record.status === 'completed')
     .sort((a, b) => `${b.record.completedAt ?? b.record.scheduledDate}`.localeCompare(`${a.record.completedAt ?? a.record.scheduledDate}`));
 
-  const completed = summary.completed.filter(item => {
+  const completed = legacyCompleted.filter(item => {
     const matchesSearch =
       !normalizedSearch ||
       (item.student?.name ?? '').toLowerCase().includes(normalizedSearch) ||
@@ -185,6 +199,22 @@ export function MakeupManager({
     });
     showToast('보강 예약을 저장했습니다.');
     setProcessingItem(null);
+  };
+
+  // 완료 처리: 보강 당일 출결(makeup) 기록을 만들어 출석 통계·알림장에 반영하고,
+  // 예약 상태를 완료로 바꾼다.
+  const handleCompleteReservation = (record: MakeupReservation) => {
+    onSaveAttendance({
+      studentId: record.studentId,
+      classId: record.classId,
+      date: record.scheduledDate,
+      status: 'makeup',
+      memo: record.memo || (record.sourceAbsenceDate ? `${record.sourceAbsenceDate} 결석분 보강` : '보강'),
+      homeworkStatus: '',
+      makeupForDate: record.sourceAbsenceDate,
+    });
+    onUpdateMakeupReservation(record.id, { status: 'completed' });
+    showToast('보강 완료로 기록하고 출결에 반영했습니다.');
   };
 
   const FILTERS: [Filter, string][] = [
@@ -337,8 +367,8 @@ export function MakeupManager({
             </div>
             <div className="gx-badges">
               <span className="at-pill danger">필요 {summary.needed.length}건</span>
-              <span className="at-pill warn">예정 {summary.scheduled.length + scheduledReservations.length}건</span>
-              <span className="at-pill info">완료 {summary.completed.length + completedReservations.length}건</span>
+              <span className="at-pill warn">예정 {legacyScheduled.length + scheduledReservations.length}건</span>
+              <span className="at-pill info">완료 {legacyCompleted.length + completedReservations.length}건</span>
             </div>
           </div>
 
@@ -473,7 +503,7 @@ export function MakeupManager({
                         </div>
                       </div>
                       <div className="mk-actions">
-                        <button type="button" className="pay-btn primary sm" onClick={() => onUpdateMakeupReservation(item.record.id, { status: 'completed' })}>
+                        <button type="button" className="pay-btn primary sm" onClick={() => handleCompleteReservation(item.record)}>
                           <CheckCircle2 size={14} /> 완료 처리
                         </button>
                         <button type="button" className="pay-btn ghost sm" onClick={() => onDeleteMakeupReservation(item.record.id)}>
