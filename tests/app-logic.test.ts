@@ -87,6 +87,31 @@ describe('알림장 (noticeDrafts)', () => {
     });
     expect(meta.attendance).toBe('출석');
   });
+
+  it('결석한 날 보강 예약이 있으면 표시된다', () => {
+    const draft = buildParentNoticeDraft(noticeInput([
+      att({ status: 'absent' }),
+      att({ id: 'att-2', date: '2026-06-15', status: 'makeup', makeupForDate: '2026-06-10' }),
+    ]));
+    expect(draft).toContain('보강 예약: 6월 15일');
+  });
+
+  it('출석한 날도 미래 보강 예약이 있으면 표시된다', () => {
+    const draft = buildParentNoticeDraft(noticeInput([
+      att({ status: 'present' }),
+      att({ id: 'att-2', date: '2026-06-15', status: 'makeup', makeupForDate: '2026-06-03' }),
+    ]));
+    expect(draft).toContain('보강 예약: 6월 15일');
+  });
+
+  it('보강 예약은 include.makeup이 false면 표시되지 않는다', () => {
+    const draft = buildParentNoticeDraft(noticeInput([
+      att({ status: 'absent' }),
+      att({ id: 'att-2', date: '2026-06-15', status: 'makeup', makeupForDate: '2026-06-10' }),
+    ], false));
+    expect(draft).toContain('보강/보충: 해당 없음');
+    expect(draft).not.toContain('보강 예약');
+  });
 });
 
 describe('날짜 유틸 (dateUtils)', () => {
