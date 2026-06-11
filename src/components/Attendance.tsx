@@ -443,25 +443,27 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                   {!linkedMakeup && (
                                     <>
                                       {!isAbsent && (
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                                          결석일
+                                          <input
+                                            type="date"
+                                            className="form-control"
+                                            style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '120px' }}
+                                            max={selectedDate}
+                                            value={bookingAbsentDate}
+                                            onChange={e => setMakeupBookings(prev => ({ ...prev, [absentDateKey]: e.target.value }))}
+                                          />
+                                        </label>
+                                      )}
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                                        보강예정일
                                         <input
                                           type="date"
                                           className="form-control"
-                                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }}
-                                          max={selectedDate}
-                                          value={bookingAbsentDate}
-                                          placeholder="결석일"
-                                          title="결석했던 날짜"
-                                          onChange={e => setMakeupBookings(prev => ({ ...prev, [absentDateKey]: e.target.value }))}
-                                        />
-                                      )}
-                                      <input
-                                        type="date"
-                                        className="form-control"
-                                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }}
-                                        min={selectedDate}
-                                        value={bookingDate}
-                                        placeholder="보강일"
-                                        title="보강 예정 날짜"
+                                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '120px' }}
+                                          min={selectedDate}
+                                          value={bookingDate}
+                                          title="보강 예정 날짜"
                                         onChange={e => {
                                           const date = e.target.value;
                                           setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
@@ -471,6 +473,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                           }
                                         }}
                                       />
+                                      </label>
                                     </>
                                   )}
                                   {linkedMakeup && <span style={{ fontSize: '0.72rem', color: 'var(--color-info, #0369a1)' }}>{linkedMakeup.date}</span>}
