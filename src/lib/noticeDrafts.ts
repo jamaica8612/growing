@@ -85,7 +85,6 @@ export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): No
   const scheduledMakeupRows = input.attendance.filter(row =>
     row.studentId === input.student.id &&
     row.status === 'makeup' &&
-    row.makeupForDate === input.today &&
     row.date > input.today
   );
   const fields = summarizeDailyNoticeFields(todayRows, scheduledMakeupRows, true);
@@ -103,7 +102,6 @@ export const buildParentNoticeDraft = (input: NoticeDraftInput): string => {
   const scheduledMakeupRows = attendance.filter(row =>
     row.studentId === student.id &&
     row.status === 'makeup' &&
-    row.makeupForDate === today &&
     row.date > today
   );
   const fields = summarizeDailyNoticeFields(todayRows, scheduledMakeupRows, include.makeup);
