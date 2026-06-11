@@ -308,7 +308,7 @@ function SavedExamsScreen({ exams, classes, onOpen, onNew }: { exams: ExamCard[]
         <div className="card" style={{ padding: '60px 30px', textAlign: 'center', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ width: 76, height: 76, borderRadius: 22, margin: '0 auto 20px', background: 'var(--mint-light)', display: 'grid', placeItems: 'center' }}><FileText size={34} color="var(--primary-light)" /></div>
           <h3 className="h-font" style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px' }}>아직 만든 시험이 없어요</h3>
-          <p style={{ margin: '0 0 22px', color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.6 }}>첫 시험을 만들어 볼까요?<br />지문이나 자료를 입력하면 AI 문항 생성을 도와드려요.</p>
+          <p style={{ margin: '0 0 22px', color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.6 }}>첫 시험을 만들어 볼까요?<br />지문이나 자료를 입력하면 아이비가 문항 생성을 도와드려요.</p>
           <button className="btn btn-primary btn-lg" onClick={onNew} style={{ margin: '0 auto' }}><Sparkles size={19} color="#fff" /> 첫 시험 만들기</button>
         </div>
       ) : (
