@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarCheck, CheckCircle2, Clock, Lightbulb, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { CalendarCheck, CalendarClock, CheckCircle2, Clock, Lightbulb, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { Attendance, Class, Student } from '../types';
 import { getMakeupSummary, hasMakeupForAbsence, type MakeupNeededItem } from '../lib/makeupUtils';
 import { getMakeupRecommendations } from '../lib/operationInsights';
@@ -11,7 +11,7 @@ interface MakeupManagerProps {
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
 }
 
-type Filter = 'all' | 'needed' | 'completed';
+type Filter = 'all' | 'needed' | 'scheduled' | 'completed';
 type ManagerMode = 'makeup' | 'supplement';
 
 const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
@@ -50,6 +50,15 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
       item.student.name.toLowerCase().includes(normalizedSearch) ||
       (item.class?.name ?? '').toLowerCase().includes(normalizedSearch);
     const matchesStatus = !activeOnly || item.student.status === 'active';
+    return matchesSearch && matchesStatus;
+  });
+
+  const scheduled = summary.scheduled.filter(item => {
+    const matchesSearch =
+      !normalizedSearch ||
+      (item.student?.name ?? '').toLowerCase().includes(normalizedSearch) ||
+      (item.class?.name ?? '').toLowerCase().includes(normalizedSearch);
+    const matchesStatus = !activeOnly || item.student?.status === 'active';
     return matchesSearch && matchesStatus;
   });
 
@@ -128,6 +137,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
 
   const FILTERS: [Filter, string][] = [
     ['needed', '보강 필요'],
+    ['scheduled', '보강 예정'],
     ['completed', '보강 완료'],
     ['all', '전체'],
   ];
@@ -275,6 +285,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             </div>
             <div className="gx-badges">
               <span className="at-pill danger">필요 {summary.needed.length}건</span>
+              <span className="at-pill warn">예정 {summary.scheduled.length}건</span>
               <span className="at-pill info">완료 {summary.completed.length}건</span>
             </div>
           </div>
@@ -365,6 +376,46 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
                       >
                         <CalendarCheck size={14} /> 보강 처리
                       </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── 보강 예정 카드 그리드 ── */}
+          {(filter === 'all' || filter === 'scheduled') && (
+            <section className="gd-card">
+              <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+                <CalendarClock size={18} /> 보강 예정
+                <span className="cl-count">{scheduled.length}</span>
+              </h2>
+              {scheduled.length === 0 ? (
+                <div className="gd-empty">
+                  <CalendarClock size={24} />
+                  <span>예정된 보강이 없어요</span>
+                </div>
+              ) : (
+                <div className="mk-cards">
+                  {scheduled.map(item => (
+                    <div key={item.id} className="mk-card">
+                      <div className="mk-card-head">
+                        <div>
+                          <b>{item.student?.name ?? '알 수 없는 학생'}</b>
+                          <span>{item.class?.name ?? '반 정보 없음'}</span>
+                        </div>
+                        <span className="at-pill warn">예정</span>
+                      </div>
+                      <div className="mk-grid">
+                        <div>
+                          <span>보강 예정일</span>
+                          <b>{item.makeupRecord.date}</b>
+                        </div>
+                        <div>
+                          <span>원래 결석일</span>
+                          <b>{item.makeupRecord.makeupForDate}</b>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
