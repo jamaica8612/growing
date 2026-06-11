@@ -644,6 +644,21 @@ export const api = {
   },
 
   // ---- Message logs ----
+  async saveMessageLog(log: Omit<MessageLog, 'id' | 'createdAt' | 'sentAt' | 'errorMessage'>): Promise<void> {
+    const { error } = await supabase.from('growing_message_logs').insert({
+      student_id: log.studentId ?? null,
+      alert_type: log.alertType,
+      recipient_phone: log.recipientPhone,
+      recipient_name: log.recipientName ?? null,
+      subject: log.subject,
+      message: log.message,
+      status: log.status,
+      error_message: null,
+      sent_at: log.status === 'sent' ? new Date().toISOString() : null,
+    });
+    if (error) throw error;
+  },
+
   async getMessageLogs(limit = 50): Promise<MessageLog[]> {
     const { data, error } = await supabase
       .from('growing_message_logs')

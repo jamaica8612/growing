@@ -299,6 +299,43 @@ export const Messaging: React.FC<MessagingProps> = ({
     setTimeout(() => setToast(''), 2000);
   };
 
+  const handleManualComplete = async () => {
+    if (!currentStudent || !message.trim()) return;
+    try {
+      await api.saveMessageLog({
+        studentId: currentStudent.id,
+        alertType: 'custom',
+        recipientPhone: currentStudent.parentContact,
+        recipientName: currentStudent.name,
+        subject: `그로잉영어 ${currentStudent.name} 학생 일일 종합알림장`,
+        message,
+        status: 'sent',
+      });
+      await refreshLogs();
+      showToast('수동 발송 완료로 기록했어요.');
+    } catch {
+      showToast('기록 저장에 실패했어요.');
+    }
+  };
+
+  const handleBatchManualComplete = async (draft: BatchDraft) => {
+    patchBatchDraft(draft.studentId, { status: 'sending' });
+    try {
+      await api.saveMessageLog({
+        studentId: draft.studentId,
+        alertType: 'custom',
+        recipientPhone: draft.contact,
+        recipientName: draft.name,
+        subject: `그로잉영어 ${draft.name} 학생 일일 종합알림장`,
+        message: draft.message,
+        status: 'sent',
+      });
+      patchBatchDraft(draft.studentId, { status: 'sent', selected: false });
+    } catch {
+      patchBatchDraft(draft.studentId, { status: 'failed', errorMessage: '기록 저장 실패' });
+    }
+  };
+
   const handleSendComprehensiveAlimtalk = async () => {
     if (!currentStudent || !currentStudent.parentContact || !message.trim()) return;
     if (isSingleDraftStale) return;
@@ -519,6 +556,9 @@ export const Messaging: React.FC<MessagingProps> = ({
                 ) : (
                   <button className="pay-btn ghost" disabled><Send size={15} /> 연락처 필요</button>
                 )}
+                <button className="pay-btn ghost" onClick={() => void handleManualComplete()} disabled={!currentStudent || !message.trim() || isSingleDraftStale}>
+                  <Check size={15} /> 수동 완료
+                </button>
                 <button className="pay-btn primary" onClick={() => void handleSendComprehensiveAlimtalk()} disabled={!currentStudent?.parentContact || !message.trim() || isSending || isSingleDraftStale}>
                   <Send size={15} /> {isSending ? '발송 요청 중' : '알림톡 보내기'}
                 </button>
@@ -579,6 +619,13 @@ export const Messaging: React.FC<MessagingProps> = ({
                             ) : (
                               <button className="pay-btn ghost sm" disabled>연락처 필요</button>
                             )}
+                            <button
+                              className="pay-btn ghost sm"
+                              disabled={draft.status === 'sent' || draft.status === 'sending' || isBatchSending}
+                              onClick={() => void handleBatchManualComplete(draft)}
+                            >
+                              <Check size={14} /> 수동 완료
+                            </button>
                           </div>
                         </div>
                       )}
