@@ -222,7 +222,7 @@ export const api = {
       supabase.from('growing_homework_alerts').select('*').order('created_at'),
       supabase.from('growing_kakao_parent_links').select('*').order('verified_at', { ascending: false }),
       supabase.from('growing_parent_requests').select('*').order('created_at', { ascending: false }),
-      supabase.from('growing_kakao_events').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('growing_kakao_events').select('*').order('created_at', { ascending: false }).limit(50),
       supabase.from('growing_kakao_channels').select('*').order('created_at', { ascending: false }),
       supabase.from('growing_settings').select('*').maybeSingle(),
     ]);

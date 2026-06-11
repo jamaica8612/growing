@@ -355,7 +355,6 @@ Deno.serve(async req => {
       const { studentName, phone } = parseConnectInput(payload);
       if (!studentName || !phone) {
         const response = skillText('학생 연결을 위해 학생 이름과 보호자 휴대폰 뒤 4자리를 함께 입력해 주세요.\n예: 김서윤 1234');
-        await logEvent(supabase, payload, channelOwnerId, 'connect_need_info', response);
         return jsonResponse(response);
       }
 
@@ -488,7 +487,6 @@ Deno.serve(async req => {
         { label: '🔗 연결 해제', action: 'unlink_student', studentId: targetId },
       ];
       const response = skillText(`${targetStudent.name} 학생, 무엇이 궁금하신가요?`, menuReplies);
-      await logEvent(supabase, payload, links[0].owner_id, 'student_menu', response);
       return jsonResponse(response);
     }
 
@@ -502,7 +500,6 @@ Deno.serve(async req => {
         { label: '➕ 학생 추가 연결', action: 'connect_student' },
       ];
       const response = skillText('어떤 자녀에 대해 문의하시겠어요?', pickerReplies);
-      await logEvent(supabase, payload, links[0].owner_id, 'student_picker', response);
       return jsonResponse(response);
     }
 
@@ -571,7 +568,6 @@ Deno.serve(async req => {
         ? `${student.name} 학생의 오늘 출결은 ${statusLabel[attendance.status] ?? attendance.status}입니다.\n등원: ${attendance.check_in_time ?? '기록 없음'}\n하원: ${attendance.check_out_time ?? '기록 없음'}`
         : `${student.name} 학생의 오늘 출결 기록은 아직 없습니다.`;
       const response = skillText(message, makeMenuReplies(student.id, links.length > 1));
-      await logEvent(supabase, payload, link.owner_id, 'attendance_ok', response);
       return jsonResponse(response);
     }
 
@@ -603,7 +599,6 @@ Deno.serve(async req => {
         hwMessage = `${student.name} 학생의 오늘 숙제 상태는 ${homeworkLabel[attendance.homework_status] ?? attendance.homework_status}입니다.`;
       }
       const response = skillText(hwMessage, makeMenuReplies(student.id, links.length > 1));
-      await logEvent(supabase, payload, link.owner_id, 'homework_ok', response);
       return jsonResponse(response);
     }
 
@@ -616,7 +611,6 @@ Deno.serve(async req => {
           `${student.name} 학생에 대해 궁금한 점을 자유롭게 입력해 주세요.\n\n예) 이번 달 출결 어때요?\n예) 보강 몇 번 남았나요?\n예) 숙제 잘 하고 있나요?`,
           [{ label: '◀️ 메뉴로', action: 'student_menu', studentId: student.id }],
         );
-        await logEvent(supabase, payload, link.owner_id, 'ask_ai_prompt', response);
         return jsonResponse(response);
       }
 
@@ -640,12 +634,10 @@ Deno.serve(async req => {
       }
 
       const response = skillText(aiAnswer, makeMenuReplies(student.id, links.length > 1));
-      await logEvent(supabase, payload, link.owner_id, 'ask_ai_ok', response);
       return jsonResponse(response);
     }
 
     const response = skillText('원하시는 메뉴를 선택해 주세요.', makeMenuReplies(student.id, links.length > 1));
-    await logEvent(supabase, payload, link.owner_id, 'menu', response);
     return jsonResponse(response);
   } catch (error) {
     const response = skillText('처리 중 오류가 발생했습니다. 학원으로 문의해 주세요.');
