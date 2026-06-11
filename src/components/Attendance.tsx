@@ -426,7 +426,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               const bookingAbsentDate = makeupBookings[absentDateKey] ?? '';
                               const effectiveAbsentDate = isAbsent ? selectedDate : bookingAbsentDate;
                               const linkedMakeup = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === (isAbsent ? record?.date : bookingAbsentDate));
-                              const canSave = bookingDate && effectiveAbsentDate;
                               return (
                                 <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   <button
@@ -467,7 +466,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                         onChange={e => {
                                           const date = e.target.value;
                                           setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
-                                          if (canSave || (isAbsent && date)) {
+                                          if (date && effectiveAbsentDate) {
                                             onSaveAttendance({ studentId, classId: cls.id, date, status: 'makeup', memo: '', makeupForDate: effectiveAbsentDate });
                                             setMakeupBookings(prev => ({ ...prev, [bookingKey]: '', [absentDateKey]: '' }));
                                           }
