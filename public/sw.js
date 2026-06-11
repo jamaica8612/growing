@@ -22,6 +22,31 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+self.addEventListener('push', event => {
+  const data = event.data?.json() ?? {};
+  const title = data.title || '그로잉영어';
+  const options = {
+    body: data.body || '',
+    icon: './pwa-icon.svg',
+    badge: './pwa-icon.svg',
+    tag: data.tag || 'growing-notify',
+    data: data.url ? { url: data.url } : {},
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification.data?.url || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      const existing = clients.find(c => c.url.includes(self.location.origin));
+      if (existing) return existing.focus();
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
