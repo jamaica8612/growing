@@ -54,6 +54,22 @@ export interface Attendance {
   supplementMinutes?: number;
 }
 
+export type MakeupReservationStatus = 'scheduled' | 'completed' | 'cancelled';
+
+export interface MakeupReservation {
+  id: string;
+  studentId: string;
+  classId: string;
+  scheduledDate: string; // YYYY-MM-DD
+  scheduledTime: string; // HH:MM
+  sourceAbsenceDate?: string; // YYYY-MM-DD
+  reason: 'absence' | 'supplement' | 'other';
+  memo: string;
+  status: MakeupReservationStatus;
+  createdAt: string;
+  completedAt?: string;
+}
+
 export type PaymentMethod = 'card' | 'cash' | 'transfer' | '';
 export type PaymentStatus = 'paid' | 'unpaid';
 

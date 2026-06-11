@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { subscribePushNotifications } from './lib/pushNotifications';
 import { useAcademyData } from './hooks/useAcademyData';
+import { useMakeupReservations } from './hooks/useMakeupReservations';
 import { Login } from './components/Login';
 
 // Import Tab Components
@@ -146,6 +147,7 @@ function AcademyApp({ session }: { session: Session }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const data = useAcademyData(session.user.id);
+  const makeupReservationStore = useMakeupReservations(session.user.id);
   const {
     loading,
     error,
@@ -245,9 +247,7 @@ function AcademyApp({ session }: { session: Session }) {
           <Dashboard
             students={students}
             classes={classes}
-            attendance={attendance}
             payments={payments}
-            onSaveAttendance={data.handleSaveAttendance}
             pendingCounselCount={pendingCounselCount}
             onNavigate={(tab) => {
               setActiveTab(tab);
@@ -290,6 +290,8 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             students={students}
             classes={classes}
+            makeupReservations={makeupReservationStore.reservations}
+            onSaveMakeupReservation={makeupReservationStore.saveReservation}
             onSaveAttendance={data.handleSaveAttendance}
             onDeleteAttendance={data.handleDeleteAttendance}
           />
@@ -300,6 +302,10 @@ function AcademyApp({ session }: { session: Session }) {
             attendance={attendance}
             students={students}
             classes={classes}
+            makeupReservations={makeupReservationStore.reservations}
+            onSaveMakeupReservation={makeupReservationStore.saveReservation}
+            onUpdateMakeupReservation={makeupReservationStore.updateReservation}
+            onDeleteMakeupReservation={makeupReservationStore.deleteReservation}
             onSaveAttendance={data.handleSaveAttendance}
           />
         );
@@ -364,6 +370,7 @@ function AcademyApp({ session }: { session: Session }) {
             students={students}
             classes={classes}
             attendance={attendance}
+            makeupReservations={makeupReservationStore.reservations}
             payments={payments}
             counselLogs={counselLogs}
             kioskAlerts={kioskAlerts}

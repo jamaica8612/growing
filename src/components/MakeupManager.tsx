@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CalendarCheck, CalendarClock, CheckCircle2, Clock, Lightbulb, Plus, RefreshCw, Search, X } from 'lucide-react';
-import type { Attendance, Class, Student } from '../types';
+import type { Attendance, Class, MakeupReservation, Student } from '../types';
 import { getMakeupSummary, hasMakeupForAbsence, type MakeupNeededItem } from '../lib/makeupUtils';
 import { getMakeupRecommendations } from '../lib/operationInsights';
 
@@ -8,6 +8,10 @@ interface MakeupManagerProps {
   students: Student[];
   classes: Class[];
   attendance: Attendance[];
+  makeupReservations: MakeupReservation[];
+  onSaveMakeupReservation: (reservation: Omit<MakeupReservation, 'id' | 'createdAt' | 'status' | 'completedAt'> & { id?: string; status?: MakeupReservation['status'] }) => void;
+  onUpdateMakeupReservation: (id: string, patch: Partial<MakeupReservation>) => void;
+  onDeleteMakeupReservation: (id: string) => void;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
 }
 
@@ -16,7 +20,16 @@ type ManagerMode = 'makeup' | 'supplement';
 
 const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
 
-export function MakeupManager({ students, classes, attendance, onSaveAttendance }: MakeupManagerProps) {
+export function MakeupManager({
+  students,
+  classes,
+  attendance,
+  makeupReservations,
+  onSaveMakeupReservation,
+  onUpdateMakeupReservation,
+  onDeleteMakeupReservation,
+  onSaveAttendance,
+}: MakeupManagerProps) {
   const [mode, setMode] = useState<ManagerMode>('makeup');
   const [filter, setFilter] = useState<Filter>('needed');
   const [search, setSearch] = useState('');
@@ -50,7 +63,12 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
       item.student.name.toLowerCase().includes(normalizedSearch) ||
       (item.class?.name ?? '').toLowerCase().includes(normalizedSearch);
     const matchesStatus = !activeOnly || item.student.status === 'active';
-    return matchesSearch && matchesStatus;
+    const hasReservation = makeupReservations.some(record =>
+      record.studentId === item.student.id &&
+      record.sourceAbsenceDate === item.absentRecord.date &&
+      record.status !== 'cancelled'
+    );
+    return matchesSearch && matchesStatus && !hasReservation;
   });
 
   const scheduled = summary.scheduled.filter(item => {
@@ -61,6 +79,29 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
     const matchesStatus = !activeOnly || item.student?.status === 'active';
     return matchesSearch && matchesStatus;
   });
+
+  const reservationRows = makeupReservations
+    .map(record => ({
+      record,
+      student: students.find(student => student.id === record.studentId),
+      classInfo: classes.find(cls => cls.id === record.classId),
+    }))
+    .filter(item => {
+      const matchesSearch =
+        !normalizedSearch ||
+        (item.student?.name ?? '').toLowerCase().includes(normalizedSearch) ||
+        (item.classInfo?.name ?? '').toLowerCase().includes(normalizedSearch);
+      const matchesStatus = !activeOnly || item.student?.status === 'active';
+      return matchesSearch && matchesStatus;
+    });
+
+  const scheduledReservations = reservationRows
+    .filter(item => item.record.status === 'scheduled')
+    .sort((a, b) => `${a.record.scheduledDate} ${a.record.scheduledTime}`.localeCompare(`${b.record.scheduledDate} ${b.record.scheduledTime}`));
+
+  const completedReservations = reservationRows
+    .filter(item => item.record.status === 'completed')
+    .sort((a, b) => `${b.record.completedAt ?? b.record.scheduledDate}`.localeCompare(`${a.record.completedAt ?? a.record.scheduledDate}`));
 
   const completed = summary.completed.filter(item => {
     const matchesSearch =
@@ -123,15 +164,26 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
       setProcessingItem(null);
       return;
     }
-    onSaveAttendance({
+    if (makeupReservations.some(record =>
+      record.studentId === processingItem.student.id &&
+      record.sourceAbsenceDate === processingItem.absentRecord.date &&
+      record.status !== 'cancelled'
+    )) {
+      showToast('이미 이 결석일에 예약된 보강이 있습니다.');
+      setProcessingItem(null);
+      return;
+    }
+    const cls = classes.find(item => item.id === makeupClassId);
+    onSaveMakeupReservation({
       studentId: processingItem.student.id,
       classId: makeupClassId,
-      date: makeupDate,
-      status: 'makeup',
+      scheduledDate: makeupDate,
+      scheduledTime: cls?.startTime || '17:00',
+      sourceAbsenceDate: processingItem.absentRecord.date,
+      reason: 'absence',
       memo: `${processingItem.absentRecord.date} 결석분 보강`,
-      homeworkStatus: '',
-      makeupForDate: processingItem.absentRecord.date,
     });
+    showToast('보강 예약을 저장했습니다.');
     setProcessingItem(null);
   };
 
@@ -285,8 +337,8 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             </div>
             <div className="gx-badges">
               <span className="at-pill danger">필요 {summary.needed.length}건</span>
-              <span className="at-pill warn">예정 {summary.scheduled.length}건</span>
-              <span className="at-pill info">완료 {summary.completed.length}건</span>
+              <span className="at-pill warn">예정 {summary.scheduled.length + scheduledReservations.length}건</span>
+              <span className="at-pill info">완료 {summary.completed.length + completedReservations.length}건</span>
             </div>
           </div>
 
@@ -374,7 +426,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
                         className="pay-btn primary sm"
                         onClick={() => openProcessModal(item)}
                       >
-                        <CalendarCheck size={14} /> 보강 처리
+                        <CalendarCheck size={14} /> 보강 예약
                       </button>
                     </div>
                   ))}
@@ -388,15 +440,48 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             <section className="gd-card">
               <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
                 <CalendarClock size={18} /> 보강 예정
-                <span className="cl-count">{scheduled.length}</span>
+                <span className="cl-count">{scheduled.length + scheduledReservations.length}</span>
               </h2>
-              {scheduled.length === 0 ? (
+              {scheduled.length + scheduledReservations.length === 0 ? (
                 <div className="gd-empty">
                   <CalendarClock size={24} />
                   <span>예정된 보강이 없어요</span>
                 </div>
               ) : (
                 <div className="mk-cards">
+                  {scheduledReservations.map(item => (
+                    <div key={item.record.id} className="mk-card">
+                      <div className="mk-card-head">
+                        <div>
+                          <b>{item.student?.name ?? '알 수 없는 학생'}</b>
+                          <span>{item.classInfo?.name ?? '반 정보 없음'}</span>
+                        </div>
+                        <span className="at-pill warn">예약</span>
+                      </div>
+                      <div className="mk-grid">
+                        <div>
+                          <span>보강일</span>
+                          <b>{item.record.scheduledDate} {item.record.scheduledTime}</b>
+                        </div>
+                        <div>
+                          <span>사유</span>
+                          <b>{item.record.sourceAbsenceDate ? `${item.record.sourceAbsenceDate} 결석분` : item.record.reason === 'supplement' ? '추가 보충' : '기타'}</b>
+                        </div>
+                        <div>
+                          <span>메모</span>
+                          <b>{item.record.memo || '-'}</b>
+                        </div>
+                      </div>
+                      <div className="mk-actions">
+                        <button type="button" className="pay-btn primary sm" onClick={() => onUpdateMakeupReservation(item.record.id, { status: 'completed' })}>
+                          <CheckCircle2 size={14} /> 완료 처리
+                        </button>
+                        <button type="button" className="pay-btn ghost sm" onClick={() => onDeleteMakeupReservation(item.record.id)}>
+                          <X size={14} /> 취소
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                   {scheduled.map(item => (
                     <div key={item.id} className="mk-card">
                       <div className="mk-card-head">
@@ -428,15 +513,36 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             <section className="gd-card">
               <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
                 <CheckCircle2 size={18} /> 보강 완료
-                <span className="cl-count">{completed.length}</span>
+                <span className="cl-count">{completed.length + completedReservations.length}</span>
               </h2>
-              {completed.length === 0 ? (
+              {completed.length + completedReservations.length === 0 ? (
                 <div className="gd-empty">
                   <CalendarCheck size={24} />
                   <span>완료된 보강 기록이 없어요</span>
                 </div>
               ) : (
                 <div className="mk-cards">
+                  {completedReservations.map(item => (
+                    <div key={item.record.id} className="mk-card done">
+                      <div className="mk-card-head">
+                        <div>
+                          <b>{item.student?.name ?? '알 수 없는 학생'}</b>
+                          <span>{item.classInfo?.name ?? '반 정보 없음'}</span>
+                        </div>
+                        <span className="at-pill info">완료</span>
+                      </div>
+                      <div className="mk-grid">
+                        <div>
+                          <span>보강일</span>
+                          <b>{item.record.scheduledDate} {item.record.scheduledTime}</b>
+                        </div>
+                        <div>
+                          <span>사유</span>
+                          <b>{item.record.sourceAbsenceDate ? `${item.record.sourceAbsenceDate} 결석분` : item.record.reason === 'supplement' ? '추가 보충' : '기타'}</b>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                   {completed.map(item => (
                     <div key={item.id} className="mk-card done">
                       <div className="mk-card-head">
@@ -463,12 +569,12 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
             </section>
           )}
 
-          {/* ── 보강 처리 모달 ── */}
+          {/* ── 보강 예약 모달 ── */}
           {processingItem && (
             <div className="modal-overlay" onClick={() => setProcessingItem(null)}>
               <div className="modal-content" style={{ maxWidth: 'min(480px, calc(100vw - 1.5rem))' }} onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                  <h3 className="modal-title">보강 처리</h3>
+                  <h3 className="modal-title">보강 예약</h3>
                   <button type="button" className="btn-icon-only" onClick={() => setProcessingItem(null)} aria-label="닫기">
                     <X size={18} />
                   </button>
@@ -478,7 +584,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
                   <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 2 }} />
                   <p style={{ margin: 0, fontSize: '0.92rem' }}>
                     <b>{processingItem.student.name}</b> 학생의{' '}
-                    <b>{processingItem.absentRecord.date}</b> 결석분을 보강 기록으로 연결합니다.
+                    <b>{processingItem.absentRecord.date}</b> 결석분을 보강 예약으로 연결합니다.
                   </p>
                 </div>
 
@@ -505,7 +611,7 @@ export function MakeupManager({ students, classes, attendance, onSaveAttendance 
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.83rem', marginBottom: '0.3rem' }}>보강 날짜</label>
+                      <label style={{ display: 'block', fontSize: '0.83rem', marginBottom: '0.3rem' }}>보강 예약일</label>
                       <input
                         type="date"
                         className="gd-field"

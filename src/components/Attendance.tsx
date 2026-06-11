@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus } from '../types';
-import { Calendar, Clock } from 'lucide-react';
+import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus, MakeupReservation } from '../types';
+import { Calendar, CalendarPlus, Clock, X } from 'lucide-react';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { getStudentIdsForDay } from '../lib/classSchedules';
@@ -9,6 +9,8 @@ interface AttendanceProps {
   attendance: Attendance[];
   students: Student[];
   classes: Class[];
+  makeupReservations: MakeupReservation[];
+  onSaveMakeupReservation: (reservation: Omit<MakeupReservation, 'id' | 'createdAt' | 'status' | 'completedAt'> & { id?: string; status?: MakeupReservation['status'] }) => void;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
   onDeleteAttendance: (attendanceId: string) => void;
 }
@@ -16,7 +18,6 @@ interface AttendanceProps {
 const PRIMARY_STATUS_OPTIONS: { value: EditableAttendanceStatus; label: string; tone: string }[] = [
   { value: 'present', label: '출석', tone: 'ok' },
   { value: 'absent', label: '결석', tone: 'danger' },
-  { value: 'makeup', label: '보강', tone: 'info' },
 ];
 
 const SUPPLEMENT_MINUTE_OPTIONS = Array.from({ length: 18 }, (_, index) => (index + 1) * 10);
@@ -25,6 +26,8 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   attendance,
   students,
   classes,
+  makeupReservations,
+  onSaveMakeupReservation,
   onSaveAttendance,
   onDeleteAttendance,
 }) => {
@@ -32,15 +35,19 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
-  const [makeupBookings, setMakeupBookings] = useState<Record<string, string>>({});
   const [pendingAbsent, setPendingAbsent] = useState<{ studentId: string; classId: string; date: string } | null>(null);
+  const [reservationTarget, setReservationTarget] = useState<{ studentId: string; classId: string } | null>(null);
+  const [reservationDate, setReservationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reservationTime, setReservationTime] = useState('17:00');
+  const [reservationAbsenceDate, setReservationAbsenceDate] = useState('');
+  const [reservationReason, setReservationReason] = useState<MakeupReservation['reason']>('absence');
+  const [reservationMemo, setReservationMemo] = useState('');
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   // 날짜 바뀌면 날짜 종속 로컬 상태 초기화 (이전 날 데이터가 새 날짜 기록에 섞이지 않도록)
   useEffect(() => {
     setAttendanceMemos({});
     setMakeupForDates({});
-    setMakeupBookings({});
     setPendingAbsent(null);
   }, [selectedDate]);
 
@@ -175,6 +182,31 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const handleMemoChange = (studentId: string, classId: string, memo: string) =>
     setAttendanceMemos(prev => ({ ...prev, [`${studentId}-${classId}`]: memo }));
+
+  const openReservationModal = (studentId: string, classId: string) => {
+    const cls = classes.find(item => item.id === classId);
+    const record = getAttendanceRecord(studentId, classId, selectedDate);
+    setReservationTarget({ studentId, classId });
+    setReservationDate(selectedDate);
+    setReservationTime(cls?.startTime || '17:00');
+    setReservationAbsenceDate(record?.status === 'absent' ? selectedDate : '');
+    setReservationReason(record?.status === 'absent' ? 'absence' : 'supplement');
+    setReservationMemo('');
+  };
+
+  const handleSaveReservation = () => {
+    if (!reservationTarget || !reservationDate || !reservationTime) return;
+    onSaveMakeupReservation({
+      studentId: reservationTarget.studentId,
+      classId: reservationTarget.classId,
+      scheduledDate: reservationDate,
+      scheduledTime: reservationTime,
+      sourceAbsenceDate: reservationReason === 'absence' ? reservationAbsenceDate || undefined : undefined,
+      reason: reservationReason,
+      memo: reservationMemo,
+    });
+    setReservationTarget(null);
+  };
 
   // 표시 대상 반 목록 (selectedClassId 필터)
   const targetClasses = classes.filter(cls =>
@@ -366,7 +398,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                           <div className="at-cell">
                             <span className="at-clabel">출결</span>
                             {/* 1단계: 출석 / 결석 / 보강 */}
-                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                            <div className="gd-seg at-seg" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
                               {PRIMARY_STATUS_OPTIONS.map(option => {
                                 const isActive =
                                   currentStatus === option.value ||
@@ -417,65 +449,20 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                                 </div>
                               );
                             })()}
-                            {/* 출결 상태 무관: 보강예약 토글 */}
-                            {(currentStatus === 'absent' || currentStatus === 'present' || currentStatus === 'supplement') && (() => {
-                              const isAbsent = currentStatus === 'absent';
-                              const bookingKey = `${studentId}-${cls.id}`;
-                              const bookingDate = makeupBookings[bookingKey] ?? '';
-                              const absentDateKey = `absent-${studentId}-${cls.id}`;
-                              const bookingAbsentDate = makeupBookings[absentDateKey] ?? '';
-                              const effectiveAbsentDate = isAbsent ? selectedDate : bookingAbsentDate;
-                              const linkedMakeup = attendance.find(a => a.studentId === studentId && a.classId === cls.id && a.status === 'makeup' && a.makeupForDate === (isAbsent ? record?.date : bookingAbsentDate));
+                            {(() => {
+                              const nextReservation = makeupReservations
+                                .filter(item => item.studentId === studentId && item.status === 'scheduled')
+                                .sort((a, b) => `${a.scheduledDate} ${a.scheduledTime}`.localeCompare(`${b.scheduledDate} ${b.scheduledTime}`))[0];
                               return (
-                                <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                  <button
-                                    className={`gd-seg-b at-secondary-toggle ${linkedMakeup ? 'sel info' : ''}`}
-                                    onClick={() => {
-                                      if (linkedMakeup) {
-                                        onDeleteAttendance(linkedMakeup.id);
-                                        setMakeupBookings(prev => ({ ...prev, [bookingKey]: '', [absentDateKey]: '' }));
-                                      }
-                                    }}
-                                  >
-                                    {linkedMakeup ? '✓ 보강예약' : '+ 보강예약'}
+                                <div className="at-reserve-row">
+                                  <button type="button" className="pay-btn ghost sm" onClick={() => openReservationModal(studentId, cls.id)}>
+                                    <CalendarPlus size={14} /> 보강 예약
                                   </button>
-                                  {!linkedMakeup && (
-                                    <>
-                                      {!isAbsent && (
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                          결석일
-                                          <input
-                                            type="date"
-                                            className="form-control"
-                                            style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '120px' }}
-                                            max={selectedDate}
-                                            value={bookingAbsentDate}
-                                            onChange={e => setMakeupBookings(prev => ({ ...prev, [absentDateKey]: e.target.value }))}
-                                          />
-                                        </label>
-                                      )}
-                                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                        보강예정일
-                                        <input
-                                          type="date"
-                                          className="form-control"
-                                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '120px' }}
-                                          min={selectedDate}
-                                          value={bookingDate}
-                                          title="보강 예정 날짜"
-                                        onChange={e => {
-                                          const date = e.target.value;
-                                          setMakeupBookings(prev => ({ ...prev, [bookingKey]: date }));
-                                          if (date && effectiveAbsentDate) {
-                                            onSaveAttendance({ studentId, classId: cls.id, date, status: 'makeup', memo: '', makeupForDate: effectiveAbsentDate });
-                                            setMakeupBookings(prev => ({ ...prev, [bookingKey]: '', [absentDateKey]: '' }));
-                                          }
-                                        }}
-                                      />
-                                      </label>
-                                    </>
+                                  {nextReservation && (
+                                    <span className="at-reserve-note">
+                                      예약 {nextReservation.scheduledDate} {nextReservation.scheduledTime}
+                                    </span>
                                   )}
-                                  {linkedMakeup && <span style={{ fontSize: '0.72rem', color: 'var(--color-info, #0369a1)' }}>{linkedMakeup.date}</span>}
                                 </div>
                               );
                             })()}
@@ -530,6 +517,64 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
               <div className="at-absent-modal-btns">
                 <button className="at-absent-btn cancel" onClick={() => setPendingAbsent(null)}>취소</button>
                 <button className="at-absent-btn confirm" onClick={confirmAbsentAction}>결석 처리</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {reservationTarget && (() => {
+        const s = students.find(st => st.id === reservationTarget.studentId);
+        const cls = classes.find(c => c.id === reservationTarget.classId);
+        return (
+          <div className="modal-overlay" onClick={() => setReservationTarget(null)}>
+            <div className="modal-content" style={{ maxWidth: 'min(520px, calc(100vw - 1.5rem))' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="modal-title">보강 예약</h3>
+                <button type="button" className="btn-icon-only" onClick={() => setReservationTarget(null)} aria-label="닫기">
+                  <X size={18} />
+                </button>
+              </div>
+              <div style={{ padding: '1rem 1.25rem', display: 'grid', gap: '0.75rem' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
+                  <b>{s?.name}</b>{cls ? ` (${cls.name})` : ''} 학생의 보강 일정을 예약합니다. 출결 상태는 그대로 유지됩니다.
+                </p>
+                <div className="mk-grid">
+                  <label>
+                    <span>보강일</span>
+                    <input type="date" className="gd-field" value={reservationDate} onChange={e => setReservationDate(e.target.value)} />
+                  </label>
+                  <label>
+                    <span>시간</span>
+                    <input type="time" className="gd-field" value={reservationTime} onChange={e => setReservationTime(e.target.value)} />
+                  </label>
+                  <label>
+                    <span>사유</span>
+                    <select className="gd-field" value={reservationReason} onChange={e => setReservationReason(e.target.value as MakeupReservation['reason'])}>
+                      <option value="absence">결석분 보강</option>
+                      <option value="supplement">추가 보충</option>
+                      <option value="other">기타</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>결석일</span>
+                    <input
+                      type="date"
+                      className="gd-field"
+                      value={reservationAbsenceDate}
+                      onChange={e => setReservationAbsenceDate(e.target.value)}
+                      disabled={reservationReason !== 'absence'}
+                    />
+                  </label>
+                </div>
+                <label>
+                  <span style={{ display: 'block', fontSize: '0.83rem', marginBottom: '0.3rem' }}>메모</span>
+                  <input className="gd-field" value={reservationMemo} onChange={e => setReservationMemo(e.target.value)} placeholder="예: 독해 진도 보충" />
+                </label>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="pay-btn ghost" onClick={() => setReservationTarget(null)}>취소</button>
+                <button type="button" className="pay-btn primary" onClick={handleSaveReservation}>예약 저장</button>
               </div>
             </div>
           </div>

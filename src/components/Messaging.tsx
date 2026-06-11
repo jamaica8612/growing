@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { Attendance, Class, CounselLog, HomeworkAlert, HomeworkStatus, KioskAlert, MessageLog, Payment, Student } from '../types';
+import type { Attendance, Class, CounselLog, HomeworkAlert, HomeworkStatus, KioskAlert, MakeupReservation, MessageLog, Payment, Student } from '../types';
 import { Bell, Check, CheckSquare, ChevronDown, ChevronUp, Clock, Copy, Edit3, Send, Sparkles, Square, Trash2, User, Users } from 'lucide-react';
 import { sendAlimtalk } from '../lib/alimtalk';
 import { api } from '../lib/api';
@@ -9,6 +9,7 @@ interface MessagingProps {
   students: Student[];
   classes: Class[];
   attendance: Attendance[];
+  makeupReservations: MakeupReservation[];
   payments: Payment[];
   counselLogs: CounselLog[];
   kioskAlerts: KioskAlert[];
@@ -97,6 +98,7 @@ export const Messaging: React.FC<MessagingProps> = ({
   students,
   classes,
   attendance,
+  makeupReservations,
   payments,
   counselLogs,
   kioskAlerts,
@@ -157,12 +159,13 @@ export const Messaging: React.FC<MessagingProps> = ({
       student: currentStudent,
       classes,
       attendance,
+      makeupReservations,
       payments,
       counselLogs,
       month: noticeMonth,
       today: noticeDate,
     });
-  }, [attendance, classes, counselLogs, currentStudent, noticeDate, noticeMonth, payments]);
+  }, [attendance, classes, counselLogs, currentStudent, makeupReservations, noticeDate, noticeMonth, payments]);
 
   const batchTargets = useMemo(() => {
     if (!batchClassId) return activeStudents;
@@ -182,6 +185,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     student,
     classes,
     attendance,
+    makeupReservations,
     payments,
     counselLogs,
     month: noticeMonth,

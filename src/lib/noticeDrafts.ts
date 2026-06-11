@@ -1,4 +1,4 @@
-import type { Attendance, Class, CounselLog, Payment, Student } from '../types';
+import type { Attendance, Class, CounselLog, MakeupReservation, Payment, Student } from '../types';
 
 export type NoticeIncludeKey = 'attendance' | 'homework' | 'makeup';
 
@@ -8,6 +8,7 @@ export interface NoticeDraftInput {
   student: Student;
   classes: Class[];
   attendance: Attendance[];
+  makeupReservations: MakeupReservation[];
   payments: Payment[];
   counselLogs: CounselLog[];
   month: string;
@@ -54,7 +55,25 @@ const buildMakeupLine = (record: Attendance) => {
   return record.supplementMinutes ? `보충 ${record.supplementMinutes}분` : '';
 };
 
-const summarizeDailyNoticeFields = (rows: Attendance[], scheduledMakeupRows: Attendance[], includeMakeup: boolean) => {
+const buildReservationLine = (reservation: MakeupReservation) => {
+  const prefix = reservation.sourceAbsenceDate
+    ? `${formatDate(reservation.sourceAbsenceDate)} 결석분 `
+    : reservation.reason === 'supplement'
+      ? '추가 보충 '
+      : '';
+  const status = reservation.status === 'completed' ? '보강 완료' : '보강 예약';
+  return `${prefix}${formatDate(reservation.scheduledDate)} ${reservation.scheduledTime} ${status}`;
+};
+
+const buildLegacyScheduledMakeupLine = (record: Attendance) =>
+  `보강 예약: ${formatDate(record.date)}`;
+
+const summarizeDailyNoticeFields = (
+  rows: Attendance[],
+  reservations: MakeupReservation[],
+  legacyScheduledMakeups: Attendance[],
+  includeMakeup: boolean,
+) => {
   const attendance = rows.map(row => {
     if (row.status === 'supplement') {
       return '출석';
@@ -71,8 +90,11 @@ const summarizeDailyNoticeFields = (rows: Attendance[], scheduledMakeupRows: Att
   let makeup = '해당 없음';
   if (includeMakeup) {
     const parts: string[] = rows.map(buildMakeupLine).filter(Boolean);
-    if (scheduledMakeupRows.length > 0) {
-      parts.push(...scheduledMakeupRows.map(row => `보강 예약: ${formatDate(row.date)}`));
+    if (reservations.length > 0) {
+      parts.push(...reservations.map(buildReservationLine));
+    }
+    if (legacyScheduledMakeups.length > 0) {
+      parts.push(...legacyScheduledMakeups.map(buildLegacyScheduledMakeupLine));
     }
     makeup = parts.length > 0 ? parts.join(', ') : '해당 없음';
   }
@@ -82,12 +104,17 @@ const summarizeDailyNoticeFields = (rows: Attendance[], scheduledMakeupRows: Att
 
 export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): NoticeDraftMeta => {
   const todayRows = input.attendance.filter(row => row.studentId === input.student.id && row.date === input.today);
-  const scheduledMakeupRows = input.attendance.filter(row =>
+  const noticeReservations = (input.makeupReservations ?? []).filter(row =>
+    row.studentId === input.student.id &&
+    row.status !== 'cancelled' &&
+    (row.scheduledDate >= input.today || row.status === 'completed')
+  );
+  const legacyScheduledMakeups = input.attendance.filter(row =>
     row.studentId === input.student.id &&
     row.status === 'makeup' &&
     row.date > input.today
   );
-  const fields = summarizeDailyNoticeFields(todayRows, scheduledMakeupRows, true);
+  const fields = summarizeDailyNoticeFields(todayRows, noticeReservations, legacyScheduledMakeups, true);
 
   return {
     attendance: fields.attendance,
@@ -99,12 +126,17 @@ export const getNoticeDraftMeta = (input: Omit<NoticeDraftInput, 'include'>): No
 export const buildParentNoticeDraft = (input: NoticeDraftInput): string => {
   const { student, attendance, today, include } = input;
   const todayRows = attendance.filter(row => row.studentId === student.id && row.date === today);
-  const scheduledMakeupRows = attendance.filter(row =>
+  const noticeReservations = (input.makeupReservations ?? []).filter(row =>
+    row.studentId === student.id &&
+    row.status !== 'cancelled' &&
+    (row.scheduledDate >= today || row.status === 'completed')
+  );
+  const legacyScheduledMakeups = attendance.filter(row =>
     row.studentId === student.id &&
     row.status === 'makeup' &&
     row.date > today
   );
-  const fields = summarizeDailyNoticeFields(todayRows, scheduledMakeupRows, include.makeup);
+  const fields = summarizeDailyNoticeFields(todayRows, noticeReservations, legacyScheduledMakeups, include.makeup);
   const lines = [
     '[그로잉영어]',
     `${student.name} 학생의 ${formatDate(today)} 일일 종합알림장입니다.`,
