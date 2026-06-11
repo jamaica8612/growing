@@ -3,6 +3,7 @@ import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStat
 import { Calendar, Clock } from 'lucide-react';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
+import { getStudentIdsForDay } from '../lib/classSchedules';
 
 interface AttendanceProps {
   attendance: Attendance[];
@@ -180,11 +181,16 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
     selectedClassId === 'all' || cls.id === selectedClassId
   );
 
+  const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'] as const;
+  const d = new Date(`${selectedDate}T00:00:00`);
+  const dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]})`;
+  const selectedDay = WEEKDAY_KO[d.getDay()];
+
   // 일자 요약
   const summary = useMemo(() => {
     const s = { present: 0, late: 0, absent: 0, makeup: 0, supplement: 0, unchecked: 0 };
     targetClasses.forEach(cls => {
-      cls.studentIds.filter(id => activeStudentIds.has(id)).forEach(id => {
+      getStudentIdsForDay(cls, selectedDay).filter(id => activeStudentIds.has(id)).forEach(id => {
         const r = getAttendanceRecord(id, cls.id, selectedDate);
         if (!r || (!r.checkInTime && r.status !== 'absent' && r.status !== 'makeup' && r.status !== 'supplement' && r.status !== 'late')) s.unchecked++;
         else if (r.status === 'absent') s.absent++;
@@ -195,13 +201,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       });
     });
     return s;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendance, selectedDate, targetClasses, activeStudentIds]);
-
-  const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'] as const;
-  const d = new Date(`${selectedDate}T00:00:00`);
-  const dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]})`;
-  const selectedDay = WEEKDAY_KO[d.getDay()];
+  }, [attendance, selectedDate, selectedDay, targetClasses, activeStudentIds]);
 
   // 월간 통계 데이터
   const getMonthlyReportData = () => {
@@ -279,7 +279,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         </div>
       ) : (
         targetClasses.map(cls => {
-          const activeMembers = cls.studentIds.filter(id => activeStudentIds.has(id));
+          const activeMembers = getStudentIdsForDay(cls, selectedDay).filter(id => activeStudentIds.has(id));
           const sched = cls.schedules?.find(s => s.day === selectedDay);
           const startTime = sched?.startTime ?? cls.startTime;
           const endTime = sched?.endTime ?? cls.endTime;
