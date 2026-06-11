@@ -7,6 +7,7 @@ import {
   parseConnectInput,
   skillText,
   cleanPhone,
+  extractPhone,
 } from '../supabase/functions/kakao-skill/logic.ts';
 
 const buttonPayload = (action: string, studentId?: string): KakaoSkillPayload => ({
@@ -145,5 +146,18 @@ describe('skillText', () => {
 describe('cleanPhone', () => {
   it('숫자만 남긴다', () => {
     expect(cleanPhone('010-1234-5678')).toBe('01012345678');
+  });
+});
+
+describe('extractPhone', () => {
+  it('자유 텍스트에서 전화번호 추출', () => {
+    expect(extractPhone('입학 문의드려요. 010-1234-5678')).toBe('01012345678');
+    expect(extractPhone('레벨 테스트 받고 싶어요 01098765432')).toBe('01098765432');
+    expect(extractPhone('공백 없이 01012345678입니다')).toBe('01012345678');
+  });
+
+  it('전화번호 없으면 빈 문자열', () => {
+    expect(extractPhone('입학 문의드려요')).toBe('');
+    expect(extractPhone('')).toBe('');
   });
 });
