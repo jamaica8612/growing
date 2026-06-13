@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>내친구 깜냥이 🐱</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    font-family:'Apple SD Gothic Neo','Malgun Gothic','Nanum Gothic',sans-serif;
+    background:linear-gradient(180deg,#ffe8f0 0%,#fff4e6 55%,#e8f7ff 100%);
+    user-select:none; touch-action:manipulation;
+    display:flex; flex-direction:column;
+    transition:background 0.8s;
+  }
+  body.night { background:linear-gradient(180deg,#2a2a4a 0%,#3a3a5e 60%,#4a4a6e 100%); }
+
+  /* 상단 상태바 */
+  #topbar {
+    padding:10px 14px 6px; flex-shrink:0;
+    display:flex; flex-direction:column; gap:6px;
+    z-index:20;
+  }
+  #stage-row {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    font-size:22px; font-weight:bold; color:#ff6b9d;
+  }
+  body.night #stage-row { color:#ffd6e6; }
+  #bond-count { font-size:16px; color:#ff8fab; }
+  .meter {
+    height:18px; border-radius:20px; background:rgba(255,255,255,0.6);
+    overflow:hidden; position:relative; box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .meter-fill { height:100%; border-radius:20px; transition:width 0.5s ease; }
+  .meter-label {
+    position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    font-size:12px; font-weight:bold; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.3);
+    white-space:nowrap;
+  }
+  #grow-fill { background:linear-gradient(90deg,#ffd24d,#ff9d4d); }
+  #meters-mini { display:flex; gap:8px; }
+  #meters-mini .meter { flex:1; height:14px; }
+  #full-fill { background:linear-gradient(90deg,#ffb347,#ff8c42); }
+  #happy-fill { background:linear-gradient(90deg,#ff9ec7,#ff6b9d); }
+
+  /* 무대 */
+  #stage {
+    flex:1; position:relative; display:flex; align-items:flex-end;
+    justify-content:center; overflow:hidden;
+  }
+  #catScale {
+    width:min(70vw,300px); max-width:300px;
+    margin-bottom:6vh;
+    transition:transform 0.6s cubic-bezier(.34,1.56,.64,1);
+    cursor:pointer; position:relative; z-index:5;
+  }
+  #cat-svg { width:100%; height:auto; display:block; transform-origin:center bottom; }
+  #cat-svg.breathe { animation:breathe 3.2s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{transform:scaleY(1) scaleX(1);} 50%{transform:scaleY(1.025) scaleX(0.99);} }
+  .bounce { animation:bounceA 0.5s cubic-bezier(.34,1.8,.5,1); }
+  @keyframes bounceA { 0%{transform:scale(1);} 35%{transform:scale(1.12,0.9);} 70%{transform:scale(0.96,1.05);} 100%{transform:scale(1);} }
+  .grow-pop { animation:growPop 0.9s cubic-bezier(.34,1.7,.5,1); }
+  @keyframes growPop { 0%{transform:scale(0.7);} 50%{transform:scale(1.18);} 100%{transform:scale(1);} }
+
+  #tail { transform-origin:230px 250px; animation:wag 2.4s ease-in-out infinite; }
+  @keyframes wag { 0%,100%{transform:rotate(-4deg);} 50%{transform:rotate(8deg);} }
+  #earL,#earR { transform-origin:center bottom; }
+  .ear-twitch { animation:twitch 0.4s ease; }
+  @keyframes twitch { 0%,100%{transform:rotate(0);} 50%{transform:rotate(-8deg);} }
+
+  /* 말풍선 */
+  #speech {
+    position:absolute; top:6%; left:50%; transform:translateX(-50%) scale(0.8);
+    background:#fff; border:3px solid #ffb3cc; border-radius:24px;
+    padding:12px 22px; font-size:21px; font-weight:bold; color:#ff5c8a;
+    max-width:80vw; text-align:center; white-space:pre-line; line-height:1.35;
+    box-shadow:0 6px 18px rgba(255,107,157,0.25); opacity:0; pointer-events:none;
+    transition:opacity .25s, transform .25s; z-index:30;
+  }
+  #speech.show { opacity:1; transform:translateX(-50%) scale(1); }
+  #speech::after {
+    content:''; position:absolute; bottom:-14px; left:50%; transform:translateX(-50%);
+    border-width:14px 12px 0 12px; border-style:solid;
+    border-color:#ffb3cc transparent transparent transparent;
+  }
+
+  /* Zzz */
+  #zzz { position:absolute; top:18%; left:62%; font-size:34px; opacity:0; z-index:8; }
+  #zzz.show { animation:zzzFloat 2.2s ease-in-out infinite; }
+  @keyframes zzzFloat { 0%{opacity:0; transform:translateY(0) scale(0.6);} 30%{opacity:1;} 100%{opacity:0; transform:translateY(-50px) scale(1.2);} }
+
+  /* 하단 버튼 */
+  #actions {
+    flex-shrink:0; padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+    display:grid; grid-template-columns:repeat(6,1fr); gap:6px;
+    background:rgba(255,255,255,0.45); backdrop-filter:blur(6px); z-index:20;
+  }
+  .btn {
+    border:none; background:#fff; border-radius:18px; padding:8px 2px 6px;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    box-shadow:0 3px 8px rgba(0,0,0,0.1); cursor:pointer;
+    transition:transform .1s;
+  }
+  .btn:active { transform:scale(0.9); }
+  .btn .ico { font-size:30px; line-height:1; }
+  .btn .lbl { font-size:13px; font-weight:bold; color:#ff6b9d; }
+  @media (max-width:380px){ .btn .ico{font-size:25px;} .btn .lbl{font-size:11px;} }
+
+  /* 이펙트 */
+  .heart { position:fixed; pointer-events:none; font-size:28px; z-index:50; animation:heartUp 1s ease-out forwards; }
+  @keyframes heartUp { 0%{transform:translate(-50%,-50%) scale(0.5); opacity:1;} 100%{transform:translate(calc(-50% + var(--hx)),-130px) scale(1.3); opacity:0;} }
+  .bubble-fx { position:fixed; pointer-events:none; border-radius:50%; background:rgba(180,230,255,0.7); border:2px solid #bce4ff; z-index:50; animation:bubbleUp 1.3s ease-out forwards; }
+  @keyframes bubbleUp { 0%{transform:translateY(0) scale(0.5); opacity:1;} 100%{transform:translateY(-160px) scale(1.2); opacity:0;} }
+  .star-fx { position:fixed; pointer-events:none; font-size:24px; z-index:50; animation:starPop 0.9s ease-out forwards; }
+  @keyframes starPop { 0%{transform:translate(-50%,-50%) scale(0); opacity:1;} 60%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy))) scale(1.3); opacity:1;} 100%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy))) scale(0.4); opacity:0;} }
+
+  #toy { position:fixed; font-size:46px; pointer-events:none; z-index:40; transform:translate(-50%,-50%); display:none; filter:drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+  #toy.show { display:block; }
+
+  /* 성장 축하 오버레이 */
+  #grow-celeb {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    z-index:200; opacity:0; pointer-events:none;
+  }
+  #grow-celeb.active { animation:celebShow 2.8s ease-out forwards; }
+  @keyframes celebShow { 0%{opacity:0;} 12%{opacity:1;} 80%{opacity:1;} 100%{opacity:0;} }
+  #grow-celeb .box {
+    background:rgba(255,107,157,0.92); color:#fff; padding:26px 36px; border-radius:28px;
+    font-size:34px; font-weight:bold; text-align:center; line-height:1.5; white-space:pre-line;
+    box-shadow:0 10px 40px rgba(255,107,157,0.5), 0 0 60px rgba(255,210,100,0.4);
+  }
+  .confetti { position:fixed; width:13px; height:13px; border-radius:3px; pointer-events:none; z-index:210; animation:confFall var(--cd) ease-in forwards; }
+  @keyframes confFall { 0%{transform:translateY(-40px) rotate(0); opacity:1;} 100%{transform:translateY(110vh) rotate(540deg) translateX(var(--cx)); opacity:0;} }
+
+  /* 홈 버튼 */
+  #home { position:fixed; top:8px; left:10px; z-index:60; background:rgba(255,255,255,0.85);
+    border:none; border-radius:50%; width:42px; height:42px; font-size:22px; cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.15); }
+</style>
+</head>
+<body>
+
+<a id="home" href="./play.html" style="display:flex;align-items:center;justify-content:center;text-decoration:none;">🏠</a>
+
+<div id="topbar">
+  <div id="stage-row">
+    <span id="stage-emoji">🐾</span>
+    <span id="stage-name">아기 깜냥이</span>
+    <span id="bond-count">💕0</span>
+  </div>
+  <div class="meter">
+    <div id="grow-fill" class="meter-fill" style="width:0%"></div>
+    <div class="meter-label" id="grow-label">자라는 중...</div>
+  </div>
+  <div id="meters-mini">
+    <div class="meter"><div id="full-fill" class="meter-fill" style="width:80%"></div><div class="meter-label">🍚 배부름</div></div>
+    <div class="meter"><div id="happy-fill" class="meter-fill" style="width:80%"></div><div class="meter-label">💛 행복</div></div>
+  </div>
+</div>
+
+<div id="stage">
+  <div id="speech"></div>
+  <div id="zzz">💤</div>
+  <div id="catScale">
+    <svg id="cat-svg" class="breathe" viewBox="0 0 300 340" xmlns="http://www.w3.org/2000/svg">
+      <!-- 꼬리 -->
+      <path id="tail" d="M222,258 q62,-6 60,-78 q-2,-44 -40,-50 q26,16 24,52 q-2,44 -50,52 z" fill="#33333f"/>
+      <!-- 몸통 -->
+      <ellipse cx="150" cy="262" rx="80" ry="64" fill="#33333f"/>
+      <ellipse cx="150" cy="282" rx="50" ry="40" fill="#45454f"/>
+      <!-- 앞발 -->
+      <ellipse cx="116" cy="316" rx="24" ry="15" fill="#33333f"/>
+      <ellipse cx="184" cy="316" rx="24" ry="15" fill="#33333f"/>
+      <!-- 귀 -->
+      <g id="earL"><path d="M86,108 L74,40 L142,90 Z" fill="#33333f"/><path d="M96,98 L90,60 L128,88 Z" fill="#f3a0b5"/></g>
+      <g id="earR"><path d="M214,108 L226,40 L158,90 Z" fill="#33333f"/><path d="M204,98 L210,60 L172,88 Z" fill="#f3a0b5"/></g>
+      <!-- 머리 -->
+      <circle cx="150" cy="152" r="72" fill="#33333f"/>
+      <!-- 볼터치 -->
+      <ellipse cx="104" cy="176" rx="15" ry="10" fill="#ff9ec7" opacity="0.55"/>
+      <ellipse cx="196" cy="176" rx="15" ry="10" fill="#ff9ec7" opacity="0.55"/>
+      <!-- 눈 (동적) -->
+      <g id="eyes"></g>
+      <!-- 코 -->
+      <path d="M142,166 L158,166 L150,176 Z" fill="#ff7fa3"/>
+      <!-- 입 (동적) -->
+      <g id="mouth"></g>
+      <!-- 수염 -->
+      <g stroke="#9a9aa5" stroke-width="2.5" stroke-linecap="round">
+        <line x1="95" y1="172" x2="45" y2="162"/>
+        <line x1="95" y1="182" x2="43" y2="184"/>
+        <line x1="205" y1="172" x2="255" y2="162"/>
+        <line x1="205" y1="182" x2="257" y2="184"/>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<div id="actions">
+  <button class="btn" data-act="feed"><span class="ico">🍚</span><span class="lbl">밥주기</span></button>
+  <button class="btn" data-act="treat"><span class="ico">🐟</span><span class="lbl">간식</span></button>
+  <button class="btn" data-act="play"><span class="ico">🧶</span><span class="lbl">놀기</span></button>
+  <button class="btn" data-act="wash"><span class="ico">🫧</span><span class="lbl">씻기</span></button>
+  <button class="btn" data-act="brush"><span class="ico">✨</span><span class="lbl">빗질</span></button>
+  <button class="btn" data-act="sleep"><span class="ico">😴</span><span class="lbl">재우기</span></button>
+</div>
+
+<div id="toy">🧶</div>
+<div id="grow-celeb"><div class="box"></div></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const eyesEl=$('eyes'), mouthEl=$('mouth'), speechEl=$('speech'),
+        catScale=$('catScale'), catSvg=$('cat-svg'), zzzEl=$('zzz'),
+        toyEl=$('toy'), stageEl=$('stage');
+
+  // ── 성장 단계 ─────────────────────────────────────────────
+  const STAGES=[
+    {name:'아기 깜냥이',  emoji:'🐾', min:0,   scale:0.60},
+    {name:'꼬마 깜냥이',  emoji:'🌱', min:40,  scale:0.76},
+    {name:'청소년 깜냥이',emoji:'⭐', min:120, scale:0.92},
+    {name:'어른 깜냥이',  emoji:'👑', min:280, scale:1.08},
+  ];
+
+  // ── 상태 ─────────────────────────────────────────────────
+  let state={ full:80, happy:80, bond:0 };
+  try{
+    const saved=JSON.parse(localStorage.getItem('kkamnyang')||'{}');
+    if(typeof saved.bond==='number') state.bond=saved.bond;
+  }catch(e){}
+  let stageIdx=stageOf(state.bond);
+
+  function stageOf(bond){
+    let idx=0;
+    for(let i=0;i<STAGES.length;i++){ if(bond>=STAGES[i].min) idx=i; }
+    return idx;
+  }
+  function save(){ try{ localStorage.setItem('kkamnyang',JSON.stringify({bond:state.bond})); }catch(e){} }
+
+  // ── 오디오 ───────────────────────────────────────────────
+  let actx=null;
+  function ac(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+  function meow(){
+    try{ const c=ac(), o=c.createOscillator(), g=c.createGain(), f=c.createBiquadFilter();
+      o.type='sawtooth'; f.type='bandpass'; f.frequency.value=1100; f.Q.value=6;
+      o.connect(f); f.connect(g); g.connect(c.destination);
+      const t=c.currentTime;
+      o.frequency.setValueAtTime(620,t);
+      o.frequency.linearRampToValueAtTime(900,t+0.12);
+      o.frequency.linearRampToValueAtTime(500,t+0.34);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.22,t+0.06);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
+      o.start(t); o.stop(t+0.42);
+    }catch(e){}
+  }
+  function purr(){
+    try{ const c=ac(), o=c.createOscillator(), g=c.createGain(),
+           lfo=c.createOscillator(), lg=c.createGain(), lp=c.createBiquadFilter();
+      o.type='sawtooth'; o.frequency.value=42; lp.type='lowpass'; lp.frequency.value=180;
+      lfo.type='square'; lfo.frequency.value=24; lg.gain.value=0.09;
+      o.connect(lp); lp.connect(g); g.connect(c.destination);
+      lfo.connect(lg); lg.connect(g.gain);
+      const t=c.currentTime; g.gain.setValueAtTime(0.1,t);
+      g.gain.setValueAtTime(0.1,t+0.7); g.gain.exponentialRampToValueAtTime(0.001,t+0.95);
+      o.start(t); lfo.start(t); o.stop(t+0.96); lfo.stop(t+0.96);
+    }catch(e){}
+  }
+  function chime(notes){
+    try{ const c=ac();
+      notes.forEach((f,i)=>{ const o=c.createOscillator(), g=c.createGain();
+        o.type='triangle'; o.connect(g); g.connect(c.destination);
+        const t=c.currentTime+i*0.11; o.frequency.setValueAtTime(f,t);
+        g.gain.setValueAtTime(0.16,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.32);
+        o.start(t); o.stop(t+0.33);
+      });
+    }catch(e){}
+  }
+  function nom(){
+    try{ const c=ac();
+      for(let i=0;i<3;i++){ const o=c.createOscillator(), g=c.createGain();
+        o.type='square'; o.connect(g); g.connect(c.destination);
+        const t=c.currentTime+i*0.13; o.frequency.setValueAtTime(160,t);
+        g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.1);
+        o.start(t); o.stop(t+0.11);
+      }
+    }catch(e){}
+  }
+
+  // ── 표정 ────────────────────────────────────────────────
+  let curMood='normal';
+  function eyeMarkup(mood){
+    const L=118,R=182,Y=150;
+    if(mood==='happy'||mood==='purr'){
+      return `<path d="M${L-18},${Y+4} Q${L},${Y-18} ${L+18},${Y+4}" stroke="#1a1a22" stroke-width="7" fill="none" stroke-linecap="round"/>`+
+             `<path d="M${R-18},${Y+4} Q${R},${Y-18} ${R+18},${Y+4}" stroke="#1a1a22" stroke-width="7" fill="none" stroke-linecap="round"/>`;
+    }
+    if(mood==='sleep'||mood==='blink'){
+      return `<path d="M${L-16},${Y} Q${L},${Y+14} ${L+16},${Y}" stroke="#1a1a22" stroke-width="6" fill="none" stroke-linecap="round"/>`+
+             `<path d="M${R-16},${Y} Q${R},${Y+14} ${R+16},${Y}" stroke="#1a1a22" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+    }
+    // normal / eat / play : 큰 눈
+    const eye=(cx)=>`<ellipse cx="${cx}" cy="${Y}" rx="18" ry="23" fill="#fff"/>`+
+      `<circle cx="${cx}" cy="${Y+2}" r="14" fill="#8fd178"/>`+
+      `<circle cx="${cx}" cy="${Y+3}" r="8.5" fill="#1a1a22"/>`+
+      `<circle cx="${cx-4}" cy="${Y-3}" r="4" fill="#fff"/>`;
+    return eye(L)+eye(R);
+  }
+  function mouthMarkup(mood){
+    if(mood==='happy'||mood==='play')
+      return `<path d="M132,182 Q150,206 168,182 Z" fill="#ff5c8a"/><path d="M138,184 Q150,192 162,184" stroke="#c0436a" stroke-width="1.5" fill="none"/>`;
+    if(mood==='eat')
+      return `<ellipse cx="150" cy="190" rx="13" ry="11" fill="#ff5c8a"><animate attributeName="ry" values="11;5;11" dur="0.4s" repeatCount="indefinite"/></ellipse>`;
+    if(mood==='sleep')
+      return `<path d="M140,188 Q150,193 160,188" stroke="#1a1a22" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    // normal / purr
+    return `<path d="M150,176 L150,184" stroke="#1a1a22" stroke-width="2.5"/>`+
+           `<path d="M150,184 Q138,194 130,184" stroke="#1a1a22" stroke-width="3" fill="none" stroke-linecap="round"/>`+
+           `<path d="M150,184 Q162,194 170,184" stroke="#1a1a22" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  }
+  function renderFace(mood){ curMood=mood; eyesEl.innerHTML=eyeMarkup(mood); mouthEl.innerHTML=mouthMarkup(mood); }
+
+  // 깜빡임
+  function scheduleBlink(){
+    const wait=2500+Math.random()*3500;
+    setTimeout(()=>{
+      if(curMood==='normal'||curMood==='happy'||curMood==='purr'){
+        const m=curMood; eyesEl.innerHTML=eyeMarkup('blink');
+        setTimeout(()=>{ if(curMood===m) eyesEl.innerHTML=eyeMarkup(m); },130);
+      }
+      scheduleBlink();
+    },wait);
+  }
+
+  // 임시 기분 → idle 복귀
+  let moodTimer=null;
+  function idleMood(){
+    if(state.happy>=80) return 'happy';
+    if(state.happy>=60||state.full>=60) return 'normal';
+    return 'normal';
+  }
+  function setMood(mood,dur){
+    renderFace(mood);
+    clearTimeout(moodTimer);
+    if(dur) moodTimer=setTimeout(()=>renderFace(idleMood()),dur);
+  }
+
+  // ── 말풍선 ──────────────────────────────────────────────
+  let speechTimer=null;
+  function say(text,dur){
+    speechEl.textContent=text; speechEl.classList.add('show');
+    clearTimeout(speechTimer);
+    speechTimer=setTimeout(()=>speechEl.classList.remove('show'),dur||2200);
+  }
+
+  // ── 이펙트 ──────────────────────────────────────────────
+  function heartAt(x,y){
+    const h=document.createElement('div'); h.className='heart';
+    h.textContent=['💕','💖','💗','💓','😻'][Math.floor(Math.random()*5)];
+    h.style.left=x+'px'; h.style.top=y+'px';
+    h.style.setProperty('--hx',((Math.random()-0.5)*80).toFixed(0)+'px');
+    document.body.appendChild(h); setTimeout(()=>h.remove(),1000);
+  }
+  function bubblesFx(){
+    const r=catScale.getBoundingClientRect();
+    for(let i=0;i<10;i++){ const b=document.createElement('div'); b.className='bubble-fx';
+      const s=14+Math.random()*22; b.style.width=s+'px'; b.style.height=s+'px';
+      b.style.left=(r.left+Math.random()*r.width)+'px'; b.style.top=(r.top+r.height*0.5+Math.random()*r.height*0.4)+'px';
+      b.style.animationDelay=(Math.random()*0.4)+'s';
+      document.body.appendChild(b); setTimeout(()=>b.remove(),1700);
+    }
+  }
+  function starsFx(){
+    const r=catScale.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height*0.4;
+    for(let i=0;i<10;i++){ const s=document.createElement('div'); s.className='star-fx';
+      s.textContent=['✨','⭐','🌟','💫'][i%4];
+      s.style.left=cx+'px'; s.style.top=cy+'px';
+      const a=(Math.PI*2*i)/10, d=50+Math.random()*60;
+      s.style.setProperty('--sx',(Math.cos(a)*d).toFixed(0)+'px');
+      s.style.setProperty('--sy',(Math.sin(a)*d).toFixed(0)+'px');
+      document.body.appendChild(s); setTimeout(()=>s.remove(),950);
+    }
+  }
+  function bounce(){ catSvg.classList.remove('bounce'); void catSvg.offsetWidth; catSvg.classList.add('bounce'); }
+  function twitchEars(){ ['earL','earR'].forEach(id=>{ const e=$(id); e.classList.remove('ear-twitch'); void e.offsetWidth; e.classList.add('ear-twitch'); }); }
+
+  // ── UI 갱신 ─────────────────────────────────────────────
+  function refresh(){
+    const st=STAGES[stageIdx];
+    $('stage-emoji').textContent=st.emoji;
+    $('stage-name').textContent=st.name;
+    $('bond-count').textContent='💕'+state.bond;
+    catScale.style.transform='scale('+st.scale+')';
+    // 성장 막대
+    if(stageIdx>=STAGES.length-1){
+      $('grow-fill').style.width='100%'; $('grow-label').textContent='다 컸어요! 👑 최고!';
+    }else{
+      const cur=st.min, nxt=STAGES[stageIdx+1].min;
+      const pct=Math.max(0,Math.min(100,((state.bond-cur)/(nxt-cur))*100));
+      $('grow-fill').style.width=pct.toFixed(0)+'%';
+      $('grow-label').textContent='다음까지 💕'+Math.max(0,nxt-state.bond);
+    }
+    $('full-fill').style.width=state.full+'%';
+    $('happy-fill').style.width=state.happy+'%';
+  }
+
+  // ── 성장 축하 ───────────────────────────────────────────
+  function celebrate(){
+    const st=STAGES[stageIdx];
+    const box=$('grow-celeb').querySelector('.box');
+    box.textContent='깜냥이가 자랐어요! 🎉\n이제 '+st.emoji+' '+st.name+'!\n연아 덕분이야 💕';
+    const ce=$('grow-celeb'); ce.classList.remove('active'); void ce.offsetWidth; ce.classList.add('active');
+    chime([523,659,784,1047,1319,1047,1319]);
+    catSvg.classList.remove('grow-pop'); void catSvg.offsetWidth; catSvg.classList.add('grow-pop');
+    const cols=['#ff6b9d','#ffd24d','#8fd178','#7bc6ff','#c89bff','#ff9d4d'];
+    for(let i=0;i<50;i++){ const c=document.createElement('div'); c.className='confetti';
+      c.style.left=Math.random()*100+'vw'; c.style.background=cols[i%cols.length];
+      c.style.setProperty('--cd',(1.5+Math.random()*1.3).toFixed(2)+'s');
+      c.style.setProperty('--cx',((Math.random()-0.5)*180).toFixed(0)+'px');
+      c.style.animationDelay=(Math.random()*0.4)+'s';
+      document.body.appendChild(c); setTimeout(()=>c.remove(),3000);
+    }
+  }
+
+  function addBond(n){
+    state.bond+=n; save();
+    const ns=stageOf(state.bond);
+    if(ns>stageIdx){ stageIdx=ns; refresh(); setTimeout(celebrate,250); }
+    else refresh();
+  }
+
+  // ── 대사 ────────────────────────────────────────────────
+  const LINES={
+    greet:['연아야 안녕! 😺','연아 왔구나! 보고싶었어','야옹~ 연아 반가워!'],
+    pet:['그르릉~ 좋아 😻','연아 손 따뜻해','더 쓰다듬어줘~','기분 최고야 야옹'],
+    feed:['냠냠 맛있다!','잘 먹었어 연아야 😋','배불러~ 고마워'],
+    treat:['우와 생선이다! 🐟','연아 최고야!','맛있어 그르릉~'],
+    play:['신난다! 같이 놀자','잡았다! 😸','더 더! 재밌어','데굴데굴~'],
+    wash:['뽀득뽀득 깨끗해졌다','거품 보글보글~ 🫧','향기나지? 헤헤'],
+    brush:['반짝반짝 털 됐다 ✨','간질간질 좋아','이뻐졌지 연아야?'],
+    sleep:['연아야 잘자... 쿨쿨','졸려... 같이 잘까?','Zzz... 좋은 꿈 꿔'],
+  };
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+  // ── 행동 ────────────────────────────────────────────────
+  let sleeping=false;
+  function wake(){ if(sleeping){ sleeping=false; document.body.classList.remove('night'); zzzEl.classList.remove('show'); renderFace(idleMood()); } }
+
+  const actions={
+    feed(){ wake(); state.full=Math.min(100,state.full+25); setMood('eat',1600); nom(); twitchEars();
+      say(pick(LINES.feed)); addBond(2); },
+    treat(){ wake(); state.full=Math.min(100,state.full+12); state.happy=Math.min(100,state.happy+15);
+      setMood('happy',1800); meow(); bounce(); say(pick(LINES.treat)); starsFx(); addBond(4); },
+    play(){ wake(); startPlay(); },
+    wash(){ wake(); state.happy=Math.min(100,state.happy+12); setMood('happy',1800); bubblesFx();
+      chime([784,880,988]); say(pick(LINES.wash)); addBond(3); },
+    brush(){ wake(); state.happy=Math.min(100,state.happy+12); setMood('purr',1800); purr(); starsFx();
+      say(pick(LINES.brush)); addBond(3); },
+    sleep(){ toggleSleep(); },
+  };
+  document.querySelectorAll('.btn').forEach(b=>{
+    b.addEventListener('click',()=>{ ac(); actions[b.dataset.act](); });
+  });
+
+  function toggleSleep(){
+    if(!sleeping){ sleeping=true; document.body.classList.add('night'); renderFace('sleep');
+      zzzEl.classList.add('show'); say(pick(LINES.sleep),3000); state.happy=Math.min(100,state.happy+10);
+      chime([523,440,392]); addBond(2);
+    } else { wake(); say('잘 잤다! 개운해 😺'); }
+  }
+
+  // ── 쓰다듬기 ────────────────────────────────────────────
+  let lastPet=0, petCount=0;
+  function petAt(x,y){
+    const now=Date.now();
+    if(now-lastPet<90) return; lastPet=now;
+    heartAt(x,y); petCount++;
+    if(petCount%6===0){ purr(); }
+    if(petCount%4===0){ setMood('purr',1400); state.happy=Math.min(100,state.happy+2); addBond(1); }
+    if(petCount%10===0) say(pick(LINES.pet),1500);
+  }
+  catScale.addEventListener('pointerdown',e=>{ ac(); if(playMode) return; if(sleeping){ wake(); return; } petAt(e.clientX,e.clientY); });
+  catScale.addEventListener('pointermove',e=>{ if(playMode||sleeping) return; if(e.buttons||e.pressure>0) petAt(e.clientX,e.clientY); });
+  catScale.addEventListener('touchmove',e=>{ if(playMode||sleeping) return; const t=e.touches[0]; if(t) petAt(t.clientX,t.clientY); e.preventDefault(); },{passive:false});
+
+  // ── 놀이 모드 (털실 쫓기) ───────────────────────────────
+  let playMode=false, playTimer=null;
+  function startPlay(){
+    if(playMode){ return; }
+    playMode=true; toyEl.classList.add('show'); setMood('play');
+    say(pick(LINES.play),2000); meow();
+    const r=stageEl.getBoundingClientRect();
+    moveToy(r.left+r.width/2, r.top+r.height*0.3);
+    clearTimeout(playTimer);
+    playTimer=setTimeout(stopPlay,9000);
+  }
+  function stopPlay(){
+    playMode=false; toyEl.classList.remove('show');
+    eyesEl.removeAttribute('transform'); renderFace(idleMood());
+    say('재밌었어 연아야! 😻',1800);
+    state.happy=Math.min(100,state.happy+18); addBond(3); refresh();
+  }
+  function moveToy(x,y){
+    toyEl.style.left=x+'px'; toyEl.style.top=y+'px';
+    // 눈동자가 털실 쪽으로
+    const r=catScale.getBoundingClientRect(); const cx=r.left+r.width/2;
+    const dx=Math.max(-9,Math.min(9,(x-cx)/14));
+    eyesEl.setAttribute('transform','translate('+dx.toFixed(1)+',0)');
+    // 가까우면 폴짝
+    const cy=r.top+r.height*0.45;
+    if(Math.hypot(x-cx,y-cy)<r.width*0.5){
+      const now=Date.now(); if(now-lastPounce>500){ lastPounce=now; bounce(); twitchEars();
+        if(Math.random()<0.5) meow(); starsFx(); state.happy=Math.min(100,state.happy+3); addBond(1);
+      }
+    }
+  }
+  let lastPounce=0;
+  document.addEventListener('pointermove',e=>{ if(playMode) moveToy(e.clientX,e.clientY); });
+  document.addEventListener('touchmove',e=>{ if(playMode){ const t=e.touches[0]; if(t) moveToy(t.clientX,t.clientY); } },{passive:true});
+
+  // ── 느린 감소 (절대 슬퍼지지 않게 바닥 45) ──────────────
+  setInterval(()=>{
+    if(sleeping||playMode) return;
+    state.full=Math.max(45,state.full-2);
+    state.happy=Math.max(45,state.happy-2);
+    refresh();
+    // 가끔 깜냥이가 조른다 (귀엽게)
+    if(Math.random()<0.4){
+      if(state.full<60) say('연아야 배고파~ 밥 줄래?',2000);
+      else if(state.happy<60) say('심심해~ 같이 놀자!',2000);
+      else if(Math.random()<0.4) say('연아 사랑해 💕',2000);
+    }
+  },14000);
+
+  // ── 시작 ────────────────────────────────────────────────
+  renderFace('happy'); refresh(); scheduleBlink();
+  setTimeout(()=>{ say(pick(LINES.greet),2800); meow(); bounce(); },500);
+  // 첫 터치로 오디오 깨우기
+  document.addEventListener('touchstart',()=>{ if(actx&&actx.state==='suspended') actx.resume(); },{once:true});
+  document.addEventListener('click',()=>{ if(actx&&actx.state==='suspended') actx.resume(); },{once:true});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>연아의 놀이방 🌈</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:'Apple SD Gothic Neo','Malgun Gothic','Nanum Gothic',sans-serif;
+    background:linear-gradient(180deg,#ffd9ec 0%,#fff0d6 50%,#d6f0ff 100%);
+    min-height:100%; overflow-x:hidden; user-select:none;
+    display:flex; flex-direction:column; align-items:center;
+    padding:24px 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  h1{ font-size:34px; color:#ff5c8a; text-shadow:0 3px 6px rgba(255,107,157,0.25);
+    margin-top:12px; text-align:center; }
+  .sub{ font-size:17px; color:#ff8fab; margin:8px 0 22px; text-align:center; }
+  .menu{ width:100%; max-width:420px; display:flex; flex-direction:column; gap:18px; }
+  .card{
+    display:flex; align-items:center; gap:18px; text-decoration:none;
+    background:#fff; border-radius:26px; padding:22px 24px;
+    box-shadow:0 8px 22px rgba(0,0,0,0.1); border:3px solid transparent;
+    transition:transform .12s;
+  }
+  .card:active{ transform:scale(0.96); }
+  .card .emoji{ font-size:56px; line-height:1; }
+  .card .txt{ display:flex; flex-direction:column; gap:3px; }
+  .card .name{ font-size:25px; font-weight:bold; color:#ff5c8a; }
+  .card .desc{ font-size:15px; color:#999; }
+  .card.cat{ border-color:#c89bff; } .card.cat .name{ color:#9b6bd6; }
+  .card.bubble{ border-color:#7bc6ff; } .card.bubble .name{ color:#3a9bd6; }
+  .float{ animation:fl 3s ease-in-out infinite; }
+  @keyframes fl{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+  .hi{ margin-top:30px; font-size:16px; color:#ff8fab; text-align:center; line-height:1.6; }
+  .deco{ position:fixed; pointer-events:none; opacity:0.5; font-size:30px; }
+</style>
+</head>
+<body>
+  <div class="deco" style="top:6%;left:8%;">⭐</div>
+  <div class="deco" style="top:12%;right:10%;">🎈</div>
+  <div class="deco" style="bottom:10%;left:12%;">🌸</div>
+  <div class="deco" style="bottom:14%;right:8%;">🌈</div>
+
+  <h1>🌈 연아의 놀이방 🌈</h1>
+  <div class="sub">오늘은 뭐하고 놀까? 골라봐!</div>
+
+  <div class="menu">
+    <a class="card cat" href="./cat.html">
+      <span class="emoji float">🐱</span>
+      <span class="txt">
+        <span class="name">내친구 깜냥이</span>
+        <span class="desc">고양이 밥 주고 놀아주며 키우기 🌱</span>
+      </span>
+    </a>
+    <a class="card bubble" href="./game.html">
+      <span class="emoji float">🎈</span>
+      <span class="txt">
+        <span class="name">버블 팡팡</span>
+        <span class="desc">둥실둥실 버블을 톡톡 터뜨리기 ✨</span>
+      </span>
+    </a>
+  </div>
+
+  <div class="hi">연아야, 많이 웃고 빨리 나아서<br>집에서도 같이 놀자! 💕</div>
+</body>
+</html>
