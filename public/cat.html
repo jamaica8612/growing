@@ -8,46 +8,59 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;user-select:none;touch-action:none;}
 canvas{display:block;position:fixed;inset:0;width:100%;height:100%;}
-#hud{position:fixed;top:0;left:0;right:0;padding:10px 14px;display:flex;flex-direction:column;gap:5px;pointer-events:none;z-index:10;}
-#sr{display:flex;align-items:center;justify-content:space-between;font-size:18px;font-weight:bold;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.6);}
+#hud{position:fixed;top:0;left:0;right:0;padding:10px 14px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:10;}
+#sr{display:flex;align-items:center;justify-content:center;gap:14px;font-size:23px;font-weight:bold;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.6);}
 #cn{color:#ffd24d;}
-.meter{height:15px;border-radius:10px;background:rgba(255,255,255,0.18);overflow:hidden;position:relative;}
-.mf{height:100%;border-radius:10px;transition:width .4s;}
-.ml{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:bold;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.6);white-space:nowrap;}
-#mr{display:flex;gap:8px;}
-#mr .meter{flex:1;}
-#speech{position:fixed;top:17%;left:50%;transform:translateX(-50%) scale(.85);background:rgba(255,255,255,.95);border-radius:20px;padding:13px 22px;font-size:21px;font-weight:bold;color:#e0306a;max-width:78vw;text-align:center;white-space:pre-line;line-height:1.4;box-shadow:0 8px 28px rgba(0,0,0,.22);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:30;}
+.meter{height:20px;border-radius:11px;background:rgba(0,0,0,0.32);overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.15);}
+.mf{height:100%;border-radius:11px;transition:width .4s;}
+.ml{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:bold;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8);white-space:nowrap;}
+#mr{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+#speech{position:fixed;top:18%;left:50%;transform:translateX(-50%) scale(.85);background:rgba(255,255,255,.96);border-radius:22px;padding:15px 26px;font-size:26px;font-weight:bold;color:#e0306a;max-width:84vw;text-align:center;white-space:pre-line;line-height:1.4;box-shadow:0 8px 28px rgba(0,0,0,.22);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:30;}
 #speech.show{opacity:1;transform:translateX(-50%) scale(1);}
-#speech::after{content:'';position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);border:12px solid transparent;border-top-color:rgba(255,255,255,.95);border-bottom:0;}
-#actions{position:fixed;bottom:0;left:0;right:0;padding:8px 6px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(6,1fr);gap:5px;background:rgba(0,0,0,.4);backdrop-filter:blur(12px);z-index:10;}
-.btn{border:none;background:rgba(255,255,255,.1);border-radius:14px;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transition:transform .1s,background .1s;border:1px solid rgba(255,255,255,.14);}
-.btn:active{transform:scale(.88);background:rgba(255,255,255,.22);}
-.btn .ico{font-size:28px;line-height:1;}
-.btn .lbl{font-size:11px;font-weight:bold;color:rgba(255,255,255,.88);}
+#speech::after{content:'';position:absolute;bottom:-13px;left:50%;transform:translateX(-50%);border:13px solid transparent;border-top-color:rgba(255,255,255,.96);border-bottom:0;}
+#actions{position:fixed;bottom:0;left:0;right:0;padding:8px 6px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:rgba(0,0,0,.42);backdrop-filter:blur(12px);z-index:10;}
+.btn{border:none;background:rgba(255,255,255,.1);border-radius:16px;padding:10px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:transform .1s,background .1s;border:1px solid rgba(255,255,255,.14);position:relative;}
+.btn:active{transform:scale(.9);background:rgba(255,255,255,.22);}
+.btn .ico{font-size:32px;line-height:1;}
+.btn .lbl{font-size:14px;font-weight:bold;color:rgba(255,255,255,.92);}
+.btn .alert{position:absolute;top:4px;right:8px;width:13px;height:13px;border-radius:50%;background:#ff4444;box-shadow:0 0 8px #ff4444;display:none;}
+.btn.need .alert{display:block;animation:bl .8s infinite;}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
 #celeb{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;}
-#celeb.active{animation:ca 2.8s ease-out forwards;}
-@keyframes ca{0%{opacity:0}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
-#celeb .box{background:rgba(220,50,120,.92);color:#fff;padding:26px 38px;border-radius:26px;font-size:30px;font-weight:bold;text-align:center;line-height:1.5;white-space:pre-line;box-shadow:0 14px 50px rgba(220,50,120,.5);}
-.cp{position:fixed;width:12px;height:12px;border-radius:3px;pointer-events:none;z-index:110;animation:cf var(--cd) ease-in forwards;}
+#celeb.active{animation:ca 3s ease-out forwards;}
+@keyframes ca{0%{opacity:0}12%{opacity:1}82%{opacity:1}100%{opacity:0}}
+#celeb .box{background:rgba(220,50,120,.93);color:#fff;padding:28px 40px;border-radius:28px;font-size:32px;font-weight:bold;text-align:center;line-height:1.5;white-space:pre-line;box-shadow:0 14px 50px rgba(220,50,120,.5);}
+.cp{position:fixed;width:13px;height:13px;border-radius:3px;pointer-events:none;z-index:110;animation:cf var(--cd) ease-in forwards;}
 @keyframes cf{0%{transform:translateY(-40px) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(540deg) translateX(var(--cx));opacity:0}}
-#home{position:fixed;top:10px;left:10px;z-index:60;background:rgba(255,255,255,.14);border:none;border-radius:50%;width:42px;height:42px;font-size:21px;cursor:pointer;color:#fff;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;text-decoration:none;}
-#shopbtn{position:fixed;top:10px;right:14px;z-index:60;background:linear-gradient(135deg,#ff6b9d,#ff9d4d);border:none;border-radius:50%;width:48px;height:48px;font-size:24px;cursor:pointer;box-shadow:0 4px 14px rgba(255,107,157,.5);}
-#shop{position:fixed;inset:0;background:rgba(10,5,25,.62);display:flex;align-items:center;justify-content:center;z-index:120;padding:16px;}
-#shop.hidden{display:none;}
-.shopbox{background:#fff;border-radius:26px;padding:20px 18px;width:min(94vw,440px);max-height:84vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);}
-.shoptitle{font-size:23px;font-weight:bold;color:#e0306a;text-align:center;}
-.shopcoins{text-align:center;font-size:16px;color:#ff9d4d;font-weight:bold;margin:4px 0 6px;}
-#shopmsg{text-align:center;font-size:14px;color:#ff5c5c;font-weight:bold;height:18px;margin-bottom:8px;white-space:pre-line;}
+.tbtn{position:fixed;z-index:60;border:none;border-radius:50%;width:50px;height:50px;font-size:25px;cursor:pointer;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 3px 10px rgba(0,0,0,.3);}
+#home{top:10px;left:10px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.22);}
+#missbtn{top:68px;left:10px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.22);}
+#shopbtn{top:10px;right:14px;background:linear-gradient(135deg,#ff6b9d,#ff9d4d);color:#fff;}
+#gamebtn{top:68px;right:14px;background:linear-gradient(135deg,#7bc6ff,#5a9bd6);color:#fff;}
+.ov{position:fixed;inset:0;background:rgba(10,5,25,.62);display:flex;align-items:center;justify-content:center;z-index:120;padding:16px;}
+.ov.hidden{display:none;}
+.box2{background:#fff;border-radius:26px;padding:20px 18px;width:min(94vw,440px);max-height:84vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.t2{font-size:25px;font-weight:bold;color:#e0306a;text-align:center;}
+.sub2{text-align:center;font-size:16px;color:#ff9d4d;font-weight:bold;margin:4px 0 12px;}
+#shopmsg{text-align:center;font-size:15px;color:#ff5c5c;font-weight:bold;height:20px;margin-bottom:6px;white-space:pre-line;}
 .shopgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 .sitem{border:2.5px solid #eee;border-radius:18px;padding:12px 4px 8px;text-align:center;cursor:pointer;background:#fafafa;transition:transform .1s;}
 .sitem:active{transform:scale(.93);}
-.sitem .se{font-size:38px;line-height:1.1;}
-.sitem .sn2{font-size:13px;font-weight:bold;color:#777;margin-top:3px;}
-.sitem .sp{font-size:12px;color:#ff9d4d;font-weight:bold;margin-top:1px;}
+.sitem .se{font-size:40px;line-height:1.1;}
+.sitem .sn2{font-size:14px;font-weight:bold;color:#777;margin-top:3px;}
+.sitem .sp{font-size:13px;color:#ff9d4d;font-weight:bold;margin-top:1px;}
 .sitem.owned{border-color:#8fd178;}
 .sitem.equipped{border-color:#ff6b9d;background:#fff0f6;}
 .sitem.equipped .sp{color:#ff6b9d;}
-.shopclose{display:block;margin:16px auto 0;border:none;background:linear-gradient(135deg,#ff6b9d,#ff9d4d);color:#fff;font-size:18px;font-weight:bold;padding:12px 44px;border-radius:40px;cursor:pointer;}
+.mrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:#faf7ff;margin-bottom:10px;}
+.mrow.done{background:#eafae6;}
+.mrow .me{font-size:32px;}
+.mrow .mtxt{flex:1;font-size:18px;font-weight:bold;color:#666;}
+.mrow.done .mtxt{color:#5fa84f;}
+.mrow .mpb{height:13px;border-radius:8px;background:#e8e8e8;overflow:hidden;margin-top:5px;}
+.mrow .mpf{height:100%;background:linear-gradient(90deg,#ff9ec7,#ff6b9d);transition:width .3s;}
+.mrow .mrew{font-size:14px;color:#ff9d4d;font-weight:bold;white-space:nowrap;}
+.closebtn{display:block;margin:16px auto 0;border:none;background:linear-gradient(135deg,#ff6b9d,#ff9d4d);color:#fff;font-size:19px;font-weight:bold;padding:13px 46px;border-radius:40px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -58,34 +71,48 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;}
 <div id="mr">
 <div class="meter"><div id="ff" class="mf" style="background:linear-gradient(90deg,#ffb347,#ff8c42);width:80%"></div><div class="ml">🍚 배부름</div></div>
 <div class="meter"><div id="hf" class="mf" style="background:linear-gradient(90deg,#ff9ec7,#ff6b9d);width:80%"></div><div class="ml">💛 행복</div></div>
+<div class="meter"><div id="clf" class="mf" style="background:linear-gradient(90deg,#7be3ff,#42b0ff);width:90%"></div><div class="ml">🛁 깨끗</div></div>
+<div class="meter"><div id="hef" class="mf" style="background:linear-gradient(90deg,#8fe88f,#42c042);width:100%"></div><div class="ml">❤️ 건강</div></div>
 </div>
 </div>
 <div id="speech"></div>
 <div id="actions">
-<button class="btn" data-act="feed"><span class="ico">🍚</span><span class="lbl">밥주기</span></button>
+<button class="btn" data-act="feed"><span class="ico">🍚</span><span class="lbl">밥주기</span><span class="alert"></span></button>
 <button class="btn" data-act="treat"><span class="ico">🐟</span><span class="lbl">간식</span></button>
-<button class="btn" data-act="play"><span class="ico">🧶</span><span class="lbl">놀기</span></button>
-<button class="btn" data-act="wash"><span class="ico">🫧</span><span class="lbl">씻기</span></button>
+<button class="btn" data-act="play"><span class="ico">🧶</span><span class="lbl">놀기</span><span class="alert"></span></button>
+<button class="btn" data-act="wash"><span class="ico">🛁</span><span class="lbl">목욕</span><span class="alert"></span></button>
 <button class="btn" data-act="brush"><span class="ico">✨</span><span class="lbl">빗질</span></button>
+<button class="btn" data-act="med"><span class="ico">💊</span><span class="lbl">약</span><span class="alert"></span></button>
 <button class="btn" data-act="sleep"><span class="ico">😴</span><span class="lbl">재우기</span></button>
+<button class="btn" data-act="game"><span class="ico">🎮</span><span class="lbl">게임</span></button>
 </div>
 <div id="celeb"><div class="box" id="ct"></div></div>
-<a id="home" href="./play.html">🏠</a>
-<button id="shopbtn">🛍️</button>
-<div id="shop" class="hidden">
-  <div class="shopbox">
-    <div class="shoptitle">🛍️ 깜냥이 꾸미기</div>
-    <div class="shopcoins" id="shopcoins">🪙 20 코인</div>
+<a id="home" class="tbtn" href="./play.html">🏠</a>
+<button id="missbtn" class="tbtn">📋</button>
+<button id="shopbtn" class="tbtn">🛍️</button>
+<a id="gamebtn" class="tbtn" href="./fishing.html">🐟</a>
+<div id="shop" class="ov hidden">
+  <div class="box2">
+    <div class="t2">🛍️ 깜냥이 꾸미기</div>
+    <div class="sub2" id="shopcoins">🪙 20 코인</div>
     <div id="shopmsg"></div>
     <div class="shopgrid" id="shopgrid"></div>
-    <button class="shopclose" id="shopclose">닫기</button>
+    <button class="closebtn" id="shopclose">닫기</button>
+  </div>
+</div>
+<div id="miss" class="ov hidden">
+  <div class="box2">
+    <div class="t2">📋 오늘의 목표</div>
+    <div class="sub2" id="agetxt">연아랑 함께 1일째 💖</div>
+    <div id="misslist"></div>
+    <button class="closebtn" id="missclose">닫기</button>
   </div>
 </div>
 <script>
 (function(){
 const cv=document.getElementById('c'),cx=cv.getContext('2d');
-let W,H,CX,CY,catX;
-function resize(){const pr=devicePixelRatio||1;cv.width=window.innerWidth*pr;cv.height=window.innerHeight*pr;cv.style.width=window.innerWidth+'px';cv.style.height=window.innerHeight+'px';cx.setTransform(pr,0,0,pr,0,0);W=window.innerWidth;H=window.innerHeight;CX=W/2;CY=H/2;if(catX===undefined)catX=W/2;catX=Math.max(70,Math.min(W-70,catX));}
+let W,H,catX;
+function resize(){const pr=devicePixelRatio||1;cv.width=window.innerWidth*pr;cv.height=window.innerHeight*pr;cv.style.width=window.innerWidth+'px';cv.style.height=window.innerHeight+'px';cx.setTransform(pr,0,0,pr,0,0);W=window.innerWidth;H=window.innerHeight;if(catX===undefined)catX=W/2;catX=Math.max(70,Math.min(W-70,catX));}
 window.addEventListener('resize',resize);resize();
 
 const STAGES=[
@@ -94,8 +121,12 @@ const STAGES=[
 {name:'⭐ 청소년 깜냥이',min:120,sc:0.86},
 {name:'👑 어른 깜냥이',min:280,sc:1.04},
 ];
-
-// 꾸미기 아이템
+// 진화 분기 (케어 품질로 결정)
+const FORMS={
+angel:{title:'😇 천사 깜냥이',aura:'rgba(255,230,120,'},
+wizard:{title:'🧙 마법사 깜냥이',aura:'rgba(190,150,255,'},
+super:{title:'🦸 슈퍼 깜냥이',aura:'rgba(120,200,255,'},
+};
 const ACC=[
 {id:'bow',e:'🎀',name:'리본',price:10,x:-28,y:-52,sz:38},
 {id:'flower',e:'🌸',name:'꽃',price:15,x:-30,y:-48,sz:36},
@@ -106,14 +137,18 @@ const ACC=[
 ];
 const ACCMAP={};ACC.forEach(a=>ACCMAP[a.id]=a);
 
-let state={full:80,happy:80,bond:0,sleeping:false,coins:20,owned:[],equipped:''};
-try{const s=JSON.parse(localStorage.getItem('kk4')||'null');
-  if(s){state.bond=s.bond||0;state.coins=(s.coins!=null?s.coins:20);state.owned=s.owned||[];state.equipped=s.equipped||'';}
-  else{const old=JSON.parse(localStorage.getItem('kk3')||'{}');if(old.bond)state.bond=old.bond;}
+let state={full:80,happy:80,clean:90,health:100,bond:0,coins:20,owned:[],equipped:'',care:50,form:'',firstTs:Date.now()};
+try{const s=JSON.parse(localStorage.getItem('kk5')||'null');
+  if(s){Object.assign(state,s);}
+  else{const o4=JSON.parse(localStorage.getItem('kk4')||'null');if(o4){state.bond=o4.bond||0;state.coins=(o4.coins!=null?o4.coins:20);state.owned=o4.owned||[];state.equipped=o4.equipped||'';}
+    else{const o3=JSON.parse(localStorage.getItem('kk3')||'{}');if(o3.bond)state.bond=o3.bond;}}
 }catch(e){}
+if(!state.firstTs)state.firstTs=Date.now();
+if(state.clean==null)state.clean=90;if(state.health==null)state.health=100;if(state.care==null)state.care=50;
 function stageOf(b){let i=0;STAGES.forEach((s,idx)=>{if(b>=s.min)i=idx;});return i;}
 let si=stageOf(state.bond);
-function save(){try{localStorage.setItem('kk4',JSON.stringify({bond:state.bond,coins:state.coins,owned:state.owned,equipped:state.equipped}));}catch(e){}}
+function save(){try{localStorage.setItem('kk5',JSON.stringify(state));}catch(e){}}
+function ageDays(){return Math.max(1,Math.floor((Date.now()-state.firstTs)/86400000)+1);}
 
 // Audio
 let ac=null;
@@ -134,22 +169,25 @@ draw(c){c.save();c.globalAlpha=Math.max(0,this.life);c.translate(this.x,this.y);
 function burst(x,y,n,o){for(let i=0;i<n;i++)pts.push(new P(x,y,o));}
 function confettiDom(n){const cols=['#ff6b9d','#ffd24d','#8fd178','#7bc6ff','#c89bff','#ff9d4d'];for(let i=0;i<n;i++){const c=document.createElement('div');c.className='cp';c.style.left=Math.random()*100+'vw';c.style.background=cols[i%cols.length];c.style.setProperty('--cd',(1.5+Math.random()*1.2).toFixed(2)+'s');c.style.setProperty('--cx',((Math.random()-.5)*160).toFixed(0)+'px');c.style.animationDelay=(Math.random()*.4)+'s';document.body.appendChild(c);setTimeout(()=>c.remove(),3000);}}
 
-// Anim state
 const an={br:0,tail:0,eL:0,eR:0,blT:0,blD:0,nxB:0,eo:1,jy:0,jvy:0,jump:false,sx:1,sy:1,mood:'normal',face:1,walking:false};
 function jump(){if(an.jump)return;an.jump=true;an.jvy=-.45;an.sx=.85;an.sy=1.2;}
 
-// 자율 이동 + 나비
 let hopTarget=W/2,nextHop=0;
 const bf={active:false,x:0,y:0,vx:0,ph:0};
 let nextBf=4000;
+const poops=[];
 function hopTo(tx){hopTarget=tx;an.face=tx>=catX?1:-1;an.walking=true;jump();}
 function spawnBf(){bf.active=true;bf.x=Math.random()<.5?-30:W+30;bf.vx=bf.x<0?(1+Math.random()*.8):-(1+Math.random()*.8);bf.y=H*.40+Math.random()*H*.16;bf.ph=Math.random()*6;}
-function catchBf(){bf.active=false;addCoins(5);state.happy=Math.min(100,state.happy+8);say('나비 잡았다! 🦋');meow();burst(catX,H*.72-100*STAGES[si].sc,12,{type:'text',txt:'💕',sz:20,spd:4});burst(catX,H*.72-100*STAGES[si].sc,6,{type:'text',txt:'🪙',sz:18,spd:3});refreshUI();}
+function catchBf(){bf.active=false;addCoins(5);state.happy=Math.min(100,state.happy+8);say('나비 잡았다! 🦋');meow();burst(catX,H*.72-100*STAGES[si].sc,12,{type:'text',txt:'💕',sz:20,spd:4});trackMission('butterfly');refreshUI();}
+function spawnPoop(){if(poops.length>=5||state.sleeping)return;poops.push({x:60+Math.random()*(W-120),y:H*.80+Math.random()*(H*.07)});}
 
-// Draw cat
+let sick=false;
+
 function drawCat(ox,oy,sc){
 cx.save();
 cx.translate(ox,oy+an.jy);
+// 진화 아우라
+if(state.form&&FORMS[state.form]){const au=FORMS[state.form].aura;const pulse=.5+.5*Math.sin(an.br*Math.PI*2);const gr=cx.createRadialGradient(0,20,20,0,20,150);gr.addColorStop(0,au+(0.35*pulse+0.15)+')');gr.addColorStop(1,au+'0)');cx.beginPath();cx.arc(0,20,150,0,Math.PI*2);cx.fillStyle=gr;cx.fill();}
 cx.scale(an.face*sc*an.sx,sc*an.sy);
 const br=Math.sin(an.br*Math.PI*2)*.012;
 cx.beginPath();cx.ellipse(0,148,70*(1+br*2),12,0,0,Math.PI*2);cx.fillStyle='rgba(0,0,0,.18)';cx.fill();
@@ -184,6 +222,8 @@ const eo=an.eo,mood=an.mood;
 [[-22,-8],[22,-8]].forEach(([ex,ey])=>{
 if(mood==='sleep'||eo<.15){
 cx.beginPath();cx.moveTo(ex-14,ey);cx.quadraticCurveTo(ex,ey+10,ex+14,ey);cx.strokeStyle='#d0c0e8';cx.lineWidth=3.5;cx.lineCap='round';cx.stroke();
+}else if(mood==='sick'){
+cx.beginPath();cx.moveTo(ex-13,ey-6);cx.quadraticCurveTo(ex,ey+4,ex+13,ey-6);cx.strokeStyle='#b0a0c8';cx.lineWidth=3.2;cx.lineCap='round';cx.stroke();
 }else if(mood==='happy'){
 cx.beginPath();cx.moveTo(ex-14,ey+4);cx.quadraticCurveTo(ex,ey-14,ex+14,ey+4);cx.strokeStyle='#d0c0e8';cx.lineWidth=3.5;cx.lineCap='round';cx.stroke();
 }else{
@@ -191,10 +231,7 @@ const eh=20*eo;
 cx.beginPath();cx.ellipse(ex,ey,14,eh,0,0,Math.PI*2);cx.fillStyle='#f0ece8';cx.fill();
 cx.beginPath();cx.ellipse(ex,ey+1,10,Math.max(1,eh*.8),0,0,Math.PI*2);cx.fillStyle='#7dc47a';cx.fill();
 cx.beginPath();cx.ellipse(ex,ey+1,6,Math.max(1,eh*.6),0,0,Math.PI*2);cx.fillStyle='#1a1020';cx.fill();
-if(eo>.5){
-cx.beginPath();cx.arc(ex-4,ey-3,3.5,0,Math.PI*2);cx.fillStyle='#fff';cx.fill();
-cx.beginPath();cx.arc(ex+4,ey+2,2,0,Math.PI*2);cx.fillStyle='rgba(255,255,255,.6)';cx.fill();
-}
+if(eo>.5){cx.beginPath();cx.arc(ex-4,ey-3,3.5,0,Math.PI*2);cx.fillStyle='#fff';cx.fill();cx.beginPath();cx.arc(ex+4,ey+2,2,0,Math.PI*2);cx.fillStyle='rgba(255,255,255,.6)';cx.fill();}
 }
 });
 cx.beginPath();cx.moveTo(-6,14);cx.lineTo(6,14);cx.lineTo(0,20);cx.closePath();cx.fillStyle='#ff7fa3';cx.fill();
@@ -204,21 +241,19 @@ cx.beginPath();cx.ellipse(0,28+mo*4,14,8+mo*6,0,0,Math.PI*2);cx.fillStyle='#d030
 cx.beginPath();cx.ellipse(0,27+mo*4,10,4+mo*3,0,0,Math.PI*2);cx.fillStyle='#ff9ec7';cx.fill();
 }else if(mood==='happy'){
 cx.beginPath();cx.moveTo(-12,24);cx.quadraticCurveTo(0,38,12,24);cx.strokeStyle='#d0c0e8';cx.lineWidth=3.5;cx.lineCap='round';cx.stroke();
+}else if(mood==='sick'){
+cx.beginPath();cx.moveTo(-9,28);cx.quadraticCurveTo(0,22,9,28);cx.strokeStyle='#d0c0e8';cx.lineWidth=3;cx.lineCap='round';cx.stroke();
 }else{
 cx.beginPath();cx.moveTo(0,20);cx.lineTo(0,26);cx.strokeStyle='#d0c0e8';cx.lineWidth=3;cx.lineCap='round';cx.stroke();
 cx.beginPath();cx.moveTo(-12,26);cx.quadraticCurveTo(-6,34,0,26);cx.quadraticCurveTo(6,34,12,26);cx.strokeStyle='#d0c0e8';cx.lineWidth=3;cx.lineCap='round';cx.stroke();
 }
 cx.strokeStyle='rgba(200,190,220,.65)';cx.lineWidth=1.8;cx.lineCap='round';
-[[-18,12,-60,5],[-18,20,-62,22],[18,12,60,5],[18,20,62,22]].forEach(([x1,y1,x2,y2])=>{
-cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();
-});
-// 꾸미기 아이템
+[[-18,12,-60,5],[-18,20,-62,22],[18,12,60,5],[18,20,62,22]].forEach(([x1,y1,x2,y2])=>{cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();});
 const acc=ACCMAP[state.equipped];
 if(acc){cx.font=acc.sz+'px serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(acc.e,acc.x,acc.y);}
 cx.restore();cx.restore();
 }
 
-// Background
 const stars=Array.from({length:65},()=>({x:Math.random(),y:Math.random(),r:.5+Math.random()*1.5,tw:Math.random()*Math.PI*2}));
 const flowers=[{x:.06,e:'🌷'},{x:.17,e:'🌼'},{x:.28,e:'🌷'},{x:.72,e:'🌸'},{x:.84,e:'🌻'},{x:.94,e:'🌼'}];
 let nightMode=false;
@@ -229,7 +264,7 @@ else{g.addColorStop(0,'#87CEEB');g.addColorStop(.5,'#b8e4f7');g.addColorStop(1,'
 cx.fillStyle=g;cx.fillRect(0,0,W,H);
 if(nightMode){
 stars.forEach(s=>{s.tw+=.018;const a=.35+.65*Math.sin(s.tw);cx.beginPath();cx.arc(s.x*W,s.y*H*.72,s.r,0,Math.PI*2);cx.fillStyle=`rgba(255,255,220,${a})`;cx.fill();});
-const mx=W*.82,my=H*.16;cx.beginPath();cx.arc(mx,my,26,0,Math.PI*2);cx.fillStyle='#fff4d0';cx.fill();cx.beginPath();cx.arc(mx+9,my-6,22,0,Math.PI*2);cx.fillStyle=nightMode?'#2a2a5e':'#87CEEB';cx.fill();
+const mx=W*.82,my=H*.16;cx.beginPath();cx.arc(mx,my,26,0,Math.PI*2);cx.fillStyle='#fff4d0';cx.fill();cx.beginPath();cx.arc(mx+9,my-6,22,0,Math.PI*2);cx.fillStyle='#2a2a5e';cx.fill();
 }else{
 cx.beginPath();cx.arc(W*.84,H*.14,30,0,Math.PI*2);cx.fillStyle='rgba(255,235,150,.9)';cx.fill();
 cx.fillStyle='rgba(255,255,255,.55)';
@@ -239,19 +274,15 @@ const fg=cx.createLinearGradient(0,H*.72,0,H);
 if(nightMode){fg.addColorStop(0,'rgba(40,40,80,0)');fg.addColorStop(.3,'rgba(40,40,80,.5)');fg.addColorStop(1,'#2a2a5a');}
 else{fg.addColorStop(0,'rgba(139,200,130,0)');fg.addColorStop(.3,'rgba(139,200,130,.35)');fg.addColorStop(1,'#7dc47a');}
 cx.fillStyle=fg;cx.fillRect(0,H*.72,W,H*.28);
-// 꽃
 cx.globalAlpha=nightMode?.5:1;cx.textAlign='center';cx.textBaseline='middle';
 flowers.forEach((f,i)=>{cx.font='26px serif';cx.fillText(f.e,f.x*W,H*.77+Math.sin(t*.001+i)*1.5);});
 cx.globalAlpha=1;
-if(state.sleeping){
-const za=.6+.4*Math.sin(t*.003);
-['z','z','z'].forEach((z,i)=>{cx.font=`bold ${26-i*4}px serif`;cx.fillStyle=`rgba(200,200,255,${za*(1-i*.25)})`;cx.textAlign='left';cx.fillText(z,catX+58+i*16,H*.4-i*22);});
-}
+// 응가
+poops.forEach(p=>{cx.font='34px serif';cx.fillText('💩',p.x,p.y);});
+if(state.sleeping){const za=.6+.4*Math.sin(t*.003);['z','z','z'].forEach((z,i)=>{cx.font=`bold ${28-i*4}px serif`;cx.fillStyle=`rgba(200,200,255,${za*(1-i*.25)})`;cx.textAlign='left';cx.fillText(z,catX+58+i*16,H*.4-i*22);});}
 }
 
-// Play mode
 let playMode=false,toyX=W/2,toyY=H*.4,playEnd=0;
-
 let lt=0;
 function loop(t){
 const dt=Math.min(t-lt,50);lt=t;
@@ -265,20 +296,16 @@ if(an.blD>0){const bl=(t-an.blT)/an.blD;an.eo=bl<.5?1-bl*2:(bl-.5)*2;if(bl>=1)an
 if(an.jump){an.jy+=an.jvy*dt;an.jvy+=.008*dt;if(an.walking)catX+=(hopTarget-catX)*.16;if(an.jy>=0){an.jy=0;an.jump=false;an.jvy=0;an.sx=1.18;an.sy=.82;if(an.walking){catX=hopTarget;an.walking=false;}}}
 an.sx+=(1-an.sx)*.14;an.sy+=(1-an.sy)*.14;
 const sc=STAGES[si].sc;
-const catTopY=H*.72-100*sc;
-// 나비
 if(bf.active){
 bf.ph+=.05;bf.x+=bf.vx;const by=bf.y+Math.sin(bf.ph)*28;
 cx.save();cx.translate(bf.x,by);cx.rotate(Math.sin(bf.ph*2)*.2);cx.font='34px serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('🦋',0,0);cx.restore();
 if(an.jump&&Math.abs(bf.x-catX)<60*sc)catchBf();
 if(bf.x<-60||bf.x>W+60)bf.active=false;
 }else if(t>nextBf&&!sleepOn&&!playMode){spawnBf();nextBf=t+11000+Math.random()*8000;}
-// 자율 이동
 if(!sleepOn&&!playMode&&an.mood!=='eat'&&!an.jump&&t>nextHop){
 if(bf.active){hopTo(Math.max(70,Math.min(W-70,bf.x)));nextHop=t+550;}
 else{hopTo(80+Math.random()*(W-160));nextHop=t+3500+Math.random()*4500;}
 }
-// toy
 if(playMode){
 if(t>playEnd){playMode=false;endPlay();}
 cx.font='42px serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('🧶',toyX,toyY);
@@ -286,74 +313,87 @@ const dist=Math.hypot(toyX-catX,toyY-(H*.72-50*sc));
 if(dist<100){catX+=(toyX-catX)*.06;an.face=toyX>=catX?1:-1;if(dist<70&&Math.random()<.05){jump();burst(toyX,toyY,2,{type:'text',txt:'✨',sz:18,spd:3});}}
 }
 drawCat(catX,H*.72-50,sc);
+// 아플 표시
+if(sick&&!sleepOn){cx.font='30px serif';cx.textAlign='center';cx.fillText('🤒',catX+50*sc,H*.72-150*sc);}
 for(let i=pts.length-1;i>=0;i--){if(!pts[i].update()){pts.splice(i,1);continue;}pts[i].draw(cx);}
 requestAnimationFrame(loop);
 }
 
-// Interaction
 let lastPet=0,petCnt=0;
 function pet(x,y){
 const now=Date.now();if(now-lastPet<80)return;lastPet=now;petCnt++;
 if(petCnt%5===0)purr();
 if(petCnt%3===0){burst(x,y,3,{type:'text',txt:'💕',sz:20,spd:2.5,grav:.05});state.happy=Math.min(100,state.happy+1);addBond(.5);}
-if(petCnt%8===0)addCoins(1);
-if(petCnt%12===0){say(pick(['그르릉~ 좋아 💕','연아 손 따뜻해','더 쓰다듬어줘~','기분 최고야']));an.mood='happy';setTimeout(()=>an.mood='normal',2000);}
+if(petCnt%6===0)addCoins(1);
+trackMission('pet');
+if(petCnt%12===0){say(pick(['그르릉~ 좋아 💕','연아 손 따뜻해','더 쓰다듬어줘~','기분 최고야']));an.mood='happy';setTimeout(()=>{if(!sick)an.mood='normal';},2000);}
 }
+function tryCleanPoop(x,y){for(let i=0;i<poops.length;i++){if(Math.hypot(x-poops[i].x,y-poops[i].y)<45){const p=poops.splice(i,1)[0];burst(p.x,p.y,8,{type:'text',txt:'✨',sz:18,spd:3});state.clean=Math.min(100,state.clean+12);addCoins(1);trackMission('clean');say(pick(['깨끗해졌다! 고마워','뽀글뽀글 ✨','시원해~ 고마워 연아야']),1600);refreshUI();return true;}}return false;}
 function moveToy(x,y){toyX+=(x-toyX)*.18;toyY+=(y-toyY)*.18;}
 function isOnCat(x,y){const sc=STAGES[si].sc,r=80*sc;return Math.hypot(x-catX,y-(H*.72-90*sc))<r;}
-function endPlay(){an.mood='normal';say('재밌었어 연아야! 😻');burst(catX,H*.5,12,{type:'text',txt:'⭐',sz:22,spd:4});addBond(2);addCoins(5);refreshUI();}
+function endPlay(){an.mood=sick?'sick':'normal';say('재밌었어 연아야! 😻');burst(catX,H*.5,12,{type:'text',txt:'⭐',sz:22,spd:4});addBond(2);addCoins(5);trackMission('play');refreshUI();}
 
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 const LINES={
 feed:['냠냠 맛있다!','잘 먹었어 연아야 😋','배불러~ 고마워'],
 treat:['우와 생선이다! 🐟','연아 최고야!','맛있어 그르릉~'],
 play:['신난다! 같이 놀자','잡았다! 😸','데굴데굴~','더 더!'],
-wash:['뽀득뽀득 깨끗해졌다','거품 보글보글~ 🫧','향기나지? 헤헤'],
+wash:['뽀득뽀득 깨끗해졌다','거품 보글보글~ 🛁','향기나지? 헤헤'],
 brush:['반짝반짝 털 됐다 ✨','간질간질 좋아','이뻐졌지 연아야?'],
 sleep:['연아야 잘자... 쿨쿨','같이 잘까? Zzz','...zzz 쿨쿨'],
 greet:['연아야 안녕! 😺','연아 왔구나! 반가워','야옹~ 연아!'],
-idle:['연아 사랑해 💕','...낮잠이 최고','연아야 뭐해?','배고파~ 밥 줘'],
+idle:['연아 사랑해 💕','...낮잠이 최고','연아야 뭐해?','오늘도 고마워 💖'],
 };
 
 let sleepOn=false,moodT=null;
-function setMood(m,d){an.mood=m;clearTimeout(moodT);if(d)moodT=setTimeout(()=>an.mood='normal',d);}
-function wake(){if(!sleepOn)return;sleepOn=false;nightMode=false;setMood('normal');state.sleeping=false;}
+function setMood(m,d){an.mood=m;clearTimeout(moodT);if(d)moodT=setTimeout(()=>{an.mood=sick?'sick':'normal';},d);}
+function wake(){if(!sleepOn)return;sleepOn=false;nightMode=false;setMood(sick?'sick':'normal');state.sleeping=false;}
 
 const actions={
-feed(){wake();state.full=Math.min(100,state.full+28);setMood('eat',2000);say(pick(LINES.feed));meow();burst(catX,H*.55,8,{type:'text',txt:'🍚',sz:20,spd:3,grav:.12});addBond(2);addCoins(3);refreshUI();},
-treat(){wake();state.full=Math.min(100,state.full+12);state.happy=Math.min(100,state.happy+15);setMood('happy',2200);say(pick(LINES.treat));meow();jump();burst(catX,H*.45,15,{type:'text',txt:'🐟',sz:22,spd:4,grav:.08});burst(catX,H*.5,8,{type:'text',txt:'⭐',sz:18,spd:3});addBond(4);addCoins(5);refreshUI();},
+feed(){wake();state.full=Math.min(100,state.full+28);setMood('eat',2000);say(pick(LINES.feed));meow();burst(catX,H*.55,8,{type:'text',txt:'🍚',sz:20,spd:3,grav:.12});addBond(2);addCoins(3);trackMission('feed');refreshUI();},
+treat(){wake();state.full=Math.min(100,state.full+10);state.happy=Math.min(100,state.happy+15);setMood('happy',2200);say(pick(LINES.treat));meow();jump();burst(catX,H*.45,15,{type:'text',txt:'🐟',sz:22,spd:4,grav:.08});addBond(4);addCoins(5);trackMission('treat');refreshUI();},
 play(){wake();if(!playMode){playMode=true;toyX=catX+(Math.random()-.5)*W*.4;toyY=H*.35;playEnd=Date.now()+9000;setMood('play');meow();jump();say(pick(LINES.play));addBond(3);state.happy=Math.min(100,state.happy+15);}},
-wash(){wake();state.happy=Math.min(100,state.happy+12);setMood('happy',2000);say(pick(LINES.wash));burst(catX,H*.5,18,{type:'circle',col:'rgba(180,230,255,.8)',sz:14,spd:3.5,grav:-.03});chime([784,880,988]);addBond(3);addCoins(3);refreshUI();},
-brush(){wake();state.happy=Math.min(100,state.happy+12);setMood('happy',2000);say(pick(LINES.brush));purr();burst(catX,H*.45,14,{type:'text',txt:'✨',sz:20,spd:3.5});addBond(3);addCoins(3);refreshUI();},
-sleep(){if(!sleepOn){sleepOn=true;nightMode=true;setMood('sleep');state.sleeping=true;say(pick(LINES.sleep),3200);chime([523,440,392]);state.happy=Math.min(100,state.happy+10);addBond(2);addCoins(2);refreshUI();}else{wake();say('잘 잤다! 개운해 😺');}},
+wash(){wake();state.clean=100;state.happy=Math.min(100,state.happy+8);setMood('happy',2000);say(pick(LINES.wash));burst(catX,H*.5,18,{type:'circle',col:'rgba(180,230,255,.85)',sz:14,spd:3.5,grav:-.03});chime([784,880,988]);addBond(2);addCoins(3);trackMission('wash');refreshUI();},
+brush(){wake();state.happy=Math.min(100,state.happy+12);setMood('happy',2000);say(pick(LINES.brush));purr();burst(catX,H*.45,14,{type:'text',txt:'✨',sz:20,spd:3.5});addBond(3);addCoins(3);trackMission('brush');refreshUI();},
+med(){if(state.health>=90){say('아직 건강해요! 😺',1800);return;}wake();state.health=Math.min(100,state.health+45);sick=false;setMood('happy',2000);say('약 먹고 나았다! 고마워 💊',2400);chime([659,784,1047]);burst(catX,H*.5,10,{type:'text',txt:'💖',sz:20,spd:3});addBond(2);trackMission('med');refreshUI();},
+sleep(){if(!sleepOn){sleepOn=true;nightMode=true;setMood('sleep');state.sleeping=true;say(pick(LINES.sleep),3200);chime([523,440,392]);state.happy=Math.min(100,state.happy+8);state.health=Math.min(100,state.health+5);addBond(2);refreshUI();}else{wake();say('잘 잤다! 개운해 😺');}},
+game(){window.location.href='./fishing.html';},
 };
 document.querySelectorAll('.btn').forEach(b=>{b.addEventListener('click',()=>{if(ac&&ac.state==='suspended')ac.resume();actions[b.dataset.act]();});});
 
 function addCoins(n){state.coins+=n;save();document.getElementById('cn').textContent='🪙'+state.coins;}
 function addBond(n){
-state.bond+=n;save();
+const before=si;state.bond+=n;save();
 const ns=stageOf(state.bond);
-if(ns>si){si=ns;refreshUI();setTimeout(growCeleb,300);}else refreshUI();
+if(ns>si){si=ns;if(si===STAGES.length-1&&!state.form)evolve();refreshUI();setTimeout(growCeleb,300);}else refreshUI();
+}
+function evolve(){
+state.form=state.care>=70?'angel':state.care>=40?'wizard':'super';save();
 }
 function growCeleb(){
-const st=STAGES[si];
-addCoins(15);
-document.getElementById('ct').textContent=`깜냥이가 자랐어요! 🎉\n${st.name}\n🪙 보너스 15코인! 💕`;
+const st=STAGES[si];addCoins(15);
+let extra='';if(si===STAGES.length-1&&state.form)extra='\n'+FORMS[state.form].title+'(으)로 진화! ✨';
+document.getElementById('ct').textContent=`깜냥이가 자랐어요! 🎉\n${st.name}${extra}\n🪙 보너스 15코인!`;
 const el=document.getElementById('celeb');el.classList.remove('active');void el.offsetWidth;el.classList.add('active');
 chime([523,659,784,1047,1319,1047,1319]);jump();
 burst(catX,H*.4,30,{type:'rect',sz:12,spd:6,grav:.12});burst(catX,H*.4,20,{type:'text',txt:'🎉',sz:24,spd:5});
-confettiDom(40);
+confettiDom(45);
 }
 
+function needFlag(act,on){const b=document.querySelector('.btn[data-act="'+act+'"]');if(b)b.classList.toggle('need',on);}
 function refreshUI(){
 const st=STAGES[si];
-document.getElementById('sn').textContent=st.name;
+let nm=st.name;if(si===STAGES.length-1&&state.form)nm=FORMS[state.form].title;
+document.getElementById('sn').textContent=nm;
 document.getElementById('cn').textContent='🪙'+state.coins;
 const nxt=si<STAGES.length-1?STAGES[si+1].min:null;
 if(!nxt){document.getElementById('gf').style.width='100%';document.getElementById('gl').textContent='다 컸어요! 👑 최고!';}
 else{const p=Math.max(0,Math.min(100,((state.bond-st.min)/(nxt-st.min))*100));document.getElementById('gf').style.width=p.toFixed(0)+'%';document.getElementById('gl').textContent='다음까지 💕'+Math.max(0,Math.ceil(nxt-state.bond));}
 document.getElementById('ff').style.width=state.full+'%';
 document.getElementById('hf').style.width=state.happy+'%';
+document.getElementById('clf').style.width=state.clean+'%';
+document.getElementById('hef').style.width=state.health+'%';
+needFlag('feed',state.full<45);needFlag('play',state.happy<45);needFlag('wash',state.clean<40||poops.length>0);needFlag('med',state.health<55);
 }
 
 let spT=null;
@@ -371,8 +411,7 @@ none.onclick=()=>{state.equipped='';save();renderShop();clickSfx();};
 grid.appendChild(none);
 ACC.forEach(a=>{
 const owned=state.owned.includes(a.id),eq=state.equipped===a.id;
-const d=document.createElement('div');
-d.className='sitem'+(eq?' equipped':owned?' owned':'');
+const d=document.createElement('div');d.className='sitem'+(eq?' equipped':owned?' owned':'');
 d.innerHTML=`<div class="se">${a.e}</div><div class="sn2">${a.name}</div>`+(owned?`<div class="sp">${eq?'착용중 ✓':'보유'}</div>`:`<div class="sp">🪙${a.price}</div>`);
 d.onclick=()=>{
 if(state.owned.includes(a.id)){state.equipped=eq?'':a.id;clickSfx();}
@@ -386,23 +425,68 @@ grid.appendChild(d);
 document.getElementById('shopbtn').addEventListener('click',()=>{if(ac&&ac.state==='suspended')ac.resume();clickSfx();renderShop();document.getElementById('shop').classList.remove('hidden');});
 document.getElementById('shopclose').addEventListener('click',()=>{document.getElementById('shop').classList.add('hidden');});
 
-cv.addEventListener('pointerdown',e=>{gac();if(ac&&ac.state==='suspended')ac.resume();const x=e.clientX,y=e.clientY;if(playMode){moveToy(x,y);return;}if(isOnCat(x,y)){if(sleepOn){wake();say('잘 잤다! 😺');return;}an.eL=1;pet(x,y);}});
+// 목표(미션)
+const POOL=[
+{key:'feed',label:'밥 주기',e:'🍚',goal:3,reward:10},
+{key:'play',label:'놀아주기',e:'🧶',goal:2,reward:12},
+{key:'pet',label:'쓰다듬기',e:'💕',goal:20,reward:12},
+{key:'butterfly',label:'나비 잡기',e:'🦋',goal:2,reward:15},
+{key:'clean',label:'응가 치우기',e:'💩',goal:3,reward:12},
+{key:'wash',label:'목욕하기',e:'🛁',goal:2,reward:10},
+{key:'brush',label:'빗질하기',e:'✨',goal:2,reward:10},
+{key:'treat',label:'간식 주기',e:'🐟',goal:3,reward:10},
+];
+let missions=pickMissions();
+function pickMissions(){const pool=POOL.slice(),out=[];while(out.length<3&&pool.length){const i=Math.floor(Math.random()*pool.length);out.push(Object.assign({prog:0,done:false},pool.splice(i,1)[0]));}return out;}
+function trackMission(key,n=1){let ch=false;missions.forEach(m=>{if(m.done||m.key!==key)return;m.prog=Math.min(m.goal,m.prog+n);ch=true;if(m.prog>=m.goal){m.done=true;addCoins(m.reward);say('목표 성공! 🎉 🪙+'+m.reward,2400);confettiDom(14);chime([1047,1319,1568]);}});if(missions.every(m=>m.done))setTimeout(()=>{missions=pickMissions();renderMiss();},1600);if(ch&&!document.getElementById('miss').classList.contains('hidden'))renderMiss();}
+function renderMiss(){
+const list=document.getElementById('misslist');list.innerHTML='';
+document.getElementById('agetxt').textContent='연아랑 함께 '+ageDays()+'일째 💖';
+missions.forEach(m=>{
+const d=document.createElement('div');d.className='mrow'+(m.done?' done':'');
+const p=Math.min(100,(m.prog/m.goal)*100);
+d.innerHTML=`<div class="me">${m.done?'✅':m.e}</div><div class="mtxt">${m.label} <span style="font-size:14px;color:#aaa">(${m.prog}/${m.goal})</span><div class="mpb"><div class="mpf" style="width:${p}%"></div></div></div><div class="mrew">🪙${m.reward}</div>`;
+list.appendChild(d);
+});
+}
+document.getElementById('missbtn').addEventListener('click',()=>{clickSfx();renderMiss();document.getElementById('miss').classList.remove('hidden');});
+document.getElementById('missclose').addEventListener('click',()=>{document.getElementById('miss').classList.add('hidden');});
+
+cv.addEventListener('pointerdown',e=>{gac();if(ac&&ac.state==='suspended')ac.resume();const x=e.clientX,y=e.clientY;if(playMode){moveToy(x,y);return;}if(tryCleanPoop(x,y))return;if(isOnCat(x,y)){if(sleepOn){wake();say('잘 잤다! 😺');return;}an.eL=1;pet(x,y);}});
 cv.addEventListener('pointermove',e=>{const x=e.clientX,y=e.clientY;if(playMode){moveToy(x,y);return;}if((e.pressure>0||e.buttons>0)&&isOnCat(x,y))pet(x,y);});
 cv.addEventListener('touchmove',e=>{const t=e.touches[0];if(!t)return;if(playMode)moveToy(t.clientX,t.clientY);else if(isOnCat(t.clientX,t.clientY))pet(t.clientX,t.clientY);e.preventDefault();},{passive:false});
 
+// 다마고치 케어 루프 (부드럽게)
 setInterval(()=>{
-if(sleepOn||playMode)return;
-state.full=Math.max(40,state.full-2);state.happy=Math.max(40,state.happy-2);refreshUI();
-if(Math.random()<.35){
-if(state.full<55)say('연아야 배고파~ 밥 줘! 🍚');
-else if(state.happy<55)say('심심해~ 같이 놀자! 🧶');
+if(sleepOn){state.health=Math.min(100,state.health+1);return;}
+state.full=Math.max(35,state.full-2);
+state.happy=Math.max(35,state.happy-2);
+state.clean=Math.max(0,state.clean-3-poops.length*2);
+if(Math.random()<.45)spawnPoop();
+const neglect=(state.full<35||state.clean<25||poops.length>=4);
+if(neglect)state.health=Math.max(20,state.health-4);
+else state.health=Math.min(100,state.health+2);
+sick=state.health<50;
+if(sick&&an.mood!=='eat'&&an.mood!=='happy'&&an.mood!=='play')an.mood='sick';
+else if(!sick&&an.mood==='sick')an.mood='normal';
+// 케어 점수 (진화 분기용)
+if(state.full>60&&state.happy>60&&state.clean>60&&state.health>70)state.care=Math.min(100,state.care+1);
+else if(neglect||sick)state.care=Math.max(0,state.care-2);
+refreshUI();save();
+if(Math.random()<.4){
+if(sick)say('연아야... 몸이 아파 💊 약 줄래?',2600);
+else if(poops.length>0)say('응가 치워줘~ 💩',2200);
+else if(state.full<45)say('연아야 배고파~ 밥 줘! 🍚',2200);
+else if(state.happy<45)say('심심해~ 같이 놀자! 🧶',2200);
 else say(pick(LINES.idle));
 an.eL=Math.random();an.eR=Math.random();
 }
-},15000);
+},14000);
 
+if(si===STAGES.length-1&&!state.form)evolve();
+save();
 refreshUI();
-setTimeout(()=>{say(pick(LINES.greet),2800);meow();jump();},600);
+setTimeout(()=>{say('연아야 안녕! 함께한 지 '+ageDays()+'일째 💖',3000);meow();jump();},600);
 requestAnimationFrame(loop);
 })();
 </script>
