@@ -43,6 +43,13 @@ export function MakeupManager({
   const [supplementMinutes, setSupplementMinutes] = useState(30);
   const [toast, setToast] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showNewReservation, setShowNewReservation] = useState(false);
+  const [newResStudentId, setNewResStudentId] = useState('');
+  const [newResClassId, setNewResClassId] = useState('');
+  const [newResDate, setNewResDate] = useState(localToday);
+  const [newResTime, setNewResTime] = useState('17:00');
+  const [newResReason, setNewResReason] = useState<'supplement' | 'other'>('supplement');
+  const [newResMemo, setNewResMemo] = useState('');
 
   const showToast = (message: string) => {
     setToast(message);
@@ -221,6 +228,35 @@ export function MakeupManager({
     showToast('보강 완료로 기록하고 출결에 반영했습니다.');
   };
 
+  const handleCreateNewReservation = () => {
+    if (!newResStudentId || !newResClassId || !newResDate) {
+      showToast('학생, 반, 날짜를 선택해 주세요.');
+      return;
+    }
+    const cls = classes.find(c => c.id === newResClassId);
+    onSaveMakeupReservation({
+      studentId: newResStudentId,
+      classId: newResClassId,
+      scheduledDate: newResDate,
+      scheduledTime: newResTime || cls?.startTime || '17:00',
+      reason: newResReason,
+      memo: newResMemo,
+    });
+    showToast('보강 예약을 저장했습니다.');
+    setShowNewReservation(false);
+    setNewResStudentId('');
+    setNewResClassId('');
+    setNewResMemo('');
+    setFilter('scheduled');
+  };
+
+  const filterCounts: Record<Filter, number> = useMemo(() => ({
+    needed: needed.length,
+    scheduled: scheduled.length + scheduledReservations.length,
+    completed: completed.length + completedReservations.length,
+    all: needed.length + scheduled.length + scheduledReservations.length + completed.length + completedReservations.length,
+  }), [needed, scheduled, scheduledReservations, completed, completedReservations]);
+
   const FILTERS: [Filter, string][] = [
     ['needed', '보강 필요'],
     ['scheduled', '보강 예정'],
@@ -376,6 +412,71 @@ export function MakeupManager({
             </div>
           </div>
 
+          {/* ── 보강 예약 직접 추가 ── */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" className="pay-btn ghost sm" onClick={() => setShowNewReservation(v => !v)}>
+              <Plus size={14} /> 보강 예약 추가
+            </button>
+          </div>
+          {showNewReservation && (
+            <section className="gd-card">
+              <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+                <Plus size={18} /> 새 보강 예약
+              </h2>
+              <div className="mk-grid" style={{ alignItems: 'end' }}>
+                <div>
+                  <span>학생</span>
+                  <select className="gd-field" value={newResStudentId} onChange={e => {
+                    setNewResStudentId(e.target.value);
+                    const cls = classes.find(c => c.studentIds.includes(e.target.value));
+                    if (cls) { setNewResClassId(cls.id); setNewResTime(cls.startTime || '17:00'); }
+                  }}>
+                    <option value="">학생 선택</option>
+                    {activeStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span>반</span>
+                  <select className="gd-field" value={newResClassId} onChange={e => {
+                    setNewResClassId(e.target.value);
+                    const cls = classes.find(c => c.id === e.target.value);
+                    if (cls) setNewResTime(cls.startTime || '17:00');
+                  }}>
+                    <option value="">반 선택</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span>날짜</span>
+                  <input type="date" className="gd-field" value={newResDate} onChange={e => setNewResDate(e.target.value)} />
+                </div>
+                <div>
+                  <span>시간</span>
+                  <input type="time" className="gd-field" value={newResTime} onChange={e => setNewResTime(e.target.value)} />
+                </div>
+                <div>
+                  <span>사유</span>
+                  <select className="gd-field" value={newResReason} onChange={e => setNewResReason(e.target.value as 'supplement' | 'other')}>
+                    <option value="supplement">추가 보충</option>
+                    <option value="other">기타</option>
+                  </select>
+                </div>
+                <div>
+                  <span>메모</span>
+                  <input type="text" className="gd-field" placeholder="메모 (선택)" value={newResMemo} onChange={e => setNewResMemo(e.target.value)} />
+                </div>
+              </div>
+              <div className="mk-actions" style={{ marginTop: '0.8rem' }}>
+                <button type="button" className="pay-btn primary sm" onClick={handleCreateNewReservation}>
+                  <CalendarCheck size={14} /> 예약 저장
+                </button>
+                <button type="button" className="pay-btn ghost sm" onClick={() => setShowNewReservation(false)}>
+                  <X size={14} /> 취소
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* ── 툴바: 검색 + 상태 세그먼트 ── */}
           <div className="mk-toolbar">
             <div className="pay-search" style={{ flex: 1, minWidth: 180 }}>
@@ -394,7 +495,7 @@ export function MakeupManager({
                   className={`gd-seg-b${filter === v ? ' sel ok' : ''}`}
                   onClick={() => setFilter(v)}
                 >
-                  {l}
+                  {l}{filterCounts[v] > 0 && <span className="cl-count">{filterCounts[v]}</span>}
                 </button>
               ))}
             </div>
