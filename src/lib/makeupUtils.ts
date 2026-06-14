@@ -76,7 +76,7 @@ export const getMakeupSummary = (students: Student[], classes: Class[], attendan
   });
 
   const scheduled: MakeupScheduledItem[] = makeupRecords
-    .filter(record => record.date > today)
+    .filter(record => record.date >= today)
     .map(toItem)
     .sort((a, b) => a.makeupRecord.date.localeCompare(b.makeupRecord.date));
 

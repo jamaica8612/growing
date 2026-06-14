@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CalendarCheck, CalendarClock, CheckCircle2, Clock, Lightbulb, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { localToday } from '../lib/dateUtils';
 import type { Attendance, Class, MakeupReservation, Student } from '../types';
 import { getMakeupSummary, hasMakeupForAbsence, type MakeupNeededItem } from '../lib/makeupUtils';
 import { getMakeupRecommendations } from '../lib/operationInsights';
@@ -112,6 +113,9 @@ export function MakeupManager({
   const scheduledReservations = reservationRows
     .filter(item => item.record.status === 'scheduled')
     .sort((a, b) => `${a.record.scheduledDate} ${a.record.scheduledTime}`.localeCompare(`${b.record.scheduledDate} ${b.record.scheduledTime}`));
+
+  const today = localToday();
+  const todayReservations = scheduledReservations.filter(item => item.record.scheduledDate === today);
 
   const completedReservations = reservationRows
     .filter(item => item.record.status === 'completed')
@@ -395,6 +399,47 @@ export function MakeupManager({
               ))}
             </div>
           </div>
+
+          {/* ── 오늘 예정 보강 ── */}
+          {todayReservations.length > 0 && (
+            <section className="gd-card" style={{ borderLeft: '3px solid var(--color-accent-mint)' }}>
+              <h2 className="gd-card-title" style={{ marginBottom: '0.9rem' }}>
+                <Clock size={18} /> 오늘 예정
+                <span className="cl-count">{todayReservations.length}</span>
+              </h2>
+              <div className="mk-cards">
+                {todayReservations.map(item => (
+                  <div key={item.record.id} className="mk-card">
+                    <div className="mk-card-head">
+                      <div>
+                        <b>{item.student?.name ?? '알 수 없는 학생'}</b>
+                        <span>{item.classInfo?.name ?? '반 정보 없음'}</span>
+                      </div>
+                      <span className="at-pill warn">{item.record.scheduledTime}</span>
+                    </div>
+                    <div className="mk-grid">
+                      <div>
+                        <span>사유</span>
+                        <b>{item.record.sourceAbsenceDate ? `${item.record.sourceAbsenceDate} 결석분` : item.record.reason === 'supplement' ? '추가 보충' : '기타'}</b>
+                      </div>
+                      <div>
+                        <span>메모</span>
+                        <b>{item.record.memo || '—'}</b>
+                      </div>
+                    </div>
+                    <div className="mk-actions">
+                      <button type="button" className="pay-btn primary sm" onClick={() => handleCompleteReservation(item.record)}>
+                        <CheckCircle2 size={14} /> 완료 처리
+                      </button>
+                      <button type="button" className="pay-btn ghost sm" onClick={() => onDeleteMakeupReservation(item.record.id)}>
+                        <X size={14} /> 취소
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* ── 보강 필요 카드 그리드 ── */}
           {(filter === 'all' || filter === 'needed') && (
