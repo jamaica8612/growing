@@ -124,6 +124,7 @@ export const Messaging: React.FC<MessagingProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [toast, setToast] = useState('');
+  const [copied, setCopied] = useState(false);
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('all');
   const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>([]);
   const [bulkCopied, setBulkCopied] = useState(false);
@@ -553,6 +554,18 @@ export const Messaging: React.FC<MessagingProps> = ({
                 <span className="msg-error-text">날짜, 학생 또는 포함 항목이 바뀌었습니다. 초안을 다시 만든 뒤 발송해 주세요.</span>
               )}
               <div className="msg-send">
+                <button
+                  className="pay-btn ghost"
+                  disabled={!message.trim()}
+                  onClick={() => {
+                    navigator.clipboard.writeText(message).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    });
+                  }}
+                >
+                  {copied ? <><Check size={15} /> 복사됨</> : <><Copy size={15} /> 복사</>}
+                </button>
                 {currentStudent?.parentContact ? (
                   <a href={buildSMSLink(currentStudent.parentContact, message)} className="pay-btn ghost" style={{ textDecoration: 'none', pointerEvents: message.trim() ? 'auto' : 'none', opacity: message.trim() ? 1 : 0.5 }}>
                     <Send size={15} /> 문자로 열기
@@ -616,6 +629,13 @@ export const Messaging: React.FC<MessagingProps> = ({
                           />
                           {draft.errorMessage && <span className="msg-error-text">{draft.errorMessage}</span>}
                           <div className="msg-batch-editor-actions">
+                            <button
+                              className="pay-btn ghost sm"
+                              disabled={!draft.message.trim()}
+                              onClick={() => navigator.clipboard.writeText(draft.message)}
+                            >
+                              <Copy size={14} /> 복사
+                            </button>
                             {draft.contact ? (
                               <a href={buildSMSLink(draft.contact, draft.message)} className="pay-btn ghost sm" style={{ textDecoration: 'none' }}>
                                 <Send size={14} /> 문자로 열기
