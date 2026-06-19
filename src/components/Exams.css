@@ -70,6 +70,7 @@
 .exam-app .btn-danger-ghost:hover { background: #fef2f2; border-color: #f0b9b9; }
 .exam-app .btn-icon { width: 38px; height: 38px; padding: 0; border-radius: 10px; }
 .exam-app .btn:disabled { opacity: .5; cursor: not-allowed; }
+.exam-app .question-action-label { display: none; }
 
 /* ===== Chips / segments ===== */
 .exam-app .chip {
@@ -319,6 +320,34 @@
   .exam-app .exam-kpigrid { grid-template-columns: 1fr 1fr !important; }
   .exam-app .exam-h1 { font-size: 25px !important; }
   .exam-app .code-pill { font-size: 32px !important; }
+  .exam-app .src-tag {
+    max-width: 100%;
+    align-items: flex-start;
+    border-radius: 12px;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .exam-app .src-tag svg { flex: 0 0 auto; margin-top: 1px; }
+  .exam-app .question-actions {
+    width: 100%;
+    margin-left: 0 !important;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 4px !important;
+  }
+  .exam-app .question-action {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    gap: 4px;
+    padding: 0 6px;
+  }
+  .exam-app .question-action-label {
+    display: inline;
+    font-size: 11px;
+    font-weight: 700;
+  }
 
   /* 인쇄/저장/배포 버튼: 좁은 화면에선 글자 숨기고 아이콘만 → 한 줄에 들어가게 */
   .exam-app .exam-btn-label { display: none; }

@@ -669,12 +669,12 @@ function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, onDup
             <input type="number" min={1} max={100} value={q.points} onChange={event => upd({ points: Math.max(1, Math.min(100, Number(event.target.value) || 1)) })} className="input" aria-label={`${n}번 문항 배점`} style={{ width: 68, height: 32, padding: '4px 8px', fontSize: 13 }} />
           </label>
         ) : <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>{q.points}점</span>}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button className="btn btn-ghost btn-icon" title="위로 이동" aria-label={`${n}번 문항 위로 이동`} onClick={() => onMove(-1)} disabled={!canMoveUp}><ArrowUp size={15} /></button>
-          <button className="btn btn-ghost btn-icon" title="아래로 이동" aria-label={`${n}번 문항 아래로 이동`} onClick={() => onMove(1)} disabled={!canMoveDown}><ArrowDown size={15} /></button>
-          <button className="btn btn-ghost btn-icon" title="문항 복제" aria-label={`${n}번 문항 복제`} onClick={onDuplicate}><Copy size={15} /></button>
-          <button className="btn btn-ghost btn-icon" title="편집" onClick={onEdit} style={{ borderColor: editing ? 'var(--mint)' : 'var(--border)', background: editing ? 'var(--mint-light)' : '#fff' }}><Pencil size={16} color={editing ? 'var(--primary)' : 'var(--text-2)'} /></button>
-          <button className="btn btn-danger-ghost btn-icon" title="삭제" onClick={onDelete}><Trash2 size={16} /></button>
+        <div className="question-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button className="btn btn-ghost btn-icon question-action" title="위로 이동" aria-label={`${n}번 문항 위로 이동`} onClick={() => onMove(-1)} disabled={!canMoveUp}><ArrowUp size={15} /><span className="question-action-label">위</span></button>
+          <button className="btn btn-ghost btn-icon question-action" title="아래로 이동" aria-label={`${n}번 문항 아래로 이동`} onClick={() => onMove(1)} disabled={!canMoveDown}><ArrowDown size={15} /><span className="question-action-label">아래</span></button>
+          <button className="btn btn-ghost btn-icon question-action" title="문항 복제" aria-label={`${n}번 문항 복제`} onClick={onDuplicate}><Copy size={15} /><span className="question-action-label">복제</span></button>
+          <button className="btn btn-ghost btn-icon question-action" title="편집" aria-label={`${n}번 문항 편집`} onClick={onEdit} style={{ borderColor: editing ? 'var(--mint)' : 'var(--border)', background: editing ? 'var(--mint-light)' : '#fff' }}><Pencil size={16} color={editing ? 'var(--primary)' : 'var(--text-2)'} /><span className="question-action-label">편집</span></button>
+          <button className="btn btn-danger-ghost btn-icon question-action" title="삭제" aria-label={`${n}번 문항 삭제`} onClick={onDelete}><Trash2 size={16} /><span className="question-action-label">삭제</span></button>
         </div>
       </div>
 
