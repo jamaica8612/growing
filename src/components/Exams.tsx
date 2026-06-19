@@ -720,7 +720,7 @@ interface AiChatMessage {
   error?: boolean;
 }
 
-function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onClasscardCopy }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onSave: () => void; onClasscardCopy: () => void }) {
+function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onClasscardCopy, onDistribute }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onSave: () => void; onClasscardCopy: () => void; onDistribute: () => void }) {
   const isMobile = useIsMobile();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatIdRef = useRef(0);
@@ -883,7 +883,8 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onCl
               )}
             </div>
             <button className="btn btn-ghost" onClick={onSave} style={{ height: 38 }}><Save size={17} /><span className="exam-btn-label">저장</span></button>
-            <button className="btn btn-primary" onClick={onClasscardCopy} title="클래스카드 붙여넣기용으로 복사" aria-label="클래스카드 붙여넣기용으로 복사" style={{ height: 38 }}><Copy size={17} color="#fff" /><span className="exam-btn-label">클래스카드 복사</span></button>
+            <button className="btn btn-ghost" onClick={onClasscardCopy} title="클래스카드 붙여넣기용으로 복사" aria-label="클래스카드 붙여넣기용으로 복사" style={{ height: 38 }}><Copy size={17} /><span className="exam-btn-label">클래스카드 복사</span></button>
+            <button className="btn btn-primary" onClick={onDistribute} style={{ height: 38 }}><QrCode size={17} color="#fff" /><span className="exam-btn-label">시험 배포</span></button>
           </div>
         </div>
       </div>
@@ -2166,6 +2167,17 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
     return () => window.clearInterval(intervalId);
   }, [exam, loadSubmissions, screen]);
 
+  const goDistribute = async () => {
+    if (!exam) return;
+    try {
+      const u = await persistExam();
+      if (!u) return;
+      await loadSubmissions(u);
+      setPublished(u.status === 'published');
+      go('distribute');
+    } catch (e) { flash(errMsg(e)); }
+  };
+
   const goResults = async () => {
     if (!exam) return;
     try {
@@ -2320,7 +2332,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
             <div className="exam-pagepad" style={{ padding: '0 44px', marginTop: 18 }}>
               <button className="btn btn-ghost" onClick={() => go('list')} style={{ height: 38 }}><List size={16} /> 시험 목록</button>
             </div>
-            <PreviewStudio exam={exam} setExam={setExam} reveal={reveal} setReveal={setReveal} onPrint={doPrint} onSave={() => void saveExam()} onClasscardCopy={() => void copyForClasscard()} />
+            <PreviewStudio exam={exam} setExam={setExam} reveal={reveal} setReveal={setReveal} onPrint={doPrint} onSave={() => void saveExam()} onClasscardCopy={() => void copyForClasscard()} onDistribute={() => void goDistribute()} />
           </div>
         )}
         {screen === 'distribute' && exam && (
