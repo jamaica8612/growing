@@ -13,6 +13,7 @@ import type { Class, Student } from '../types';
 import { examsApi, type ExamQuestion as SdkQuestion, type ExamStatus, type ExamListItem, type ExamSubmission as DbSubmission, type ExamAnswer as DbAnswer, type ExamAiChatMessage } from '../lib/exams';
 import { buildClasscardPasteText } from '../lib/classcardExport';
 import { inspectExamQuestions, type ExamQualityIssue } from '../lib/examQuality';
+import { createBTypeQuestions } from '../lib/examVariants';
 import './Exams.css';
 
 /* ===========================================================================
@@ -728,7 +729,7 @@ interface AiChatMessage {
   error?: boolean;
 }
 
-function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDuplicate, onClasscardCopy, onDistribute }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onSave: () => void; onDuplicate: () => void; onClasscardCopy: () => void; onDistribute: () => void }) {
+function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDuplicate, onCreateBType, onClasscardCopy, onDistribute }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onSave: () => void; onDuplicate: () => void; onCreateBType: () => void; onClasscardCopy: () => void; onDistribute: () => void }) {
   const isMobile = useIsMobile();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatIdRef = useRef(0);
@@ -893,6 +894,7 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDu
               )}
             </div>
             {isSavedId(exam.id) && <button className="btn btn-ghost" onClick={onDuplicate} title="이 시험을 새 초안으로 복제" style={{ height: 38 }}><Copy size={17} /><span className="exam-btn-label">복제</span></button>}
+            {isSavedId(exam.id) && <button className="btn btn-ghost" onClick={onCreateBType} title="문항과 보기 순서를 섞어 B형 초안 만들기" style={{ height: 38 }}><RotateCw size={17} /><span className="exam-btn-label">B형 만들기</span></button>}
             <button className="btn btn-ghost" onClick={onSave} style={{ height: 38 }}><Save size={17} /><span className="exam-btn-label">저장</span></button>
             <button className="btn btn-ghost" onClick={onClasscardCopy} title="클래스카드 붙여넣기용으로 복사" aria-label="클래스카드 붙여넣기용으로 복사" style={{ height: 38 }}><Copy size={17} /><span className="exam-btn-label">클래스카드 복사</span></button>
             <button className="btn btn-primary" onClick={onDistribute} style={{ height: 38 }}><QrCode size={17} color="#fff" /><span className="exam-btn-label">시험 배포</span></button>
@@ -2343,6 +2345,25 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
     flash('새 시험 초안으로 복제했어요. 수정 후 저장해 주세요.');
   };
 
+  const createBTypeExam = () => {
+    if (!exam || !isSavedId(exam.id)) return;
+    const createdAt = Date.now();
+    const baseName = exam.name.replace(/\s+[AB]형$/u, '');
+    const variant: Exam = {
+      ...exam,
+      id: 'draft',
+      name: `${baseName} B형`,
+      date: new Date().toISOString().slice(0, 10),
+      status: 'draft',
+      shortCode: undefined,
+      questions: createBTypeQuestions(exam.questions).map((question, index) => ({ ...question, id: `btype-${createdAt}-${index}` })),
+    };
+    setExam(variant);
+    setReveal(false);
+    go('preview');
+    flash('문항과 보기 순서를 섞은 B형 초안을 만들었어요.');
+  };
+
   return (
     <div className="exam-app">
       <div ref={scrollRef}>
@@ -2368,7 +2389,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
             <div className="exam-pagepad" style={{ padding: '0 44px', marginTop: 18 }}>
               <button className="btn btn-ghost" onClick={() => go('list')} style={{ height: 38 }}><List size={16} /> 시험 목록</button>
             </div>
-            <PreviewStudio exam={exam} setExam={setExam} reveal={reveal} setReveal={setReveal} onPrint={doPrint} onSave={() => void saveExam()} onDuplicate={duplicateExam} onClasscardCopy={() => void copyForClasscard()} onDistribute={() => void goDistribute()} />
+            <PreviewStudio exam={exam} setExam={setExam} reveal={reveal} setReveal={setReveal} onPrint={doPrint} onSave={() => void saveExam()} onDuplicate={duplicateExam} onCreateBType={createBTypeExam} onClasscardCopy={() => void copyForClasscard()} onDistribute={() => void goDistribute()} />
           </div>
         )}
         {screen === 'distribute' && exam && (
