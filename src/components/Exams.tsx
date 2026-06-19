@@ -7,7 +7,7 @@ import {
   Trash2, CheckCircle2, Eye, EyeOff, Printer, Save, QrCode, Send, Plus, Minus,
   Link2, Copy, Play, Square, Tablet, BarChart3,
   Award, TrendingUp, ChevronRight, MessageCircle, Sprout,
-  Clock, ArrowRight, RotateCw, User, Hand, AlertTriangle,
+  Clock, ArrowRight, RotateCw, User, Hand, AlertTriangle, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import type { Class, Student } from '../types';
 import { examsApi, type ExamQuestion as SdkQuestion, type ExamStatus, type ExamListItem, type ExamSubmission as DbSubmission, type ExamAnswer as DbAnswer, type ExamAiChatMessage } from '../lib/exams';
@@ -654,7 +654,7 @@ function ChoiceRow({ idx, text, correct, reveal, editing, onText }: { idx: numbe
   );
 }
 
-function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highlight, qualityIssues }: { q: Question; n: number; reveal: boolean; editing: boolean; onEdit: () => void; onChange: (q: Question) => void; onDelete: () => void; highlight: boolean; qualityIssues: ExamQualityIssue[] }) {
+function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, onDuplicate, onMove, canMoveUp, canMoveDown, highlight, qualityIssues }: { q: Question; n: number; reveal: boolean; editing: boolean; onEdit: () => void; onChange: (q: Question) => void; onDelete: () => void; onDuplicate: () => void; onMove: (direction: -1 | 1) => void; canMoveUp: boolean; canMoveDown: boolean; highlight: boolean; qualityIssues: ExamQualityIssue[] }) {
   const m = TYPE_META[q.type];
   const upd = (patch: Partial<Question>) => onChange({ ...q, ...patch });
   return (
@@ -669,6 +669,9 @@ function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highl
           </label>
         ) : <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>{q.points}점</span>}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button className="btn btn-ghost btn-icon" title="위로 이동" aria-label={`${n}번 문항 위로 이동`} onClick={() => onMove(-1)} disabled={!canMoveUp}><ArrowUp size={15} /></button>
+          <button className="btn btn-ghost btn-icon" title="아래로 이동" aria-label={`${n}번 문항 아래로 이동`} onClick={() => onMove(1)} disabled={!canMoveDown}><ArrowDown size={15} /></button>
+          <button className="btn btn-ghost btn-icon" title="문항 복제" aria-label={`${n}번 문항 복제`} onClick={onDuplicate}><Copy size={15} /></button>
           <button className="btn btn-ghost btn-icon" title="편집" onClick={onEdit} style={{ borderColor: editing ? 'var(--mint)' : 'var(--border)', background: editing ? 'var(--mint-light)' : '#fff' }}><Pencil size={16} color={editing ? 'var(--primary)' : 'var(--text-2)'} /></button>
           <button className="btn btn-danger-ghost btn-icon" title="삭제" onClick={onDelete}><Trash2 size={16} /></button>
         </div>
@@ -764,6 +767,7 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDu
   const isMobile = useIsMobile();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatIdRef = useRef(0);
+  const questionCopyIdRef = useRef(0);
   const [dockOpen, setDockOpen] = useState(false);
   const [mode, setMode] = useState<'student' | 'teacher'>('student');
   const [editId, setEditId] = useState<string | null>(null);
@@ -806,6 +810,25 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDu
 
   const changeQ = (q: Question) => setExam(e => e ? { ...e, questions: e.questions.map(x => x.id === q.id ? q : x) } : e);
   const delQ = (id: string) => setExam(e => e ? { ...e, questions: e.questions.filter(x => x.id !== id) } : e);
+  const moveQ = (index: number, direction: -1 | 1) => setExam(current => {
+    if (!current) return current;
+    const target = index + direction;
+    if (target < 0 || target >= current.questions.length) return current;
+    const questions = [...current.questions];
+    [questions[index], questions[target]] = [questions[target], questions[index]];
+    return { ...current, questions };
+  });
+  const duplicateQ = (index: number) => {
+    const source = exam.questions[index];
+    if (!source) return;
+    questionCopyIdRef.current += 1;
+    const duplicate = { ...source, id: `question-copy-${exam.questions.length}-${questionCopyIdRef.current}-${index}` };
+    const questions = [...exam.questions];
+    questions.splice(index + 1, 0, duplicate);
+    setExam({ ...exam, questions });
+    setEditId(duplicate.id);
+    setNewId(duplicate.id);
+  };
 
   const materialForRevision = () => exam.materialText?.trim() || exam.questions.map((q, i) => [
     `문항 ${i + 1}`,
@@ -962,6 +985,8 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDu
           <div id={'q-' + q.id} key={q.id}>
             <QuestionCard q={q} n={i + 1} reveal={reveals} editing={editId === q.id} highlight={q.id === newId}
               qualityIssues={qualityIssues.filter(issue => issue.questionIndex === i)}
+              canMoveUp={i > 0} canMoveDown={i < exam.questions.length - 1}
+              onMove={direction => moveQ(i, direction)} onDuplicate={() => duplicateQ(i)}
               onEdit={() => setEditId(id => id === q.id ? null : q.id)} onChange={changeQ} onDelete={() => delQ(q.id)} />
           </div>
         ))}
