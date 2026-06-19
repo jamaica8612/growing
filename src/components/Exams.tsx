@@ -112,6 +112,68 @@ interface GenMeta {
   instruction?: string;
 }
 
+interface CreateExamDraft {
+  mats: Material[];
+  pasteText: string;
+  optOpen: boolean;
+  classId: string;
+  scope: string;
+  teacherRequest: string;
+  count: number;
+  types: QType[];
+  difficulty: string;
+}
+
+interface PersistedExamDraft {
+  screen: 'create' | 'preview';
+  form: CreateExamDraft;
+  meta: GenMeta | null;
+  exam: Exam | null;
+  updatedAt: number;
+}
+
+const examDraftKey = (ownerId: string) => `growing_exam_draft_v1_${ownerId}`;
+
+const defaultCreateExamDraft = (classes: Class[]): CreateExamDraft => ({
+  mats: [],
+  pasteText: '',
+  optOpen: true,
+  classId: classes[0]?.id ?? '',
+  scope: '',
+  teacherRequest: '',
+  count: 8,
+  types: ['vocab', 'grammar', 'reading', 'writing'],
+  difficulty: '보통',
+});
+
+const loadExamDraft = (ownerId: string): PersistedExamDraft | null => {
+  try {
+    const raw = localStorage.getItem(examDraftKey(ownerId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedExamDraft;
+    if (!parsed?.form || (parsed.screen !== 'create' && parsed.screen !== 'preview')) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const saveExamDraft = (ownerId: string, draft: PersistedExamDraft) => {
+  try {
+    localStorage.setItem(examDraftKey(ownerId), JSON.stringify(draft));
+  } catch {
+    // Draft persistence must never interrupt exam creation.
+  }
+};
+
+const removeExamDraft = (ownerId: string) => {
+  try {
+    localStorage.removeItem(examDraftKey(ownerId));
+  } catch {
+    // Storage can be unavailable in restricted browser modes.
+  }
+};
+
 // ----- 데이터 -----
 const TYPE_META: Record<QType, { label: string; cls: string }> = {
   vocab: { label: '어휘', cls: 'badge-vocab' },
@@ -365,20 +427,29 @@ function MaterialChip({ m, onDel }: { m: Material; onDel: () => void }) {
   );
 }
 
-function CreateExam({ classes, onGenerate }: { classes: Class[]; onGenerate: (m: GenMeta) => void }) {
+function CreateExam({ classes, draft, onDraftChange, onGenerate }: {
+  classes: Class[];
+  draft: CreateExamDraft;
+  onDraftChange: (draft: CreateExamDraft) => void;
+  onGenerate: (m: GenMeta) => void;
+}) {
   // 지금 단계에서는 텍스트 자료만 받는다.
   const [tab, setTab] = useState<MaterialKind>('text');
-  const [mats, setMats] = useState<Material[]>([]);
-  const [pasteText, setPasteText] = useState('');
-  const [optOpen, setOptOpen] = useState(true);
+  const [mats, setMats] = useState<Material[]>(draft.mats);
+  const [pasteText, setPasteText] = useState(draft.pasteText);
+  const [optOpen, setOptOpen] = useState(draft.optOpen);
 
-  const [clsId, setClsId] = useState(classes[0]?.id ?? '');
-  const [scope, setScope] = useState('');
-  const [teacherRequest, setTeacherRequest] = useState('');
-  const [count, setCount] = useState(8);
-  const [types, setTypes] = useState<QType[]>(['vocab', 'grammar', 'reading', 'writing']);
-  const [diff, setDiff] = useState('보통');
+  const [clsId, setClsId] = useState(draft.classId || classes[0]?.id || '');
+  const [scope, setScope] = useState(draft.scope);
+  const [teacherRequest, setTeacherRequest] = useState(draft.teacherRequest);
+  const [count, setCount] = useState(draft.count);
+  const [types, setTypes] = useState<QType[]>(draft.types);
+  const [diff, setDiff] = useState(draft.difficulty);
   const className = classes.find(c => c.id === clsId)?.name ?? '';
+
+  useEffect(() => {
+    onDraftChange({ mats, pasteText, optOpen, classId: clsId, scope, teacherRequest, count, types, difficulty: diff });
+  }, [clsId, count, diff, mats, onDraftChange, optOpen, pasteText, scope, teacherRequest, types]);
 
   const addText = () => {
     const next = TEXT_MATERIALS[0];
@@ -401,6 +472,7 @@ function CreateExam({ classes, onGenerate }: { classes: Class[]; onGenerate: (m:
         <div className="badge" style={{ background: 'var(--mint-light)', color: 'var(--primary)', marginBottom: 12 }}><Sparkles size={13} /> 자료 기반 AI 출제</div>
         <h1 className="h-font exam-h1" style={{ fontSize: 33, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-.02em' }}>새 시험 만들기</h1>
         <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 15 }}>교재·자료를 올리면 <b style={{ color: 'var(--primary)' }}>그 자료 안에서만</b> 문제를 만들어 드려요.</p>
+        <p style={{ margin: '8px 0 0', color: 'var(--primary-light)', fontSize: 12.5, fontWeight: 600 }}>작성 내용은 자동으로 임시 저장됩니다.</p>
       </div>
 
       {/* ===== 자료 올리기 ===== */}
@@ -1973,13 +2045,15 @@ export function PublicExamRoute({ code }: { code: string }) {
   );
 }
 
-export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuideToMessaging?: (content: string) => void }> = ({ classes, students, onSendGuideToMessaging }) => {
-  const [screen, setScreen] = useState<Screen>('list');
+export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Student[]; onSendGuideToMessaging?: (content: string) => void }> = ({ ownerId, classes, students, onSendGuideToMessaging }) => {
+  const [restoredDraft] = useState<PersistedExamDraft | null>(() => loadExamDraft(ownerId));
+  const [screen, setScreen] = useState<Screen>(restoredDraft?.screen ?? 'list');
   const [saved, setSaved] = useState<ExamCard[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
-  const [exam, setExam] = useState<Exam | null>(null);
-  const [genMeta, setGenMeta] = useState<GenMeta | null>(null);
+  const [exam, setExam] = useState<Exam | null>(restoredDraft?.exam ?? null);
+  const [genMeta, setGenMeta] = useState<GenMeta | null>(restoredDraft?.meta ?? null);
+  const [createDraft, setCreateDraft] = useState<CreateExamDraft>(restoredDraft?.form ?? defaultCreateExamDraft(classes));
   const [reveal, setReveal] = useState(false);
   const [printMode, setPrintMode] = useState<'student' | 'teacher' | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -1991,6 +2065,20 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
 
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2600); };
   const go = (s: Screen) => { setScreen(s); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
+  const clearLocalDraft = () => removeExamDraft(ownerId);
+
+  useEffect(() => {
+    const hasUnsavedExam = Boolean(exam && !isSavedId(exam.id));
+    if (screen !== 'create' && screen !== 'loading' && !(screen === 'preview' && hasUnsavedExam)) return;
+    const persisted: PersistedExamDraft = {
+      screen: screen === 'preview' && hasUnsavedExam ? 'preview' : 'create',
+      form: createDraft,
+      meta: genMeta,
+      exam: hasUnsavedExam ? exam : null,
+      updatedAt: Date.now(),
+    };
+    saveExamDraft(ownerId, persisted);
+  }, [createDraft, exam, genMeta, ownerId, screen]);
 
   // 저장된 시험 목록을 실제 DB에서 불러온다.
   const refreshList = useCallback(async () => {
@@ -2031,6 +2119,7 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
     });
     const updated: Exam = { ...exam, id: savedExam.id, shortCode: savedExam.shortCode, status: savedExam.status, questions: fromSdkQuestions(savedExam.questions) };
     setExam(updated);
+    clearLocalDraft();
     await refreshList();
     return updated;
   };
@@ -2180,6 +2269,7 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
     setReveal(false);
     try {
       const full = await examsApi.get(card.id);
+      clearLocalDraft();
       setExam({
         id: full.id, name: full.title, target: full.targetLabel, topic: full.topic,
         date: full.date, difficulty: full.difficulty,
@@ -2223,7 +2313,7 @@ export const Exams: React.FC<{ classes: Class[]; students: Student[]; onSendGuid
             <SavedExamsScreen exams={saved} classes={classes} onOpen={card => void openSaved(card)} onNew={() => go('create')} />
           )
         )}
-        {screen === 'create' && <CreateExam classes={classes} onGenerate={meta => void handleGenerate(meta)} />}
+        {screen === 'create' && <CreateExam classes={classes} draft={createDraft} onDraftChange={setCreateDraft} onGenerate={meta => void handleGenerate(meta)} />}
         {screen === 'loading' && <GenLoading meta={genMeta} />}
         {screen === 'preview' && exam && (
           <div>

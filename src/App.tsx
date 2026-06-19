@@ -283,7 +283,7 @@ function AcademyApp({ session }: { session: Session }) {
           />
         );
       case 'exams':
-        return <Exams classes={classes} students={students} onSendGuideToMessaging={handleAssistantDraftToMessaging} />;
+        return <Exams ownerId={session.user.id} classes={classes} students={students} onSendGuideToMessaging={handleAssistantDraftToMessaging} />;
       case 'attendance':
         return (
           <AttendanceManager
