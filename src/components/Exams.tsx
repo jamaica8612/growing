@@ -14,6 +14,7 @@ import { examsApi, type ExamQuestion as SdkQuestion, type ExamStatus, type ExamL
 import { buildClasscardPasteText } from '../lib/classcardExport';
 import { inspectExamQuestions, type ExamQualityIssue } from '../lib/examQuality';
 import { createBTypeQuestions } from '../lib/examVariants';
+import { buildExamDocumentText } from '../lib/examDocumentExport';
 import './Exams.css';
 
 /* ===========================================================================
@@ -763,7 +764,7 @@ interface AiChatMessage {
   error?: boolean;
 }
 
-function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDuplicate, onCreateBType, onClasscardCopy, onDistribute }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onSave: () => void; onDuplicate: () => void; onCreateBType: () => void; onClasscardCopy: () => void; onDistribute: () => void }) {
+function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onDocumentCopy, onSave, onDuplicate, onCreateBType, onClasscardCopy, onDistribute }: { exam: Exam; setExam: React.Dispatch<React.SetStateAction<Exam | null>>; reveal: boolean; setReveal: React.Dispatch<React.SetStateAction<boolean>>; onPrint: (mode: 'student' | 'teacher') => void; onDocumentCopy: (mode: 'student' | 'teacher') => void; onSave: () => void; onDuplicate: () => void; onCreateBType: () => void; onClasscardCopy: () => void; onDistribute: () => void }) {
   const isMobile = useIsMobile();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatIdRef = useRef(0);
@@ -941,9 +942,12 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onDu
             <div style={{ position: 'relative' }}>
               <button className="btn btn-ghost" onClick={() => setPrintMenu(p => !p)} style={{ height: 38 }}><Printer size={17} /><span className="exam-btn-label">인쇄</span><ChevronDown size={14} color="var(--muted)" /></button>
               {printMenu && (
-                <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50, boxShadow: 'var(--shadow-lg)', padding: 6, width: 210 }}>
+                <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50, boxShadow: 'var(--shadow-lg)', padding: 6, width: 230 }}>
                   <button onClick={() => { setPrintMenu(false); onPrint('student'); }} style={pmI}><Users size={17} color="var(--info)" /><div><div style={pmT}>학생용 시험지</div><div style={pmS}>정답 없음</div></div></button>
                   <button onClick={() => { setPrintMenu(false); onPrint('teacher'); }} style={pmI}><GraduationCap size={17} color="var(--primary)" /><div><div style={pmT}>선생님용 정답지</div><div style={pmS}>정답·해설 포함</div></div></button>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '5px 7px' }} />
+                  <button onClick={() => { setPrintMenu(false); onDocumentCopy('student'); }} style={pmI}><Copy size={17} color="var(--info)" /><div><div style={pmT}>학생용 문서 복사</div><div style={pmS}>한글·Word 붙여넣기</div></div></button>
+                  <button onClick={() => { setPrintMenu(false); onDocumentCopy('teacher'); }} style={pmI}><Copy size={17} color="var(--primary)" /><div><div style={pmT}>정답지 문서 복사</div><div style={pmS}>정답·해설 포함</div></div></button>
                 </div>
               )}
             </div>
@@ -2384,6 +2388,22 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
     }
   };
 
+  const copyExamDocument = async (mode: 'student' | 'teacher') => {
+    if (!exam || exam.questions.length === 0) return;
+    try {
+      await copyText(buildExamDocumentText({
+        title: exam.name,
+        target: exam.target,
+        topic: exam.topic,
+        date: exam.date,
+        questions: exam.questions,
+      }, mode));
+      flash(mode === 'student' ? '학생용 시험지를 문서용으로 복사했어요.' : '정답·해설지를 문서용으로 복사했어요.');
+    } catch (e) {
+      flash(errMsg(e));
+    }
+  };
+
   const duplicateExam = () => {
     if (!exam || !isSavedId(exam.id)) return;
     const duplicated: Exam = {
@@ -2445,7 +2465,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
             <div className="exam-pagepad" style={{ padding: '0 44px', marginTop: 18 }}>
               <button className="btn btn-ghost" onClick={() => go('list')} style={{ height: 38 }}><List size={16} /> 시험 목록</button>
             </div>
-            <PreviewStudio exam={exam} setExam={setExam} reveal={reveal} setReveal={setReveal} onPrint={doPrint} onSave={() => void saveExam()} onDuplicate={duplicateExam} onCreateBType={createBTypeExam} onClasscardCopy={() => void copyForClasscard()} onDistribute={() => void goDistribute()} />
+            <PreviewStudio exam={exam} setExam={setExam} reveal={reveal} setReveal={setReveal} onPrint={doPrint} onDocumentCopy={mode => void copyExamDocument(mode)} onSave={() => void saveExam()} onDuplicate={duplicateExam} onCreateBType={createBTypeExam} onClasscardCopy={() => void copyForClasscard()} onDistribute={() => void goDistribute()} />
           </div>
         )}
         {screen === 'distribute' && exam && (
