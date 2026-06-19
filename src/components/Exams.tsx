@@ -15,6 +15,7 @@ import { buildClasscardPasteText } from '../lib/classcardExport';
 import { inspectExamQuestions, type ExamQualityIssue } from '../lib/examQuality';
 import { createBTypeQuestions } from '../lib/examVariants';
 import { buildExamDocumentText } from '../lib/examDocumentExport';
+import { combineExamMaterialTexts } from '../lib/examMaterials';
 import './Exams.css';
 
 /* ===========================================================================
@@ -103,6 +104,7 @@ interface Material {
   name: string;
   meta: string;
   label: string;
+  text?: string;
 }
 
 interface GenMeta {
@@ -439,6 +441,7 @@ function CreateExam({ classes, draft, onDraftChange, onGenerate }: {
 }) {
   // 지금 단계에서는 텍스트 자료만 받는다.
   const [tab, setTab] = useState<MaterialKind>('text');
+  const materialIdRef = useRef(0);
   const [mats, setMats] = useState<Material[]>(draft.mats);
   const [pasteText, setPasteText] = useState(draft.pasteText);
   const [optOpen, setOptOpen] = useState(draft.optOpen);
@@ -457,13 +460,17 @@ function CreateExam({ classes, draft, onDraftChange, onGenerate }: {
 
   const addText = () => {
     const next = TEXT_MATERIALS[0];
-    const chars = pasteText.trim().length;
-    setMats(ms => [...ms, { ...next, id: next.id + '-' + Date.now(), label: '자료 ' + (ms.length + 1), meta: `텍스트 · ${chars}자` }]);
+    const text = pasteText.trim();
+    if (!text) return;
+    materialIdRef.current += 1;
+    setMats(ms => [...ms, { ...next, id: `${next.id}-${ms.length}-${materialIdRef.current}`, label: '자료 ' + (ms.length + 1), meta: `텍스트 · ${text.length}자`, text }]);
+    setPasteText('');
   };
   const delMat = (id: string) => setMats(ms => ms.filter(m => m.id !== id).map((m, i) => ({ ...m, label: '자료 ' + (i + 1) })));
   const toggleType = (t: QType) => setTypes(ts => ts.includes(t) ? ts.filter(x => x !== t) : [...ts, t]);
 
-  const canGen = !!clsId && pasteText.trim().length > 0 && types.length > 0;
+  const combinedMaterialText = combineExamMaterialTexts(mats.map(material => material.text), pasteText);
+  const canGen = !!clsId && combinedMaterialText.length > 0 && types.length > 0;
 
   // 지금은 텍스트 자료만 사용한다.
   const TABS: { k: MaterialKind; icon: React.ReactNode; label: string }[] = [
@@ -501,7 +508,7 @@ function CreateExam({ classes, draft, onDraftChange, onGenerate }: {
         {tab === 'text' && (
           <div>
             <textarea className="input" value={pasteText} onChange={e => setPasteText(e.target.value)} style={{ minHeight: 130, fontSize: 14, lineHeight: 1.6 }} placeholder="교재 본문이나 단어장을 붙여넣으세요…" />
-            <button className="btn btn-soft" style={{ marginTop: 12 }} disabled={!pasteText.trim()} onClick={addText}><Plus size={16} color="var(--primary)" /> 이 텍스트 추가</button>
+            <button type="button" className="btn btn-soft" style={{ marginTop: 12 }} disabled={!pasteText.trim()} onClick={addText}><Plus size={16} color="var(--primary)" /> 이 텍스트 추가</button>
           </div>
         )}
         {mats.length > 0 && (
@@ -572,10 +579,10 @@ function CreateExam({ classes, draft, onDraftChange, onGenerate }: {
         )}
       </div>
 
-      <button className="btn btn-primary btn-lg" disabled={!canGen} style={{ width: '100%' }} onClick={() => onGenerate({ classId: clsId, targetLabel: className, topic: scope, count, types, diff, materialText: pasteText, instruction: teacherRequest })}>
+      <button className="btn btn-primary btn-lg" disabled={!canGen} style={{ width: '100%' }} onClick={() => onGenerate({ classId: clsId, targetLabel: className, topic: scope, count, types, diff, materialText: combinedMaterialText, instruction: teacherRequest })}>
         <Sparkles size={20} color="#fff" /> 이 자료로 문제 생성
       </button>
-      {!canGen && <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', margin: '12px 0 0' }}>{!clsId ? '대상 반을 선택해 주세요' : pasteText.trim().length === 0 ? '텍스트 자료를 붙여넣어 주세요' : '유형을 1개 이상 선택해 주세요'}</p>}
+      {!canGen && <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', margin: '12px 0 0' }}>{!clsId ? '대상 반을 선택해 주세요' : combinedMaterialText.length === 0 ? '텍스트 자료를 붙여넣어 주세요' : '유형을 1개 이상 선택해 주세요'}</p>}
     </div>
   );
 }
@@ -2149,6 +2156,14 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2600); };
   const go = (s: Screen) => { setScreen(s); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
   const clearLocalDraft = () => removeExamDraft(ownerId);
+  const startNewExam = () => {
+    clearLocalDraft();
+    setCreateDraft(defaultCreateExamDraft(classes));
+    setExam(null);
+    setGenMeta(null);
+    setReveal(false);
+    go('create');
+  };
 
   useEffect(() => {
     const hasUnsavedExam = Boolean(exam && !isSavedId(exam.id));
@@ -2455,7 +2470,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
               <button className="btn btn-primary" onClick={() => { setListLoading(true); void refreshList(); }}>다시 시도</button>
             </div>
           ) : (
-            <SavedExamsScreen exams={saved} classes={classes} onOpen={card => void openSaved(card)} onNew={() => go('create')} />
+            <SavedExamsScreen exams={saved} classes={classes} onOpen={card => void openSaved(card)} onNew={startNewExam} />
           )
         )}
         {screen === 'create' && <CreateExam classes={classes} draft={createDraft} onDraftChange={setCreateDraft} onGenerate={meta => void handleGenerate(meta)} />}
