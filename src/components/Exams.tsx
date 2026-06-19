@@ -662,7 +662,12 @@ function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highl
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <div className="num-font h-font" style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--primary)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>{n}</div>
         <span className={'badge ' + m.cls}>{m.label}</span>
-        <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>{q.points}점</span>
+        {editing ? (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>
+            배점
+            <input type="number" min={1} max={100} value={q.points} onChange={event => upd({ points: Math.max(1, Math.min(100, Number(event.target.value) || 1)) })} className="input" aria-label={`${n}번 문항 배점`} style={{ width: 68, height: 32, padding: '4px 8px', fontSize: 13 }} />
+          </label>
+        ) : <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>{q.points}점</span>}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <button className="btn btn-ghost btn-icon" title="편집" onClick={onEdit} style={{ borderColor: editing ? 'var(--mint)' : 'var(--border)', background: editing ? 'var(--mint-light)' : '#fff' }}><Pencil size={16} color={editing ? 'var(--primary)' : 'var(--text-2)'} /></button>
           <button className="btn btn-danger-ghost btn-icon" title="삭제" onClick={onDelete}><Trash2 size={16} /></button>
@@ -689,11 +694,37 @@ function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highl
         : <p style={{ margin: '0 0 16px', fontSize: 15.5, lineHeight: 1.6, color: 'var(--text)', fontWeight: 500, whiteSpace: 'pre-line' }}><MarkdownText text={q.prompt} /></p>}
 
       {q.choices ? (
-        <div className="exam-col2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-          {q.choices.map((c, i) => <ChoiceRow key={i} idx={i} text={c} correct={i === q.answer} reveal={reveal} editing={editing} onText={(v) => upd({ choices: q.choices!.map((x, xi) => xi === i ? v : x) })} />)}
-        </div>
+        <>
+          <div className="exam-col2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+            {q.choices.map((c, i) => <ChoiceRow key={i} idx={i} text={c} correct={i === Number(q.answer)} reveal={reveal} editing={editing} onText={(v) => upd({ choices: q.choices!.map((x, xi) => xi === i ? v : x) })} />)}
+          </div>
+          {editing && (
+            <div style={{ marginTop: 14 }}>
+              <div className="field-label" style={{ marginBottom: 8 }}>정답 보기</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                {q.choices.map((choice, index) => (
+                  <button key={index} type="button" className="chip" data-on={Number(q.answer) === index} onClick={() => upd({ answer: index })} aria-label={`${index + 1}번 보기를 정답으로 선택`}>
+                    {Number(q.answer) === index && <Check size={14} color="var(--primary)" />}{CIRC[index]} {choice || '(빈 보기)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       ) : (
-        <div style={{ border: '1.5px dashed #cfdad3', borderRadius: 12, padding: '16px', minHeight: 54, display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: 13.5 }}><Pencil size={15} style={{ marginRight: 8 }} /> 답안 작성란 (서술형)</div>
+        editing ? (
+          <div style={{ marginTop: 4 }}>
+            <div className="field-label" style={{ marginBottom: 8 }}>서술형 정답</div>
+            <textarea className="input" value={String(q.answer)} onChange={event => upd({ answer: event.target.value })} aria-label={`${n}번 문항 서술형 정답`} style={{ minHeight: 64, fontSize: 14 }} />
+          </div>
+        ) : <div style={{ border: '1.5px dashed #cfdad3', borderRadius: 12, padding: '16px', minHeight: 54, display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: 13.5 }}><Pencil size={15} style={{ marginRight: 8 }} /> 답안 작성란 (서술형)</div>
+      )}
+
+      {editing && (
+        <div style={{ marginTop: 14 }}>
+          <div className="field-label" style={{ marginBottom: 8 }}>해설</div>
+          <textarea className="input" value={q.explanation} onChange={event => upd({ explanation: event.target.value })} aria-label={`${n}번 문항 해설`} placeholder="정답의 근거와 풀이를 입력해 주세요" style={{ minHeight: 76, fontSize: 14, lineHeight: 1.55 }} />
+        </div>
       )}
 
       {reveal && (
