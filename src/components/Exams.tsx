@@ -7,11 +7,12 @@ import {
   Trash2, CheckCircle2, Eye, EyeOff, Printer, Save, QrCode, Send, Plus, Minus,
   Link2, Copy, Play, Square, Tablet, BarChart3,
   Award, TrendingUp, ChevronRight, MessageCircle, Sprout,
-  Clock, ArrowRight, RotateCw, User, Hand,
+  Clock, ArrowRight, RotateCw, User, Hand, AlertTriangle,
 } from 'lucide-react';
 import type { Class, Student } from '../types';
 import { examsApi, type ExamQuestion as SdkQuestion, type ExamStatus, type ExamListItem, type ExamSubmission as DbSubmission, type ExamAnswer as DbAnswer, type ExamAiChatMessage } from '../lib/exams';
 import { buildClasscardPasteText } from '../lib/classcardExport';
+import { inspectExamQuestions, type ExamQualityIssue } from '../lib/examQuality';
 import './Exams.css';
 
 /* ===========================================================================
@@ -652,7 +653,7 @@ function ChoiceRow({ idx, text, correct, reveal, editing, onText }: { idx: numbe
   );
 }
 
-function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highlight }: { q: Question; n: number; reveal: boolean; editing: boolean; onEdit: () => void; onChange: (q: Question) => void; onDelete: () => void; highlight: boolean }) {
+function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highlight, qualityIssues }: { q: Question; n: number; reveal: boolean; editing: boolean; onEdit: () => void; onChange: (q: Question) => void; onDelete: () => void; highlight: boolean; qualityIssues: ExamQualityIssue[] }) {
   const m = TYPE_META[q.type];
   const upd = (patch: Partial<Question>) => onChange({ ...q, ...patch });
   return (
@@ -666,6 +667,13 @@ function QuestionCard({ q, n, reveal, editing, onEdit, onChange, onDelete, highl
           <button className="btn btn-danger-ghost btn-icon" title="삭제" onClick={onDelete}><Trash2 size={16} /></button>
         </div>
       </div>
+
+      {qualityIssues.length > 0 && (
+        <button type="button" onClick={() => { if (!editing) onEdit(); }} style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14, padding: '10px 12px', textAlign: 'left', borderRadius: 10, border: '1px solid #f4cf8e', background: '#fffbeb', color: '#92400e' }}>
+          <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 12.5, lineHeight: 1.5, fontWeight: 600 }}>{qualityIssues.map(issue => issue.message).join(' · ')}</span>
+        </button>
+      )}
 
       {q.source && <div style={{ marginBottom: 12 }}><span className="src-tag"><FileText size={12} color="var(--primary-light)" /> 출처 · {q.source}</span></div>}
 
@@ -740,6 +748,8 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onCl
   const [newId, setNewId] = useState<string | null>(null);
   const reveals = mode === 'teacher' && reveal;
   const total = exam.questions.reduce((s, q) => s + q.points, 0);
+  const qualityIssues = inspectExamQuestions(exam.questions);
+  const qualityErrorCount = qualityIssues.filter(issue => issue.severity === 'error').length;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'nearest' });
@@ -907,9 +917,17 @@ function PreviewStudio({ exam, setExam, reveal, setReveal, onPrint, onSave, onCl
           <span style={{ fontSize: 13.5, fontWeight: 600, color: reveals ? 'var(--primary)' : 'var(--info)' }}>{mode === 'student' ? '학생용 보기 — 정답과 해설이 숨겨져 있어요.' : (reveal ? '선생님용 보기 — 정답·해설이 표시됩니다.' : '선생님용 보기 — “정답 보기”를 켜면 정답이 표시돼요.')}</span>
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 16px', borderRadius: 12, marginBottom: 18, background: qualityIssues.length > 0 ? '#fffbeb' : '#f3faf6', border: `1px solid ${qualityIssues.length > 0 ? '#f4cf8e' : '#c7ecd9'}` }}>
+          {qualityIssues.length > 0 ? <AlertTriangle size={17} color="#b45309" /> : <CheckCircle2 size={17} color="var(--success)" />}
+          <span style={{ fontSize: 13.5, fontWeight: 650, color: qualityIssues.length > 0 ? '#92400e' : 'var(--primary)' }}>
+            {qualityIssues.length > 0 ? `자동 검수: 오류 ${qualityErrorCount}개 · 확인 ${qualityIssues.length - qualityErrorCount}개` : '자동 검수 완료: 발견된 구조 오류가 없습니다.'}
+          </span>
+        </div>
+
         {exam.questions.map((q, i) => (
           <div id={'q-' + q.id} key={q.id}>
             <QuestionCard q={q} n={i + 1} reveal={reveals} editing={editId === q.id} highlight={q.id === newId}
+              qualityIssues={qualityIssues.filter(issue => issue.questionIndex === i)}
               onEdit={() => setEditId(id => id === q.id ? null : q.id)} onChange={changeQ} onDelete={() => delQ(q.id)} />
           </div>
         ))}
