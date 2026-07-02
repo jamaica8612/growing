@@ -180,24 +180,27 @@ export const Payments: React.FC<PaymentsProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const buf = ev.target?.result as ArrayBuffer;
-      const result = parsePayssamExcel(buf);
-      const norm = (s: string) => s.replace(/\s/g, '');
-      const matched: MatchedRow[] = [];
-      const unmatched: PayssamRow[] = [];
+    void (async () => {
+      try {
+        const buf = await file.arrayBuffer();
+        const result = await parsePayssamExcel(buf);
+        const norm = (s: string) => s.replace(/\s/g, '');
+        const matched: MatchedRow[] = [];
+        const unmatched: PayssamRow[] = [];
 
-      for (const row of result.rows) {
-        const student = students.find(s => norm(s.name) === norm(row.name));
-        if (student) matched.push({ ...row, studentId: student.id });
-        else unmatched.push(row);
+        for (const row of result.rows) {
+          const student = students.find(s => norm(s.name) === norm(row.name));
+          if (student) matched.push({ ...row, studentId: student.id });
+          else unmatched.push(row);
+        }
+
+        setImportParsed({ matched, unmatched, errors: result.errors, skippedVoid: result.skippedVoid });
+        setImportResult(null);
+      } catch {
+        setImportParsed({ matched: [], unmatched: [], errors: ['엑셀 파일을 읽지 못했어요. 결제선생에서 다시 내려받아 시도해 주세요.'], skippedVoid: 0 });
+        setImportResult(null);
       }
-
-      setImportParsed({ matched, unmatched, errors: result.errors, skippedVoid: result.skippedVoid });
-      setImportResult(null);
-    };
-    reader.readAsArrayBuffer(file);
+    })();
     e.target.value = '';
   };
 
