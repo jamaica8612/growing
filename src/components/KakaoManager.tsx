@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Clock3, Copy, KeyRound, Link2, MessageCircle, ShieldCheck, Trash2, UserX } from 'lucide-react';
 import type { KakaoChannelConfig, KakaoEventLog, KakaoParentLink, KakaoParentRequest, KakaoParentRequestStatus, Student } from '../types';
 
@@ -96,14 +96,17 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
   const [eventSecret, setEventSecret] = useState(primaryChannel?.eventSecret || '');
   const [enabled, setEnabled] = useState(primaryChannel?.enabled ?? true);
   // 저장 후 props 변경 시 폼 상태 동기화
-  useEffect(() => {
-    if (!primaryChannel) return;
-    setChannelName(primaryChannel.channelName || '그로잉영어 카카오 채널');
-    setSkillSecret(primaryChannel.skillSecret || '');
-    setEventSecret(primaryChannel.eventSecret || '');
-    setEnabled(primaryChannel.enabled ?? true);
-    setAutoReply(primaryChannel.autoReply ?? true);
-  }, [primaryChannel]);
+  const [syncedChannel, setSyncedChannel] = useState(primaryChannel);
+  if (primaryChannel !== syncedChannel) {
+    setSyncedChannel(primaryChannel);
+    if (primaryChannel) {
+      setChannelName(primaryChannel.channelName || '그로잉영어 카카오 채널');
+      setSkillSecret(primaryChannel.skillSecret || '');
+      setEventSecret(primaryChannel.eventSecret || '');
+      setEnabled(primaryChannel.enabled ?? true);
+      setAutoReply(primaryChannel.autoReply ?? true);
+    }
+  }
 
   const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
   const skillUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/kakao-skill` : 'Supabase URL 설정 필요';

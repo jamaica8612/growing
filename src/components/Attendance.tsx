@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus, MakeupReservation } from '../types';
 import { Calendar, CalendarPlus, Clock, X } from 'lucide-react';
 import { AttendanceCalendar } from './AttendanceCalendar';
@@ -45,16 +45,18 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   // 날짜 바뀌면 날짜 종속 로컬 상태 초기화 (이전 날 데이터가 새 날짜 기록에 섞이지 않도록)
-  useEffect(() => {
+  const [lastResetDate, setLastResetDate] = useState(selectedDate);
+  if (lastResetDate !== selectedDate) {
+    setLastResetDate(selectedDate);
     setAttendanceMemos({});
     setMakeupForDates({});
     setPendingAbsent(null);
-  }, [selectedDate]);
+  }
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
 
-  const getAttendanceRecord = (studentId: string, classId: string, date: string) =>
-    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === date);
+  const getAttendanceRecord = React.useCallback((studentId: string, classId: string, date: string) =>
+    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === date), [attendance]);
 
   const todayDateStr = new Date().toISOString().split('T')[0];
 
@@ -233,7 +235,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       });
     });
     return s;
-  }, [attendance, selectedDate, selectedDay, targetClasses, activeStudentIds]);
+  }, [getAttendanceRecord, selectedDate, selectedDay, targetClasses, activeStudentIds]);
 
   // 월간 통계 데이터
   const getMonthlyReportData = () => {

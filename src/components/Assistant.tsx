@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Check, CheckCircle2, Copy, MessageSquare, RefreshCw, Send, X, XCircle, AlertCircle } from 'lucide-react';
 import { sendAssistantMessage, executeAction, type ChatMessage, type PendingAction } from '../lib/assistant';
+import type { CounselNotification, NotificationBus } from '../lib/notificationBus';
 
 // AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯.
 // Phase 2: propose_* tool 응답에 action 객체가 오면 확인 카드를 표시하고,
@@ -9,8 +10,7 @@ import { sendAssistantMessage, executeAction, type ChatMessage, type PendingActi
 
 interface AssistantProps {
   onSendToMessaging?: (content: string) => void;
-  counselNotification?: { studentName: string; message: string } | null;
-  onCounselNotificationConsumed?: () => void;
+  counselBus?: NotificationBus<CounselNotification>;
 }
 
 const ATTENDANCE_KO: Record<string, string> = {
@@ -186,7 +186,7 @@ function ConfirmationCard({ action, status, onApprove, onReject, disabled }: Con
   );
 }
 
-export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counselNotification, onCounselNotificationConsumed }) => {
+export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counselBus }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -202,14 +202,15 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
 
-  // 새 상담 요청 알림 → 아이비 채팅에 자동 주입
+  // 새 상담 요청 알림 → 아이비 채팅에 자동 주입 (위젯이 없던 동안의 알림은 버스가 버퍼)
   useEffect(() => {
-    if (!counselNotification) return;
-    const text = `📨 **새 상담 요청이 들어왔어요!**\n\n**${counselNotification.studentName}** 학부모님: "${counselNotification.message}"\n\n카카오 관리 탭에서 확인하고 답변해 주세요.`;
-    setMessages(prev => [...prev, { role: 'assistant', content: text }]);
-    setHasUnread(true);
-    onCounselNotificationConsumed?.();
-  }, [counselNotification]);
+    if (!counselBus) return;
+    return counselBus.subscribe(notification => {
+      const text = `📨 **새 상담 요청이 들어왔어요!**\n\n**${notification.studentName}** 학부모님: "${notification.message}"\n\n카카오 관리 탭에서 확인하고 답변해 주세요.`;
+      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      setHasUnread(true);
+    });
+  }, [counselBus]);
 
   const flash = (msg: string) => {
     setToast(msg);
