@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -195,8 +196,19 @@ const TEXT_MATERIALS: Omit<Material, 'label'>[] = [
 ];
 // ----- 배포/응시 데이터 -----
 interface RosterStudent { id?: string; no: number; name: string; submitted?: boolean }
-const getQrImageUrl = (value: string) =>
-  `https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=18&data=${encodeURIComponent(value)}`;
+// QR은 외부 서비스 없이 로컬에서 생성한다 (응시 링크를 제3자에 노출하지 않음)
+function QrImage({ value, alt, size = 280 }: { value: string; alt: string; size?: number }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(value, { width: 420, margin: 2, errorCorrectionLevel: 'M' })
+      .then(url => { if (!cancelled) setSrc(url); })
+      .catch(() => { if (!cancelled) setSrc(null); });
+    return () => { cancelled = true; };
+  }, [value]);
+  if (!src) return <div aria-hidden style={{ width: size, height: size, maxWidth: '100%' }} />;
+  return <img src={src} alt={alt} style={{ width: size, height: size, maxWidth: '100%', display: 'block' }} />;
+}
 
 interface PerQ { correct: boolean; partial?: boolean; gained?: number; answer: number | string; feedback?: string | null; type: 'mcq' | 'write'; gradedBy?: 'auto' | 'ai' | 'teacher' }
 interface Submission { id?: string; no: number; name: string; time: string; score: number; totalPoints: number; submitted: boolean; perQ: Record<string, PerQ> }
@@ -1144,7 +1156,7 @@ function Distribute({ exam, published, code, roster, onToggleStatus, submissions
 
           <div style={{ width: 304, maxWidth: '100%', margin: '0 auto 18px', position: 'relative', filter: published ? 'none' : 'grayscale(1) opacity(.45)', transition: 'filter .2s' }}>
             <div style={{ padding: 12, background: '#fff', border: '1px solid var(--border)', borderRadius: 18, boxShadow: 'var(--shadow-sm)' }}>
-              <img src={getQrImageUrl(joinUrl)} alt={`${exam.name} 응시 QR`} style={{ width: 280, height: 280, maxWidth: '100%', display: 'block' }} />
+              <QrImage value={joinUrl} alt={`${exam.name} 응시 QR`} />
             </div>
             {!published && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}><div style={{ background: 'rgba(15,46,33,.86)', color: '#fff', fontSize: 12.5, fontWeight: 700, padding: '7px 14px', borderRadius: 999 }}>마감됨</div></div>}
           </div>
