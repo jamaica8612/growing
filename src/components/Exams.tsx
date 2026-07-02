@@ -195,14 +195,6 @@ const TEXT_MATERIALS: Omit<Material, 'label'>[] = [
 ];
 // ----- 배포/응시 데이터 -----
 interface RosterStudent { id?: string; no: number; name: string; submitted?: boolean }
-const ROSTER: RosterStudent[] = [
-  { no: 1, name: '김서연' }, { no: 2, name: '박지훈' }, { no: 3, name: '이도윤' },
-  { no: 4, name: '최하은' }, { no: 5, name: '정우진' }, { no: 6, name: '한소라' },
-  { no: 7, name: '오민재' }, { no: 8, name: '윤채원' }, { no: 9, name: '강시우' },
-  { no: 10, name: '임나윤' },
-];
-const SHORT_CODE = 'ABC123';
-const JOIN_URL = 'growing.kr/t/ABC123';
 const getQrImageUrl = (value: string) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=18&data=${encodeURIComponent(value)}`;
 
@@ -1545,9 +1537,9 @@ function StudentApp({
   exam,
   published,
   submissions,
-  roster = ROSTER,
-  code = SHORT_CODE,
-  joinUrl = JOIN_URL,
+  roster,
+  code,
+  joinUrl,
   showExit = true,
   onSubmit,
   onExit,
@@ -1555,9 +1547,9 @@ function StudentApp({
   exam: Exam;
   published: boolean;
   submissions: Submission[];
-  roster?: RosterStudent[];
-  code?: string;
-  joinUrl?: string;
+  roster: RosterStudent[];
+  code: string;
+  joinUrl: string;
   showExit?: boolean;
   onSubmit: (s: Submission, answers: Record<string, number | string>, student: RosterStudent) => void | Promise<void>;
   onExit: () => void;
@@ -1772,7 +1764,7 @@ function PRing({ score, totalPoints = 100, size = 132, stroke = 12 }: { score: n
 }
 
 function ParentResult({ exam, submissions, onExit, showExit = true }: { exam: Exam; submissions: Submission[]; onExit: () => void; showExit?: boolean }) {
-  const [pickNo, setPickNo] = useState<number | null>((submissions.find(s => s.name === '윤채원') || submissions[0])?.no ?? null);
+  const [pickNo, setPickNo] = useState<number | null>(submissions[0]?.no ?? null);
   const pick = submissions.find(s => s.no === pickNo) || submissions[0] || null;
 
   if (!pick) {
@@ -2151,7 +2143,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentRoster = exam ? rosterForClass(classes, students, exam.classId) : [];
-  const rosterList = currentRoster.length > 0 ? currentRoster : (exam && isSavedId(exam.id) ? [] : ROSTER);
+  const rosterList = currentRoster;
 
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2600); };
   const go = (s: Screen) => { setScreen(s); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
@@ -2488,7 +2480,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
             <div className="exam-pagepad" style={{ padding: '0 44px', marginTop: 18 }}>
               <button className="btn btn-ghost" onClick={() => go('preview')} style={{ height: 38 }}><Pencil size={16} /> 미리보기로</button>
             </div>
-            <Distribute exam={exam} published={published} code={exam.shortCode || SHORT_CODE} roster={rosterList} onToggleStatus={() => void toggleStatus()} submissions={submissions} onGoResults={goResults} onRefresh={refreshSubmissions} onGoStudent={() => go('student')} flash={flash} />
+            <Distribute exam={exam} published={published} code={exam.shortCode ?? ''} roster={rosterList} onToggleStatus={() => void toggleStatus()} submissions={submissions} onGoResults={goResults} onRefresh={refreshSubmissions} onGoStudent={() => go('student')} flash={flash} />
           </div>
         )}
         {screen === 'results' && exam && (
@@ -2500,7 +2492,7 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
           </div>
         )}
         {screen === 'student' && exam && (
-          <StudentApp exam={exam} published={published} submissions={submissions} roster={rosterList} code={exam.shortCode || SHORT_CODE} joinUrl={`${window.location.origin}${window.location.pathname}#/exam/${exam.shortCode || SHORT_CODE}`} onSubmit={handleStudentSubmit} onExit={() => go('distribute')} />
+          <StudentApp exam={exam} published={published} submissions={submissions} roster={rosterList} code={exam.shortCode ?? ''} joinUrl={`${window.location.origin}${window.location.pathname}#/exam/${exam.shortCode ?? ''}`} onSubmit={handleStudentSubmit} onExit={() => go('distribute')} />
         )}
         {screen === 'parent' && exam && (
           <ParentResult exam={exam} submissions={submissions} onExit={() => go('results')} />
