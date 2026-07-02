@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { subscribePushNotifications } from './lib/pushNotifications';
+import { createNotificationBus, type CounselNotification, type NotificationBus } from './lib/notificationBus';
 import { useAcademyData } from './hooks/useAcademyData';
 import { useMakeupReservations } from './hooks/useMakeupReservations';
 import { Login } from './components/Login';
@@ -170,10 +171,12 @@ function AcademyApp({ session }: { session: Session }) {
     r => r.requestType === 'counsel' && r.status === 'pending'
   ).length;
 
-  // 아이비 상담 알림 상태
-  const [counselNotification, setCounselNotification] = useState<{ studentName: string; message: string } | null>(null);
+  // 아이비 상담 알림 버스 — 위젯이 언마운트된 동안 온 알림은 버퍼 후 전달
+  const [counselBus] = useState<NotificationBus<CounselNotification>>(() => createNotificationBus<CounselNotification>());
   const studentsRef = useRef(students);
-  studentsRef.current = students;
+  useEffect(() => {
+    studentsRef.current = students;
+  }, [students]);
 
   // PWA 푸시 알림 구독 (원장님 로그인 시 한 번)
   useEffect(() => {
@@ -193,12 +196,12 @@ function AcademyApp({ session }: { session: Session }) {
         const rec = payload.new as { request_type: string; message: string; student_id: string };
         if (rec.request_type !== 'counsel') return;
         const student = studentsRef.current.find(s => s.id === rec.student_id);
-        setCounselNotification({ studentName: student?.name ?? '학부모', message: rec.message });
+        counselBus.emit({ studentName: student?.name ?? '학부모', message: rec.message });
         void reload(); // 배지 카운트 즉시 갱신
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [session.user.id, reload]);
+  }, [session.user.id, reload, counselBus]);
 
   const handleLogout = () => {
     void supabase.auth.signOut();
@@ -674,8 +677,7 @@ function AcademyApp({ session }: { session: Session }) {
       {activeTab !== 'exams' && (
         <Assistant
           onSendToMessaging={handleAssistantDraftToMessaging}
-          counselNotification={counselNotification}
-          onCounselNotificationConsumed={() => setCounselNotification(null)}
+          counselBus={counselBus}
         />
       )}
     </div>
