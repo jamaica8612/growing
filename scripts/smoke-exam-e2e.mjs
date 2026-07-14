@@ -96,7 +96,7 @@ student_row as (
   insert into public.growing_students (
     id, owner_id, name, school, grade, contact, parent_contact, registration_date, status, memo
   )
-  select student_id, owner_id, 'CodexE2E 학생 ' || code, '', '테스트', '', '', current_date, 'active', 'CodexE2E cleanup'
+  select student_id, owner_id, 'CodexE2E 학생 ' || code, '', '테스트', '', '010-0000-5678', current_date, 'active', 'CodexE2E cleanup'
   from seed
   returning id
 ),
@@ -166,11 +166,38 @@ try {
   if (!Array.isArray(exam.payload.students) || exam.payload.students.length !== 1) {
     throw new Error('get_exam did not return the temporary roster.');
   }
+  const publicStudent = exam.payload.students[0];
+  if (!publicStudent?.studentKey || 'id' in publicStudent || 'submitted' in publicStudent) {
+    throw new Error('get_exam exposed the legacy student identity contract.');
+  }
+  if (typeof publicStudent.name !== 'string' || !publicStudent.name.includes('*') || publicStudent.name.includes('CodexE2E')) {
+    throw new Error('get_exam exposed an unmasked student name.');
+  }
+
+  const rejectedVerification = await callPublic({
+    action: 'verify_student',
+    code: created.short_code,
+    studentKey: publicStudent.studentKey,
+    contactLast4: '0000',
+  });
+  if (rejectedVerification.status !== 403 || rejectedVerification.payload.verificationToken) {
+    throw new Error('verify_student accepted an invalid contact suffix.');
+  }
+
+  const verification = await callPublic({
+    action: 'verify_student',
+    code: created.short_code,
+    studentKey: publicStudent.studentKey,
+    contactLast4: '5678',
+  });
+  if (verification.status !== 200 || !verification.payload.verificationToken) {
+    throw new Error(`verify_student failed: ${verification.status}`);
+  }
 
   const submit = await callPublic({
     action: 'submit',
     code: created.short_code,
-    studentId: created.student_id,
+    verificationToken: verification.payload.verificationToken,
     answers: { [created.question_id]: 1 },
   });
   if (submit.status !== 200 || submit.payload.score !== 10 || submit.payload.total !== 10) {

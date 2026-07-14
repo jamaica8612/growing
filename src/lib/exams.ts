@@ -88,10 +88,11 @@ const toExam = (r: Row, questions: ExamQuestion[] = []): Exam => ({
 });
 
 // 응시코드(6자 대문자/숫자) — 혼동되는 0/O/1/I 제외
-function makeShortCode(): string {
+export function makeShortCode(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const randomBytes = crypto.getRandomValues(new Uint8Array(6));
   let code = '';
-  for (let i = 0; i < 6; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (const byte of randomBytes) code += alphabet[byte % alphabet.length];
   return code;
 }
 
@@ -130,6 +131,30 @@ export interface ExamListItem {
   count: number;
   types: ExamQType[];
   totalPoints: number;
+}
+
+export interface PublicExamStudent {
+  studentKey: string;
+  no: number;
+  name: string;
+}
+
+async function throwPublicFunctionError(error: unknown, data: unknown, fallback: string): Promise<never> {
+  const directMessage = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
+    ? data.error
+    : '';
+  if (directMessage) throw new Error(directMessage);
+
+  const context = error && typeof error === 'object' && 'context' in error ? error.context : null;
+  if (context instanceof Response) {
+    let contextMessage = '';
+    try {
+      const body = await context.clone().json() as { error?: unknown };
+      contextMessage = typeof body.error === 'string' ? body.error.trim() : '';
+    } catch { /* fall through to the non-identifying fallback */ }
+    if (contextMessage) throw new Error(contextMessage);
+  }
+  throw new Error(fallback);
 }
 
 export const examsApi = {
@@ -439,20 +464,26 @@ export const examsApi = {
   // ---- 학생/학부모 무로그인 (exam-public, 별도 공개 라우트에서 사용) ----
   async publicGetExam(code: string) {
     const { data, error } = await supabase.functions.invoke('exam-public', { body: { action: 'get_exam', code } });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    return data as { exam: Row; questions: Row[]; students: { id: string; no: number; name: string; submitted: boolean }[] };
+    if (error || data?.error) await throwPublicFunctionError(error, data, '시험 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    return data as { exam: Row; questions: Row[]; students: PublicExamStudent[] };
   },
-  async publicSubmit(code: string, studentId: string, answers: Record<string, number | string>) {
-    const { data, error } = await supabase.functions.invoke('exam-public', { body: { action: 'submit', code, studentId, answers } });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
+  async publicVerifyStudent(code: string, studentKey: string, contactLast4: string) {
+    const { data, error } = await supabase.functions.invoke('exam-public', {
+      body: { action: 'verify_student', code, studentKey, contactLast4 },
+    });
+    if (error || data?.error) await throwPublicFunctionError(error, data, '본인 확인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    return data as { verificationToken: string; expiresIn: number };
+  },
+  async publicSubmit(code: string, verificationToken: string, answers: Record<string, number | string>) {
+    const { data, error } = await supabase.functions.invoke('exam-public', {
+      body: { action: 'submit', code, verificationToken, answers },
+    });
+    if (error || data?.error) await throwPublicFunctionError(error, data, '답안을 제출하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     return data as { ok: boolean; score: number; total: number };
   },
   async publicGetResult(token: string) {
     const { data, error } = await supabase.functions.invoke('exam-public', { body: { action: 'get_result', token } });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
+    if (error || data?.error) await throwPublicFunctionError(error, data, '결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     return data as { exam: Row; submission: Row; questions: Row[]; answers: Row[] };
   },
 };

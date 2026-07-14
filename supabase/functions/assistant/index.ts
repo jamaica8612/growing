@@ -8,7 +8,7 @@
 // Phase 2 추가: propose_attendance_change / propose_payment_change 도구로
 // 변경 제안 객체만 반환. execute_action 모드에서 승인된 action을 실제로 DB에 반영.
 
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
 
 declare const Supabase: {
   ai: {
@@ -511,9 +511,13 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       let rows = (payRes.data ?? []).map((p: Json) => {
         const stu = byId.get(p.student_id) as Json | undefined;
         return {
-          studentName: stu?.name ?? '(알수없음)', parentContact: stu?.parent_contact ?? '',
-          billingMonth: p.billing_month, amount: p.amount, status: p.status,
-          paymentDate: p.payment_date, paymentMethod: p.payment_method,
+          studentName: String(stu?.name ?? '(알수없음)'),
+          parentContact: String(stu?.parent_contact ?? ''),
+          billingMonth: String(p.billing_month ?? ''),
+          amount: Number(p.amount ?? 0),
+          status: String(p.status ?? ''),
+          paymentDate: p.payment_date,
+          paymentMethod: p.payment_method,
         };
       });
       if (status !== 'all') rows = rows.filter(r => r.status === status);
@@ -798,8 +802,8 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
           action_proposed: true,
           action: {
             type: 'create_attendance',
-            student_id: student.id,
-            student_name: student.name,
+            student_id: String(student.id),
+            student_name: String(student.name),
             date, old_status: '(기록없음)', new_status: newStatus,
           } satisfies CreateAttendanceAction,
           summary: `${student.name} 학생의 ${date} 출결 기록이 없어 ${newStatusKo}으로 새로 등록합니다.`,

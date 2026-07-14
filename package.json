@@ -9,19 +9,22 @@
     "lint": "eslint .",
     "test": "vitest run",
     "verify": "npm run lint && npm run test && npm run build",
+    "audit:security": "npm audit --audit-level=high",
+    "check:edge": "deno check --no-lock supabase/functions/assistant/index.ts supabase/functions/exam-generate/index.ts supabase/functions/exam-public/index.ts supabase/functions/kakao-channel-event/index.ts supabase/functions/kakao-skill/index.ts supabase/functions/send-alimtalk/index.ts supabase/functions/send-push/index.ts",
     "verify:quiet": "node scripts/verify-quiet.mjs",
     "deploy:exam-functions": "npx supabase functions deploy exam-public --no-verify-jwt && npx supabase functions deploy exam-generate",
     "smoke:exam-public": "node scripts/smoke-exam-public.mjs",
     "smoke:exam-e2e": "node scripts/smoke-exam-e2e.mjs",
+    "check:migration-drift": "node scripts/check-migration-drift.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.106.2",
+    "@supabase/supabase-js": "^2.110.4",
     "lucide-react": "^1.17.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -29,13 +32,14 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "deno": "^2.9.2",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12",
+    "vite": "^8.1.4",
     "vitest": "^4.1.8"
   }
 }

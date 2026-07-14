@@ -14,7 +14,7 @@ interface BackupProps {
     attendance: Attendance[];
     payments: Payment[];
     counselLogs: CounselLog[];
-  }) => void;
+  }) => Promise<boolean>;
   onResetData: () => void;
   getAllData: () => {
     students: Student[];
@@ -32,6 +32,8 @@ interface BackupProps {
 const isRecordArray = (value: unknown): value is { id: unknown }[] =>
   Array.isArray(value) &&
   value.every(item => typeof item === 'object' && item !== null && typeof (item as { id?: unknown }).id === 'string');
+
+const MAX_BACKUP_FILE_BYTES = 10 * 1024 * 1024;
 
 export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAllData, kioskPin, onChangeKioskPin }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -224,8 +226,19 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.name.toLowerCase().endsWith('.json') || file.size > MAX_BACKUP_FILE_BYTES) {
+      setImportStatus({
+        success: false,
+        message: file.size > MAX_BACKUP_FILE_BYTES
+          ? '백업 파일이 너무 큽니다. 10MB 이하 파일을 선택해 주세요.'
+          : 'JSON 형식의 그로잉영어 백업 파일만 복원할 수 있습니다.',
+      });
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
 
@@ -251,13 +264,21 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         }
 
         if (window.confirm('클라우드에 저장된 기존 데이터가 모두 지워지고 백업 파일 데이터로 덮어씌워집니다. 진행하시겠습니까?')) {
-          onImportData({
+          const restored = await onImportData({
             students: json.students,
             classes: json.classes,
             attendance: json.attendance,
             payments: json.payments,
             counselLogs: json.counselLogs,
           });
+
+          if (!restored) {
+            setImportStatus({
+              success: false,
+              message: '데이터 복원을 완료하지 못했습니다. 화면을 새로고침해 현재 저장 상태를 확인해 주세요.',
+            });
+            return;
+          }
 
           setImportStatus({
             success: true,
@@ -273,6 +294,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
         });
       }
     };
+    reader.onerror = () => setImportStatus({ success: false, message: '백업 파일을 읽지 못했습니다. 다시 시도해 주세요.' });
     reader.readAsText(file);
     
     // reset input

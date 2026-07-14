@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import type { Student, Class, Attendance, EditableAttendanceStatus, HomeworkStatus, MakeupReservation } from '../types';
 import { Calendar, CalendarPlus, Clock, X } from 'lucide-react';
 import { AttendanceCalendar } from './AttendanceCalendar';
@@ -44,17 +44,17 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const [reservationMemo, setReservationMemo] = useState('');
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
-  // 날짜 바뀌면 날짜 종속 로컬 상태 초기화 (이전 날 데이터가 새 날짜 기록에 섞이지 않도록)
-  useEffect(() => {
+  const handleSelectedDateChange = (date: string) => {
+    setSelectedDate(date);
     setAttendanceMemos({});
     setMakeupForDates({});
     setPendingAbsent(null);
-  }, [selectedDate]);
+  };
 
   const activeStudentIds = useMemo(() => new Set(students.filter(s => s.status === 'active').map(s => s.id)), [students]);
 
-  const getAttendanceRecord = (studentId: string, classId: string, date: string) =>
-    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === date);
+  const getAttendanceRecord = useCallback((studentId: string, classId: string, date: string) =>
+    attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === date), [attendance]);
 
   const todayDateStr = new Date().toISOString().split('T')[0];
 
@@ -209,9 +209,9 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   };
 
   // 표시 대상 반 목록 (selectedClassId 필터)
-  const targetClasses = classes.filter(cls =>
+  const targetClasses = useMemo(() => classes.filter(cls =>
     selectedClassId === 'all' || cls.id === selectedClassId
-  );
+  ), [classes, selectedClassId]);
 
   const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'] as const;
   const d = new Date(`${selectedDate}T00:00:00`);
@@ -233,7 +233,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
       });
     });
     return s;
-  }, [attendance, selectedDate, selectedDay, targetClasses, activeStudentIds]);
+  }, [selectedDate, selectedDay, targetClasses, activeStudentIds, getAttendanceRecord]);
 
   // 월간 통계 데이터
   const getMonthlyReportData = () => {
@@ -277,7 +277,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
         <div className="at-filter-left">
           <label className="at-datepick">
             <span>출결 기준일</span>
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="gd-dateinput" style={{ border: '1px solid var(--color-border)' }} />
+            <input type="date" value={selectedDate} onChange={e => handleSelectedDateChange(e.target.value)} className="gd-dateinput" style={{ border: '1px solid var(--color-border)' }} />
           </label>
           <div className="at-chips">
             <button className={`at-chip ${selectedClassId === 'all' ? 'on' : ''}`} onClick={() => setSelectedClassId('all')}>전체 반</button>
@@ -592,7 +592,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
           </div>
         </div>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>날짜를 누르면 위쪽 출결 기록이 해당 날짜로 이동합니다.</p>
-        <AttendanceCalendar attendance={activeAttendance} month={reportMonth} selectedDate={selectedDate} onSelectDate={date => setSelectedDate(date)} compact />
+        <AttendanceCalendar attendance={activeAttendance} month={reportMonth} selectedDate={selectedDate} onSelectDate={handleSelectedDateChange} compact />
       </div>
 
       {/* ── 월간 출결 통계 ── */}

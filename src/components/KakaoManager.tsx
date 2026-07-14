@@ -98,11 +98,14 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
   // 저장 후 props 변경 시 폼 상태 동기화
   useEffect(() => {
     if (!primaryChannel) return;
-    setChannelName(primaryChannel.channelName || '그로잉영어 카카오 채널');
-    setSkillSecret(primaryChannel.skillSecret || '');
-    setEventSecret(primaryChannel.eventSecret || '');
-    setEnabled(primaryChannel.enabled ?? true);
-    setAutoReply(primaryChannel.autoReply ?? true);
+    const frame = requestAnimationFrame(() => {
+      setChannelName(primaryChannel.channelName || '그로잉영어 카카오 채널');
+      setSkillSecret(primaryChannel.skillSecret || '');
+      setEventSecret(primaryChannel.eventSecret || '');
+      setEnabled(primaryChannel.enabled ?? true);
+      setAutoReply(primaryChannel.autoReply ?? true);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [primaryChannel]);
 
   const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');

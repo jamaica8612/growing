@@ -173,7 +173,10 @@ function AcademyApp({ session }: { session: Session }) {
   // 아이비 상담 알림 상태
   const [counselNotification, setCounselNotification] = useState<{ studentName: string; message: string } | null>(null);
   const studentsRef = useRef(students);
-  studentsRef.current = students;
+
+  useEffect(() => {
+    studentsRef.current = students;
+  }, [students]);
 
   // PWA 푸시 알림 구독 (원장님 로그인 시 한 번)
   useEffect(() => {

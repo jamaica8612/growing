@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
 import {
   type KakaoSkillPayload,
   type QuickReplyDef,
@@ -12,6 +12,16 @@ import {
   parseConnectInput,
   skillText,
 } from './logic.ts';
+import {
+  createPushAuthHeaders,
+  isPushInternalSecretConfigured,
+} from '../_shared/push-auth.ts';
+
+// The Edge Function intentionally uses the dynamic database shape. Supabase's
+// generic factory must be instantiated before ReturnType is taken, otherwise
+// newer TypeScript versions collapse every table operation to `never`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type UntypedSupabaseClient = ReturnType<typeof createClient<any>>;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -91,7 +101,7 @@ function getSkillSecret(req: Request): string {
 }
 
 async function logEvent(
-  supabase: ReturnType<typeof createClient>,
+  supabase: UntypedSupabaseClient,
   payload: KakaoSkillPayload,
   ownerId: string | null,
   status: string,
@@ -110,7 +120,7 @@ async function logEvent(
   });
 }
 
-async function findActiveLinks(supabase: ReturnType<typeof createClient>, ownerId: string, kakaoUserKey: string): Promise<ParentLinkRow[]> {
+async function findActiveLinks(supabase: UntypedSupabaseClient, ownerId: string, kakaoUserKey: string): Promise<ParentLinkRow[]> {
   const { data, error } = await supabase
     .from('growing_kakao_parent_links')
     .select('*')
@@ -121,7 +131,7 @@ async function findActiveLinks(supabase: ReturnType<typeof createClient>, ownerI
   return (data ?? []) as ParentLinkRow[];
 }
 
-async function resolveChannel(supabase: ReturnType<typeof createClient>, skillSecret: string): Promise<{ ownerId: string; autoReply: boolean } | null> {
+async function resolveChannel(supabase: UntypedSupabaseClient, skillSecret: string): Promise<{ ownerId: string; autoReply: boolean } | null> {
   if (!skillSecret) return null;
   const { data, error } = await supabase
     .from('growing_kakao_channels')
@@ -135,7 +145,7 @@ async function resolveChannel(supabase: ReturnType<typeof createClient>, skillSe
   return { ownerId: row.owner_id, autoReply: row.auto_reply !== false };
 }
 
-async function getStudent(supabase: ReturnType<typeof createClient>, studentId: string): Promise<StudentRow | null> {
+async function getStudent(supabase: UntypedSupabaseClient, studentId: string): Promise<StudentRow | null> {
   const { data, error } = await supabase
     .from('growing_students')
     .select('id, name, parent_contact, status')
@@ -146,7 +156,7 @@ async function getStudent(supabase: ReturnType<typeof createClient>, studentId: 
 }
 
 async function createParentRequest(
-  supabase: ReturnType<typeof createClient>,
+  supabase: UntypedSupabaseClient,
   ownerId: string,
   studentId: string | null,
   kakaoUserKey: string,
@@ -167,7 +177,7 @@ async function createParentRequest(
 // ── AI 질문 처리 ──────────────────────────────────────────────
 
 async function buildStudentContext(
-  supabase: ReturnType<typeof createClient>,
+  supabase: UntypedSupabaseClient,
   studentId: string,
   ownerId: string,
   studentName: string,
@@ -201,7 +211,7 @@ async function buildStudentContext(
   const recent30 = rows.slice(0, 30);
   const attendanceLines = recent30.map(r => {
     const st = statusLabel[r.status] ?? r.status;
-    const hw = r.homework_status && r.homework_status !== ''
+    const hw = r.homework_status
       ? ` 숙제:${homeworkLabel[r.homework_status] ?? r.homework_status}`
       : '';
     const time = (r.check_in_time || r.check_out_time)
@@ -211,7 +221,7 @@ async function buildStudentContext(
   }).join('\n') || '기록 없음';
 
   // 숙제 통계
-  const hwRows = recent30.filter(r => r.homework_status && r.homework_status !== '');
+  const hwRows = recent30.filter(r => r.homework_status);
   const hwDone = hwRows.filter(r => r.homework_status === 'done').length;
   const hwIncomplete = hwRows.filter(r => r.homework_status === 'incomplete').length;
   const hwUndone = hwRows.filter(r => r.homework_status === 'undone').length;
@@ -286,7 +296,7 @@ ${context}`;
 
 /** 직전 응답이 상담 사유 입력 안내였는지 (10분 이내) */
 async function wasRecentlyPromptedForCounsel(
-  supabase: ReturnType<typeof createClient>,
+  supabase: UntypedSupabaseClient,
   ownerId: string,
   kakaoUserKey: string,
 ): Promise<boolean> {
@@ -303,19 +313,44 @@ async function wasRecentlyPromptedForCounsel(
   return Date.now() - new Date(row.created_at).getTime() < 10 * 60 * 1000;
 }
 
-async function sendPushToOwner(ownerId: string, title: string, body: string): Promise<void> {
+async function sendPushToOwner(
+  callerOwnerId: string,
+  recipientOwnerId: string,
+  title: string,
+  body: string,
+): Promise<void> {
   try {
+    if (callerOwnerId !== recipientOwnerId) {
+      console.error('Counsel push blocked: caller and recipient owners do not match');
+      return;
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+    const internalSecret = Deno.env.get('PUSH_INTERNAL_SECRET');
+    if (!supabaseUrl || !isPushInternalSecretConfigured(internalSecret)) {
+      console.error('Counsel push skipped: PUSH_INTERNAL_SECRET must be at least 32 bytes');
+      return;
+    }
+
+    const rawBody = JSON.stringify({ owner_id: recipientOwnerId, title, body, tag: 'counsel' });
+    const authHeaders = await createPushAuthHeaders({
+      secret: internalSecret,
+      ownerId: callerOwnerId,
+      rawBody,
+    });
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceKey}`,
+        ...authHeaders,
       },
-      body: JSON.stringify({ owner_id: ownerId, title, body, tag: 'counsel' }),
+      body: rawBody,
     });
-  } catch {
+    if (!response.ok && response.status !== 204) {
+      console.error(`Counsel push failed with status ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Counsel push failed', error);
     // push failures must never interrupt the main response
   }
 }
@@ -460,7 +495,7 @@ Deno.serve(async req => {
 
       // 원장님 폰 푸시 알림 (실패해도 응답에 영향 없음)
       const pushTitle = counselStudentName ? `${counselStudentName} 상담 요청` : isNewInquiry ? '신규 상담 문의' : '카카오 상담 요청';
-      void sendPushToOwner(ownerId, pushTitle, savedMessage.slice(0, 100));
+      void sendPushToOwner(channelOwnerId, ownerId, pushTitle, savedMessage.slice(0, 100));
 
       return jsonResponse(response);
     }
@@ -481,7 +516,7 @@ Deno.serve(async req => {
             { label: '💬 상담 요청', action: 'counsel_request' },
           ]);
           await logEvent(supabase, payload, channelOwnerId, 'counsel_queued_unlinked', response);
-          void sendPushToOwner(channelOwnerId, '신규 상담 문의', savedMessage.slice(0, 100));
+          void sendPushToOwner(channelOwnerId, channelOwnerId, '신규 상담 문의', savedMessage.slice(0, 100));
           return jsonResponse(response);
         }
       }

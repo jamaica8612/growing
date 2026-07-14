@@ -11,14 +11,15 @@ permissions:
   id-token: write
 
 concurrency:
-  group: 'pages'
-  cancel-in-progress: true
+  group: growing-production
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  deploy-functions:
+    uses: ./.github/workflows/deploy-functions.yml
+    secrets: inherit
+
+  build-pages:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,10 +34,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
-
-      - name: Build
+      - name: Build Pages artifact
         run: npm run build
 
       - name: Setup Pages
@@ -46,6 +44,16 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
+
+  deploy:
+    needs:
+      - deploy-functions
+      - build-pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
 
       - name: Deploy to GitHub Pages
         id: deployment

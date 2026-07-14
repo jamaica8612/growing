@@ -1,12 +1,15 @@
 name: Deploy Supabase Edge Functions
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'supabase/functions/**'
+  workflow_call:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: growing-edge-functions
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -22,15 +25,59 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Verify application
+        run: npm run verify
+
+      - name: Type-check Edge Functions
+        run: npm run check:edge
+
+      - name: Audit dependencies
+        run: npm run audit:security
 
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
+      - name: Check required Edge secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          secrets_json="$(supabase secrets list --project-ref xrrdokcjhjqdfvwtbenl --output json)"
+          for required_secret in PUSH_INTERNAL_SECRET EXAM_VERIFICATION_SECRET; do
+            if ! jq -e --arg name "$required_secret" 'any(.[]; .name == $name)' <<<"$secrets_json" >/dev/null; then
+              echo "Missing required Supabase secret: $required_secret" >&2
+              exit 1
+            fi
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deploy kakao-skill
         run: supabase functions deploy kakao-skill --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Gateway JWT verification is intentionally disabled because this endpoint
+      # authenticates only signed server-to-server requests with PUSH_INTERNAL_SECRET.
+      - name: Deploy send-push
+        run: supabase functions deploy send-push --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-alimtalk
+        run: supabase functions deploy send-alimtalk --project-ref xrrdokcjhjqdfvwtbenl
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # This public route verifies the student with a masked roster, contact
+      # suffix, and a short-lived HMAC token inside the function.
+      - name: Deploy exam-public
+        run: supabase functions deploy exam-public --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy exam-generate
+        run: supabase functions deploy exam-generate --project-ref xrrdokcjhjqdfvwtbenl
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

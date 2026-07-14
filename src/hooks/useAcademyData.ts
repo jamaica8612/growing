@@ -393,14 +393,15 @@ export function useAcademyData(userId: string) {
   // ---- Backup: export current data / restore a JSON backup into the DB ----
   const getAllData = () => ({ students, classes, attendance, payments, counselLogs });
 
-  const handleImportData = (data: {
+  const handleImportData = async (data: {
     students: Student[];
     classes: Class[];
     attendance: Attendance[];
     payments: Payment[];
     counselLogs: CounselLog[];
-  }) =>
-    guard(async () => {
+  }): Promise<boolean> => {
+    let succeeded = false;
+    await guard(async () => {
       await api.clearAll();
       // Old backups carry client-generated ids; remap them to fresh DB uuids.
       const studentIdMap = new Map<string, string>();
@@ -452,7 +453,10 @@ export function useAcademyData(userId: string) {
         await api.addCounselLog({ ...l, studentId });
       }
       await load();
+      succeeded = true;
     });
+    return succeeded;
+  };
 
   // "Reset" in DB mode wipes all of this owner's academy data.
   const handleResetData = () =>

@@ -1,11 +1,16 @@
 /**
  * send-push: Internal Edge Function to deliver Web Push notifications (RFC 8291).
- * Called by other functions (e.g. kakao-skill) — not exposed directly to clients.
+ * Called by other functions (e.g. kakao-skill) with a short-lived HMAC signature;
+ * direct client calls are rejected even though gateway JWT verification is disabled.
  *
  * Body: { owner_id: string, title: string, body: string, url?: string, tag?: string }
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
+import {
+  isPushInternalSecretConfigured,
+  verifyPushAuth,
+} from '../_shared/push-auth.ts';
 
 interface PushSub {
   endpoint: string;
@@ -22,15 +27,19 @@ interface PushPayload {
 
 // ── VAPID JWT ──────────────────────────────────────────────────
 
-function b64uEncode(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+function b64uEncode(buf: ArrayBuffer | Uint8Array<ArrayBuffer>): string {
+  const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
+  return btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function b64uDecode(str: string): Uint8Array {
+function b64uDecode(str: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (str.length % 4)) % 4);
   const b64 = (str + padding).replace(/-/g, '+').replace(/_/g, '/');
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const decoded = atob(b64);
+  const bytes = new Uint8Array(decoded.length);
+  for (let index = 0; index < decoded.length; index += 1) bytes[index] = decoded.charCodeAt(index);
+  return bytes;
 }
 
 async function makeVapidJwt(audience: string, subject: string, privateKeyB64u: string): Promise<string> {
@@ -81,7 +90,11 @@ async function encryptPayload(
   payload: string,
   clientPublicKeyB64u: string,
   authSecretB64u: string,
-): Promise<{ ciphertext: Uint8Array; salt: Uint8Array; serverPublicKeyRaw: Uint8Array }> {
+): Promise<{
+  ciphertext: Uint8Array<ArrayBuffer>;
+  salt: Uint8Array<ArrayBuffer>;
+  serverPublicKeyRaw: Uint8Array<ArrayBuffer>;
+}> {
   const enc = new TextEncoder();
 
   // Generate ephemeral server key pair
@@ -117,7 +130,12 @@ async function encryptPayload(
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
   // HKDF for content encryption key (RFC 8291 §3.3)
-  async function hkdf(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
+  async function hkdf(
+    ikm: Uint8Array<ArrayBuffer>,
+    salt: Uint8Array<ArrayBuffer>,
+    info: Uint8Array<ArrayBuffer>,
+    length: number,
+  ): Promise<Uint8Array<ArrayBuffer>> {
     const ikmKey = await crypto.subtle.importKey('raw', ikm, { name: 'HKDF' }, false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits(
       { name: 'HKDF', hash: 'SHA-256', salt, info },
@@ -135,7 +153,11 @@ async function encryptPayload(
 
   const prk = await hkdf(sharedSecret, authSecret, authInfoBuf, 32);
 
-  function makeInfo(type: string, clientKey: Uint8Array, serverKey: Uint8Array): Uint8Array {
+  function makeInfo(
+    type: string,
+    clientKey: Uint8Array<ArrayBuffer>,
+    serverKey: Uint8Array<ArrayBuffer>,
+  ): Uint8Array<ArrayBuffer> {
     const label = enc.encode(`Content-Encoding: ${type}\x00P-256\x00`);
     const buf = new Uint8Array(label.length + 2 + clientKey.length + 2 + serverKey.length);
     let off = 0;
@@ -195,7 +217,7 @@ async function sendWebPush(
       'Crypto-Key': `dh=${b64uEncode(serverPublicKeyRaw.buffer)}`,
       'TTL': '86400',
     },
-    body: ciphertext,
+    body: ciphertext.buffer,
   });
 
   if (!res.ok && res.status !== 201) {
@@ -206,21 +228,69 @@ async function sendWebPush(
 
 // ── Main handler ───────────────────────────────────────────────
 
+const MAX_REQUEST_BODY_BYTES = 16_384;
+const OWNER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isSafeNotificationUrl(value: string): boolean {
+  return value.startsWith('/') || value.startsWith('./') || value.startsWith('#');
+}
+
 Deno.serve(async req => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  let body: { owner_id: string; title: string; body: string; url?: string; tag?: string };
+  const internalSecret = Deno.env.get('PUSH_INTERNAL_SECRET');
+  if (!isPushInternalSecretConfigured(internalSecret)) {
+    console.error('send-push is disabled: PUSH_INTERNAL_SECRET must be at least 32 bytes');
+    return new Response('Service unavailable', { status: 503 });
+  }
+
+  const contentLength = Number(req.headers.get('content-length') ?? '0');
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BODY_BYTES) {
+    return new Response('Payload too large', { status: 413 });
+  }
+
+  let rawBody: string;
   try {
-    body = await req.json();
+    rawBody = await req.text();
   } catch {
     return new Response('Bad request', { status: 400 });
   }
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_REQUEST_BODY_BYTES) {
+    return new Response('Payload too large', { status: 413 });
+  }
 
+  let parsedBody: unknown;
+  try {
+    parsedBody = JSON.parse(rawBody);
+  } catch {
+    return new Response('Bad request', { status: 400 });
+  }
+  if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+    return new Response('Bad request', { status: 400 });
+  }
+
+  const body = parsedBody as { owner_id?: unknown; title?: unknown; body?: unknown; url?: unknown; tag?: unknown };
   const { owner_id, title, body: msgBody, url, tag } = body;
-  if (!owner_id || !title || !msgBody) {
+  if (
+    typeof owner_id !== 'string' || !OWNER_ID_PATTERN.test(owner_id) ||
+    typeof title !== 'string' || !title || title.length > 120 ||
+    typeof msgBody !== 'string' || !msgBody || msgBody.length > 500 ||
+    (url !== undefined && (typeof url !== 'string' || url.length > 2_048 || !isSafeNotificationUrl(url))) ||
+    (tag !== undefined && (typeof tag !== 'string' || tag.length > 64))
+  ) {
     return new Response('Missing fields', { status: 400 });
+  }
+
+  const authorized = await verifyPushAuth({
+    secret: internalSecret,
+    ownerId: owner_id,
+    rawBody,
+    headers: req.headers,
+  });
+  if (!authorized) {
+    return new Response('Unauthorized', { status: 401 });
   }
 
   const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
@@ -262,6 +332,7 @@ Deno.serve(async req => {
     await supabase
       .from('growing_push_subscriptions')
       .delete()
+      .eq('owner_id', owner_id)
       .in('endpoint', staleEndpoints);
   }
 

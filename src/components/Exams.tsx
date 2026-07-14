@@ -194,7 +194,7 @@ const TEXT_MATERIALS: Omit<Material, 'label'>[] = [
   { id: 'mt1', kind: 'text', name: '붙여넣은 텍스트', meta: '텍스트 · 본문/단어장' },
 ];
 // ----- 배포/응시 데이터 -----
-interface RosterStudent { id?: string; no: number; name: string; submitted?: boolean }
+interface RosterStudent { id?: string; studentKey?: string; no: number; name: string; submitted?: boolean; verificationReady?: boolean }
 const ROSTER: RosterStudent[] = [
   { no: 1, name: '김서연' }, { no: 2, name: '박지훈' }, { no: 3, name: '이도윤' },
   { no: 4, name: '최하은' }, { no: 5, name: '정우진' }, { no: 6, name: '한소라' },
@@ -1133,6 +1133,7 @@ function Distribute({ exam, published, code, roster, onToggleStatus, submissions
   const submittedNos = new Set(submissions.map(s => s.no));
   const doneCount = submittedNos.size;
   const avg = submissions.length ? Math.round(submissions.reduce((a, s) => a + s.score, 0) / submissions.length) : 0;
+  const unavailableStudents = rosterList.filter(student => student.verificationReady === false);
 
   return (
     <div className="fade-up exam-pagepad" style={{ maxWidth: 960, margin: '0 auto', padding: '40px 44px 60px' }}>
@@ -1141,6 +1142,18 @@ function Distribute({ exam, published, code, roster, onToggleStatus, submissions
         <h1 className="h-font exam-h1" style={{ fontSize: 32, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-.02em' }}>{exam.name}</h1>
         <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 15 }}>학생은 QR 코드나 응시코드로 <b style={{ color: 'var(--primary)' }}>로그인 없이</b> 태블릿에서 바로 시작해요.</p>
       </div>
+
+      {unavailableStudents.length > 0 && (
+        <div className="exam-verification-warning" role="alert">
+          <AlertTriangle size={21} aria-hidden="true" />
+          <div>
+            <strong>연락처가 없어 응시할 수 없는 학생이 {unavailableStudents.length}명 있어요.</strong>
+            <p>
+              {unavailableStudents.map(student => student.name).join(', ')} · 학생 관리에서 학생 또는 보호자 연락처를 등록한 뒤 배포해 주세요.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="exam-distgrid" style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 18, alignItems: 'start' }}>
         {/* QR 카드 */}
@@ -1539,7 +1552,7 @@ function gradeSubmission(exam: Exam, answers: Record<string, number | string>, s
   return { no: student.no, name: student.name, time: new Date().toTimeString().slice(0, 5), score, totalPoints: exam.questions.reduce((sum, q) => sum + q.points, 0), perQ, submitted: true };
 }
 
-type StudentStage = 'enter' | 'identify' | 'solve' | 'confirm' | 'done';
+type StudentStage = 'enter' | 'identify' | 'verify' | 'solve' | 'confirm' | 'done';
 
 function StudentApp({
   exam,
@@ -1549,6 +1562,7 @@ function StudentApp({
   code = SHORT_CODE,
   joinUrl = JOIN_URL,
   showExit = true,
+  onVerify,
   onSubmit,
   onExit,
 }: {
@@ -1559,7 +1573,8 @@ function StudentApp({
   code?: string;
   joinUrl?: string;
   showExit?: boolean;
-  onSubmit: (s: Submission, answers: Record<string, number | string>, student: RosterStudent) => void | Promise<void>;
+  onVerify?: (student: RosterStudent, contactLast4: string) => Promise<string>;
+  onSubmit: (s: Submission, answers: Record<string, number | string>, student: RosterStudent, verificationToken?: string) => void | Promise<void>;
   onExit: () => void;
 }) {
   const isMobile = useIsMobile();
@@ -1568,6 +1583,10 @@ function StudentApp({
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number | string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [contactLast4, setContactLast4] = useState('');
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const land = !isMobile;
@@ -1582,12 +1601,63 @@ function StudentApp({
     if (!student || submitting) return;
     setSubmitting(true);
     const submission = gradeSubmission(exam, answers, student);
-    void Promise.resolve(onSubmit(submission, answers, student))
-      .then(() => setStage('done'))
-      .catch(error => alert(errMsg(error)))
+    void Promise.resolve(onSubmit(submission, answers, student, verificationToken ?? undefined))
+      .then(() => {
+        setVerificationToken(null);
+        setContactLast4('');
+        setStage('done');
+      })
+      .catch(error => {
+        const message = errMsg(error);
+        if (onVerify && message.includes('본인 확인')) {
+          setVerificationToken(null);
+          setContactLast4('');
+          setVerificationError(message);
+          setStage('verify');
+          return;
+        }
+        alert(message);
+      })
       .finally(() => setSubmitting(false));
   };
-  const restart = () => { setStage('enter'); setStudent(null); setIdx(0); setAnswers({}); setSubmitting(false); };
+  const selectStudent = (selected: RosterStudent) => {
+    setStudent(selected);
+    setContactLast4('');
+    setVerificationToken(null);
+    setVerificationError(null);
+    setStage(onVerify ? 'verify' : 'solve');
+  };
+  const verifyStudent = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!student || !onVerify || verifying) return;
+    if (!/^\d{4}$/.test(contactLast4)) {
+      setVerificationError('연락처 뒤 4자리를 숫자로 입력해 주세요.');
+      return;
+    }
+    setVerifying(true);
+    setVerificationError(null);
+    try {
+      const token = await onVerify(student, contactLast4);
+      setVerificationToken(token);
+      setContactLast4('');
+      setStage('solve');
+    } catch (error) {
+      setVerificationError(errMsg(error));
+    } finally {
+      setVerifying(false);
+    }
+  };
+  const restart = () => {
+    setStage('enter');
+    setStudent(null);
+    setIdx(0);
+    setAnswers({});
+    setSubmitting(false);
+    setContactLast4('');
+    setVerificationToken(null);
+    setVerificationError(null);
+    setVerifying(false);
+  };
 
   let body: React.ReactNode;
   if (stage === 'enter') {
@@ -1631,7 +1701,7 @@ function StudentApp({
             {roster.map(st => {
               const done = st.submitted || submittedNos.has(st.no);
               return (
-                <button key={st.no} disabled={done} onClick={() => { setStudent(st); setStage('solve'); }} className="t-opt" style={{ padding: '18px 18px', opacity: done ? 0.5 : 1, cursor: done ? 'not-allowed' : 'pointer' }}>
+                <button key={st.no} disabled={done} onClick={() => selectStudent(st)} className="t-opt" style={{ padding: '18px 18px', opacity: done ? 0.5 : 1, cursor: done ? 'not-allowed' : 'pointer' }}>
                   <div className="t-opt-mark num-font" style={{ width: 36, height: 36, fontSize: 15 }}>{st.no}</div>
                   <div style={{ minWidth: 0 }}>
                     <div className="h-font" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{st.name}</div>
@@ -1643,6 +1713,55 @@ function StudentApp({
           </div>
         )}
         <div style={{ textAlign: 'center', marginTop: 22, fontSize: 13, color: 'var(--muted)' }}>이름이 없나요? 선생님께 출석번호를 확인해 주세요.</div>
+      </div>
+    );
+  } else if (stage === 'verify') {
+    body = (
+      <div className="student-verify-stage">
+        <form className="card student-verify-card" onSubmit={event => void verifyStudent(event)}>
+          <div className="student-verify-icon"><Lock size={28} color="var(--primary)" /></div>
+          <h2 className="h-font">연락처로 본인을 확인해 주세요</h2>
+          <p className="student-verify-description">
+            <strong>{student?.name}</strong> 학생 또는 보호자 휴대폰 번호의 뒤 4자리를 입력하세요.
+          </p>
+          <label className="field-label" htmlFor="exam-contact-last4">연락처 뒤 4자리</label>
+          <input
+            id="exam-contact-last4"
+            className="input student-verify-input num-font"
+            type="password"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{4}"
+            maxLength={4}
+            value={contactLast4}
+            onChange={event => {
+              setContactLast4(event.target.value.replace(/\D/g, '').slice(0, 4));
+              setVerificationError(null);
+            }}
+            aria-describedby={verificationError ? 'exam-verification-error' : 'exam-verification-help'}
+            autoFocus
+          />
+          <div id="exam-verification-help" className="student-verify-help">등록된 학생 연락처와 보호자 연락처 중 하나로 확인합니다.</div>
+          {verificationError && <div id="exam-verification-error" className="student-verify-error" role="alert">{verificationError}</div>}
+          <div className="student-verify-actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setStudent(null);
+                setContactLast4('');
+                setVerificationError(null);
+                setStage('identify');
+              }}
+              disabled={verifying}
+            >
+              이름 다시 선택
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={verifying || contactLast4.length !== 4}>
+              {verifying ? '확인 중...' : '확인하고 시작'}
+            </button>
+          </div>
+        </form>
       </div>
     );
   } else if (stage === 'solve') {
@@ -1887,7 +2006,16 @@ const rosterForClass = (classes: Class[], students: Student[], classId?: string 
   const byId = new Map(students.map(student => [student.id, student]));
   return ids.reduce<RosterStudent[]>((list, id, index) => {
     const student = byId.get(id);
-    if (student && student.status === 'active') list.push({ id: student.id, no: index + 1, name: student.name });
+    if (student && student.status === 'active') {
+      const hasVerificationContact = [student.contact, student.parentContact]
+        .some(contact => contact.replace(/\D/g, '').length >= 4);
+      list.push({
+        id: student.id,
+        no: index + 1,
+        name: student.name,
+        verificationReady: hasVerificationContact,
+      });
+    }
     return list;
   }, []);
 };
@@ -1949,7 +2077,7 @@ const publicQuestionToExamQuestion = (row: PublicExamPayload['questions'][number
 const publicPayloadToExam = (payload: PublicExamPayload, code: string): Exam => {
   const exam = payload.exam;
   return {
-    id: String(exam.id),
+    id: 'public-exam',
     name: String(exam.title ?? '온라인 시험'),
     target: String(exam.targetLabel ?? ''),
     topic: String(exam.topic ?? ''),
@@ -2079,10 +2207,9 @@ export function PublicExamRoute({ code }: { code: string }) {
         const payload = await examsApi.publicGetExam(upperCode);
         setExam(publicPayloadToExam(payload, upperCode));
         setRoster(payload.students.map(student => ({
-          id: student.id,
+          studentKey: student.studentKey,
           no: student.no,
           name: student.name,
-          submitted: student.submitted,
         })));
         setError(null);
       } catch (e) {
@@ -2125,10 +2252,14 @@ export function PublicExamRoute({ code }: { code: string }) {
         joinUrl={joinUrl}
         showExit={false}
         onExit={() => undefined}
-        onSubmit={async (_submission, answers, student) => {
-          if (!student.id) throw new Error('학생 정보를 찾을 수 없습니다.');
-          await examsApi.publicSubmit(upperCode, student.id, answers);
-          setRoster(list => list.map(item => item.id === student.id ? { ...item, submitted: true } : item));
+        onVerify={async (student, contactLast4) => {
+          if (!student.studentKey) throw new Error('본인 확인을 시작할 수 없습니다. 선생님에게 문의해 주세요.');
+          const result = await examsApi.publicVerifyStudent(upperCode, student.studentKey, contactLast4);
+          return result.verificationToken;
+        }}
+        onSubmit={async (_submission, answers, _student, verificationToken) => {
+          if (!verificationToken) throw new Error('본인 확인이 필요합니다.');
+          await examsApi.publicSubmit(upperCode, verificationToken, answers);
         }}
       />
     </div>
@@ -2308,6 +2439,16 @@ export const Exams: React.FC<{ ownerId: string; classes: Class[]; students: Stud
   const toggleStatus = async () => {
     if (!exam || !isSavedId(exam.id)) return;
     const next: ExamStatus = exam.status === 'published' ? 'closed' : 'published';
+    if (next === 'published') {
+      const unavailableStudents = rosterList.filter(student => student.verificationReady === false);
+      if (unavailableStudents.length > 0) {
+        const names = unavailableStudents.map(student => student.name).join(', ');
+        const confirmed = window.confirm(
+          `${names} 학생은 등록된 학생/보호자 연락처가 없어 온라인 시험에 응시할 수 없습니다. 그래도 시험을 시작할까요?`,
+        );
+        if (!confirmed) return;
+      }
+    }
     try {
       await examsApi.setStatus(exam.id, next);
       setExam(e => (e ? { ...e, status: next } : e));

@@ -1,4 +1,7 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type UntypedSupabaseClient = ReturnType<typeof createClient<any>>;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +47,7 @@ function getEventSecret(req: Request): string {
   );
 }
 
-async function resolveChannelOwner(supabase: ReturnType<typeof createClient>, eventSecret: string): Promise<string | null> {
+async function resolveChannelOwner(supabase: UntypedSupabaseClient, eventSecret: string): Promise<string | null> {
   if (!eventSecret) return null;
   const { data, error } = await supabase
     .from('growing_kakao_channels')

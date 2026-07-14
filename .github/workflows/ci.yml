@@ -1,0 +1,33 @@
+name: Verify
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 18 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify application
+        run: npm run verify
+
+      - name: Type-check Edge Functions
+        run: npm run check:edge
+
+      - name: Audit dependencies
+        run: npm run audit:security

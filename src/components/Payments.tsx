@@ -8,6 +8,9 @@ import { localToday, localMonth } from '../lib/dateUtils';
 
 type MatchedRow = PayssamRow & { studentId: string };
 
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+const SUPPORTED_IMPORT_EXTENSIONS = new Set(['xlsx', 'xls', 'csv']);
+
 interface PaymentsProps {
   payments: Payment[];
   students: Student[];
@@ -180,23 +183,45 @@ export const Payments: React.FC<PaymentsProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const buf = ev.target?.result as ArrayBuffer;
-      const result = parsePayssamExcel(buf);
-      const norm = (s: string) => s.replace(/\s/g, '');
-      const matched: MatchedRow[] = [];
-      const unmatched: PayssamRow[] = [];
-
-      for (const row of result.rows) {
-        const student = students.find(s => norm(s.name) === norm(row.name));
-        if (student) matched.push({ ...row, studentId: student.id });
-        else unmatched.push(row);
-      }
-
-      setImportParsed({ matched, unmatched, errors: result.errors, skippedVoid: result.skippedVoid });
+    const showImportError = (message: string) => {
+      setImportParsed({ matched: [], unmatched: [], errors: [message], skippedVoid: 0 });
       setImportResult(null);
     };
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!SUPPORTED_IMPORT_EXTENSIONS.has(extension)) {
+      showImportError('지원하지 않는 파일 형식입니다. xlsx, xls 또는 csv 파일을 선택해 주세요.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      showImportError('파일이 너무 큽니다. 5MB 이하 파일을 선택해 주세요.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const buf = ev.target?.result;
+        if (!(buf instanceof ArrayBuffer)) throw new Error('invalid file buffer');
+        const result = parsePayssamExcel(buf);
+        const norm = (s: string) => s.replace(/\s/g, '');
+        const matched: MatchedRow[] = [];
+        const unmatched: PayssamRow[] = [];
+
+        for (const row of result.rows) {
+          const student = students.find(s => norm(s.name) === norm(row.name));
+          if (student) matched.push({ ...row, studentId: student.id });
+          else unmatched.push(row);
+        }
+
+        setImportParsed({ matched, unmatched, errors: result.errors, skippedVoid: result.skippedVoid });
+        setImportResult(null);
+      } catch {
+        showImportError('파일을 읽을 수 없습니다. 손상되지 않은 결제선생 엑셀 파일인지 확인해 주세요.');
+      }
+    };
+    reader.onerror = () => showImportError('파일을 읽는 중 오류가 발생했습니다. 다시 시도해 주세요.');
     reader.readAsArrayBuffer(file);
     e.target.value = '';
   };

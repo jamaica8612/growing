@@ -205,11 +205,14 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
   // 새 상담 요청 알림 → 아이비 채팅에 자동 주입
   useEffect(() => {
     if (!counselNotification) return;
-    const text = `📨 **새 상담 요청이 들어왔어요!**\n\n**${counselNotification.studentName}** 학부모님: "${counselNotification.message}"\n\n카카오 관리 탭에서 확인하고 답변해 주세요.`;
-    setMessages(prev => [...prev, { role: 'assistant', content: text }]);
-    setHasUnread(true);
-    onCounselNotificationConsumed?.();
-  }, [counselNotification]);
+    const frame = requestAnimationFrame(() => {
+      const text = `📨 **새 상담 요청이 들어왔어요!**\n\n**${counselNotification.studentName}** 학부모님: "${counselNotification.message}"\n\n카카오 관리 탭에서 확인하고 답변해 주세요.`;
+      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      setHasUnread(true);
+      onCounselNotificationConsumed?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [counselNotification, onCounselNotificationConsumed]);
 
   const flash = (msg: string) => {
     setToast(msg);
