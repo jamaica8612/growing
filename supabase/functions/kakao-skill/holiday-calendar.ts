@@ -450,31 +450,163 @@ function endOfMonth(year: number, month: number): string {
   return makeDate(year, month, day)!;
 }
 
+function singleDayPeriod(date: string): SchedulePeriod {
+  return { startDate: date, endDate: date, kind: 'single' };
+}
+
+function inferMonthDay(month: number, day: number, today: string, explicitYear?: number): string | null {
+  let year = explicitYear ?? Number(today.slice(0, 4));
+  let date = makeDate(year, month, day);
+  if (date && explicitYear === undefined && date < today) {
+    year += 1;
+    date = makeDate(year, month, day);
+  }
+  return date;
+}
+
+interface FixedHolidayRule {
+  pattern: RegExp;
+  calendarName: string;
+  month: number;
+  day: number;
+}
+
+const FIXED_HOLIDAY_RULES: FixedHolidayRule[] = [
+  { pattern: /(신정|새해첫날)/, calendarName: '1월 1일', month: 1, day: 1 },
+  { pattern: /(삼일절|3[ㆍ·]1절)/, calendarName: '3ㆍ1절', month: 3, day: 1 },
+  { pattern: /(근로자의날|노동절)/, calendarName: '노동절', month: 5, day: 1 },
+  { pattern: /어린이날/, calendarName: '어린이날', month: 5, day: 5 },
+  { pattern: /현충일/, calendarName: '현충일', month: 6, day: 6 },
+  { pattern: /제헌절/, calendarName: '제헌절', month: 7, day: 17 },
+  { pattern: /광복절/, calendarName: '광복절', month: 8, day: 15 },
+  { pattern: /개천절/, calendarName: '개천절', month: 10, day: 3 },
+  { pattern: /한글날/, calendarName: '한글날', month: 10, day: 9 },
+  { pattern: /(성탄절|크리스마스)/, calendarName: '기독탄신일', month: 12, day: 25 },
+];
+
+interface FloatingHolidayRule {
+  pattern: RegExp;
+  calendarName: string;
+}
+
+const FLOATING_HOLIDAY_RULES: FloatingHolidayRule[] = [
+  { pattern: /(설날|설연휴|설에|설은|구정)/, calendarName: '설날' },
+  { pattern: /(추석|한가위)/, calendarName: '추석' },
+  { pattern: /(부처님오신날|석가탄신일)/, calendarName: '부처님 오신 날' },
+];
+
+function requestedHolidayYear(compact: string, today: string): { year: number; fixed: boolean } {
+  const currentYear = Number(today.slice(0, 4));
+  const explicit = compact.match(/(?:^|[^0-9])(\d{4})(?:년)?(?=[^0-9]|$)/);
+  if (explicit) return { year: Number(explicit[1]), fixed: true };
+  if (compact.includes('내년')) return { year: currentYear + 1, fixed: true };
+  if (compact.includes('올해') || compact.includes('금년')) return { year: currentYear, fixed: true };
+  return { year: currentYear, fixed: false };
+}
+
+function fallbackHolidayDates(year: number, calendarName: string): string[] {
+  return Object.entries(FALLBACK_HOLIDAYS[String(year)] ?? {})
+    .filter(([, names]) => names.some(name => name.includes(calendarName)))
+    .map(([date]) => date)
+    .sort();
+}
+
+function parseNamedHolidayPeriod(compact: string, today: string): SchedulePeriod | null {
+  const requestedYear = requestedHolidayYear(compact, today);
+  const floatingRule = FLOATING_HOLIDAY_RULES.find(rule => rule.pattern.test(compact));
+  if (floatingRule) {
+    const candidateYears = requestedYear.fixed
+      ? [requestedYear.year]
+      : [requestedYear.year, requestedYear.year + 1];
+    for (const year of candidateYears) {
+      const dates = fallbackHolidayDates(year, floatingRule.calendarName);
+      if (dates.length === 0) continue;
+      const mainDate = dates.find(date =>
+        FALLBACK_HOLIDAYS[String(year)]?.[date]?.includes(floatingRule.calendarName)
+      ) ?? dates[0];
+      if (!requestedYear.fixed && mainDate < today) continue;
+      if (compact.includes('연휴') && dates.length > 1) {
+        return { startDate: dates[0], endDate: dates.at(-1)!, kind: 'week' };
+      }
+      return singleDayPeriod(mainDate);
+    }
+    return { startDate: today, endDate: today, kind: 'invalid' };
+  }
+
+  const fixedRule = FIXED_HOLIDAY_RULES.find(rule => rule.pattern.test(compact));
+  if (!fixedRule) return null;
+  if (/(대체공휴일|대체휴일)/.test(compact)) {
+    const candidateYears = requestedYear.fixed
+      ? [requestedYear.year]
+      : [requestedYear.year, requestedYear.year + 1];
+    for (const year of candidateYears) {
+      const substituteDate = Object.entries(FALLBACK_HOLIDAYS[String(year)] ?? {})
+        .find(([date, names]) =>
+          (requestedYear.fixed || date >= today) &&
+          names.some(name => name.includes('대체공휴일') && name.includes(fixedRule.calendarName))
+        )?.[0];
+      if (substituteDate) return singleDayPeriod(substituteDate);
+    }
+    return { startDate: today, endDate: today, kind: 'invalid' };
+  }
+  const date = inferMonthDay(
+    fixedRule.month,
+    fixedRule.day,
+    today,
+    requestedYear.fixed ? requestedYear.year : undefined,
+  );
+  return date ? singleDayPeriod(date) : { startDate: today, endDate: today, kind: 'invalid' };
+}
+
+function looksLikeUnsupportedDate(value: string): boolean {
+  const compact = value.replace(/\s+/g, '');
+  return /\d{4}년(?:\d{1,2}월)?(?!\d{1,2}일)/.test(compact) ||
+    /(?:^|[^0-9])\d{4}[-./]\d{1,2}(?![-./]\d)/.test(compact) ||
+    /\d{1,2}월\d{1,2}(?!일)/.test(compact) ||
+    /(?:^|[^0-9월])\d{1,2}일(?:$|[^0-9])/.test(compact);
+}
+
 export function parseSchedulePeriod(utterance: string, today: string): SchedulePeriod {
   if (!isValidIsoDate(today)) throw new RangeError('Invalid today date');
   const compact = utterance.toLowerCase().replace(/\s+/g, '');
-  const isoMatch = utterance.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
-  if (isoMatch) {
-    const date = makeDate(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
+  const fullDateMatch = utterance.match(/(?:^|[^0-9])(\d{4})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{1,2})(?![0-9])/);
+  if (fullDateMatch) {
+    const date = makeDate(Number(fullDateMatch[1]), Number(fullDateMatch[2]), Number(fullDateMatch[3]));
     if (date) return { startDate: date, endDate: date, kind: 'single' };
     return { startDate: today, endDate: today, kind: 'invalid' };
   }
   const koreanMatch = utterance.match(/(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
   if (koreanMatch) {
-    let year = koreanMatch[1] ? Number(koreanMatch[1]) : Number(today.slice(0, 4));
-    let date = makeDate(year, Number(koreanMatch[2]), Number(koreanMatch[3]));
-    if (date && !koreanMatch[1] && date < today) {
-      year += 1;
-      date = makeDate(year, Number(koreanMatch[2]), Number(koreanMatch[3]));
-    }
+    const date = inferMonthDay(
+      Number(koreanMatch[2]),
+      Number(koreanMatch[3]),
+      today,
+      koreanMatch[1] ? Number(koreanMatch[1]) : undefined,
+    );
     if (date) return { startDate: date, endDate: date, kind: 'single' };
     return { startDate: today, endDate: today, kind: 'invalid' };
+  }
+  const shortDateMatch = utterance.match(/(?:^|[^0-9])(\d{1,2})\s*[-./]\s*(\d{1,2})(?![0-9])/);
+  if (shortDateMatch) {
+    const date = inferMonthDay(Number(shortDateMatch[1]), Number(shortDateMatch[2]), today);
+    if (date) return singleDayPeriod(date);
+    return { startDate: today, endDate: today, kind: 'invalid' };
+  }
+
+  const namedHoliday = parseNamedHolidayPeriod(compact, today);
+  if (namedHoliday) return namedHoliday;
+  if (looksLikeUnsupportedDate(utterance)) {
+    return { startDate: today, endDate: today, kind: 'invalid' };
+  }
+  if (compact.includes('글피')) {
+    const date = addDays(today, 3);
+    return { startDate: date, endDate: date, kind: 'single' };
   }
   if (compact.includes('모레')) {
     const date = addDays(today, 2);
     return { startDate: date, endDate: date, kind: 'single' };
   }
-  if (compact.includes('내일')) {
+  if (compact.includes('내일') || compact.includes('낼')) {
     const date = addDays(today, 1);
     return { startDate: date, endDate: date, kind: 'single' };
   }
@@ -482,16 +614,16 @@ export function parseSchedulePeriod(utterance: string, today: string): ScheduleP
 
   const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
   const todayWeekday = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay)).getUTCDay();
-  const weekdayMatch = compact.match(/(이번주|다음주|다음)?([일월화수목금토])요일/);
+  const weekdayMatch = compact.match(/(이번주|금주|다음주|담주|차주|다음)?([일월화수목금토])요일/);
   if (weekdayMatch) {
     const targetWeekday = WEEKDAYS.indexOf(weekdayMatch[2]);
     const modifier = weekdayMatch[1] ?? '';
     let delta: number;
-    if (modifier === '이번주') {
+    if (modifier === '이번주' || modifier === '금주') {
       const mondayDelta = todayWeekday === 0 ? -6 : 1 - todayWeekday;
       const targetOffset = targetWeekday === 0 ? 6 : targetWeekday - 1;
       delta = mondayDelta + targetOffset;
-    } else if (modifier === '다음주') {
+    } else if (modifier === '다음주' || modifier === '담주' || modifier === '차주') {
       const nextMondayDelta = todayWeekday === 0 ? 1 : 8 - todayWeekday;
       const targetOffset = targetWeekday === 0 ? 6 : targetWeekday - 1;
       delta = nextMondayDelta + targetOffset;
@@ -502,10 +634,10 @@ export function parseSchedulePeriod(utterance: string, today: string): ScheduleP
     const date = addDays(today, delta);
     return { startDate: date, endDate: date, kind: 'single' };
   }
-  if (compact.includes('이번주')) {
+  if (compact.includes('이번주') || compact.includes('금주')) {
     return { startDate: today, endDate: addDays(today, todayWeekday === 0 ? 0 : 7 - todayWeekday), kind: 'week' };
   }
-  if (compact.includes('다음주')) {
+  if (compact.includes('다음주') || compact.includes('담주') || compact.includes('차주')) {
     const nextMondayDelta = todayWeekday === 0 ? 1 : 8 - todayWeekday;
     const startDate = addDays(today, nextMondayDelta);
     return { startDate, endDate: addDays(startDate, 6), kind: 'week' };
@@ -523,11 +655,10 @@ export function parseSchedulePeriod(utterance: string, today: string): ScheduleP
 
   const isCalendarList = ['휴강일안내', '휴강·수업일정', '휴강수업일정', '휴강일알려줘', '공휴일알려줘']
     .some(keyword => compact.includes(keyword)) || compact.includes('공휴일');
-  if (!isCalendarList && [
-    '수업하나요', '수업해요', '수업있어요', '수업있나요',
-    '학원쉬나요', '학원쉬어요', '학원가나요', '학원가요',
-  ]
-    .some(keyword => compact.includes(keyword))) {
+  const asksSingleDayByDefault =
+    /(수업).*(하나요|하냐|하니|하나|해요|해|있나요|있냐|있니|있나|있어요|있어|없나요|없어|쉬나요|쉬어)/.test(compact) ||
+    /(학원).*(쉬나요|쉬어요|쉬어|가나요|가요|가야|가는날|여나요|열어요|문여나요)/.test(compact);
+  if (!isCalendarList && asksSingleDayByDefault) {
     return { startDate: today, endDate: today, kind: 'single' };
   }
   return { startDate: today, endDate: addDays(today, 29), kind: 'upcoming' };
@@ -579,7 +710,7 @@ export async function getScheduleInfo(
 ): Promise<{ message: string }> {
   const period = parseSchedulePeriod(utterance, kstToday());
   if (period.kind === 'invalid') {
-    return { message: '날짜를 확인하지 못했습니다. 예: 2026년 8월 17일 수업하나요?' };
+    return { message: '날짜를 확인하지 못했습니다. 예: 8월 17일 또는 2026-08-17처럼 입력해 주세요.' };
   }
   const [calendar, settings] = await Promise.all([
     loadHolidayCalendar(),

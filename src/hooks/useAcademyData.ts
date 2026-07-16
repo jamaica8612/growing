@@ -14,6 +14,7 @@ import type {
   KakaoParentRequestStatus,
   KakaoEventLog,
   KakaoChannelConfig,
+  KakaoChannelConfigInput,
   HolidaySettings,
 } from '../types';
 import { api } from '../lib/api';
@@ -374,7 +375,22 @@ export function useAcademyData(userId: string) {
       setKakaoParentRequests(prev => prev.filter(req => req.id !== id));
     });
 
-  const handleSaveKakaoChannel = (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }) =>
+  const handleDeleteKakaoParentLink = (id: string) =>
+    guard(async () => {
+      await api.deleteKakaoParentLink(id);
+      await load();
+    });
+
+  const handleDeleteKakaoUnlinkedIdentity = (requestId: string) =>
+    guard(async () => {
+      await api.deleteKakaoUnlinkedIdentity(requestId);
+      await load();
+    });
+
+  const handleCreateKakaoLinkCode = (studentId: string) =>
+    guard(() => api.createKakaoLinkCode(studentId, 10));
+
+  const handleSaveKakaoChannel = (config: KakaoChannelConfigInput) =>
     guard(async () => {
       const saved = await api.saveKakaoChannelConfig(userId, config);
       setKakaoChannels(prev => {
@@ -540,6 +556,9 @@ export function useAcademyData(userId: string) {
     handleClearHomeworkAlerts,
     handleKakaoRequestStatus,
     handleDeleteKakaoRequest,
+    handleDeleteKakaoParentLink,
+    handleDeleteKakaoUnlinkedIdentity,
+    handleCreateKakaoLinkCode,
     handleSaveKakaoChannel,
     handleChangeKioskPin,
     handleSaveMessageTemplates,

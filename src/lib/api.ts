@@ -13,6 +13,8 @@ import type {
   KakaoParentRequestStatus,
   KakaoEventLog,
   KakaoChannelConfig,
+  KakaoChannelConfigInput,
+  KakaoLinkCode,
   StudentStatus,
   AttendanceStatus,
   HomeworkStatus,
@@ -193,6 +195,10 @@ const toKakaoChannelConfig = (r: Row): KakaoChannelConfig => ({
   channelName: s(r.channel_name),
   skillSecret: s(r.skill_secret),
   eventSecret: (r.event_secret as string) ?? undefined,
+  channelPublicId: (r.kakao_channel_public_id as string) ?? undefined,
+  channelUuid: (r.kakao_channel_uuid as string) ?? undefined,
+  skillSecretConfigured: Boolean(r.skill_secret_configured),
+  eventAdminKeyConfigured: Boolean(r.event_admin_key_configured),
   enabled: Boolean(r.enabled),
   autoReply: r.auto_reply !== false,
   createdAt: s(r.created_at),
@@ -239,10 +245,23 @@ export const api = {
       supabase.from('growing_counsel_logs').select('*'),
       supabase.from('growing_kiosk_alerts').select('*').order('created_at'),
       supabase.from('growing_homework_alerts').select('*').order('created_at'),
-      supabase.from('growing_kakao_parent_links').select('*').order('verified_at', { ascending: false }),
-      supabase.from('growing_parent_requests').select('*').order('created_at', { ascending: false }),
-      supabase.from('growing_kakao_events').select('*').order('created_at', { ascending: false }).limit(50),
-      supabase.from('growing_kakao_channels').select('*').order('created_at', { ascending: false }),
+      supabase
+        .from('growing_kakao_parent_links')
+        .select('id, student_id, kakao_user_key, plusfriend_user_key, verified_at, consent_at, blocked_at')
+        .order('verified_at', { ascending: false }),
+      supabase
+        .from('growing_parent_requests')
+        .select('id, student_id, kakao_user_key, request_type, message, status, created_at, resolved_at')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('growing_kakao_events')
+        .select('id, kakao_user_key, plusfriend_user_key, event_type, intent, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('growing_kakao_channels')
+        .select('id, channel_name, kakao_channel_public_id, kakao_channel_uuid, skill_secret_configured, event_admin_key_configured, enabled, auto_reply, created_at, updated_at')
+        .order('created_at', { ascending: false }),
       supabase.from('growing_settings').select('*').maybeSingle(),
     ]);
     const error =
@@ -636,6 +655,47 @@ export const api = {
   },
 
   // ---- Kakao channel bot prep ----
+  async deleteKakaoParentLink(linkId: string): Promise<void> {
+    const { data, error } = await supabase.rpc('growing_delete_kakao_parent_link', {
+      p_link_id: linkId,
+    });
+    if (error) throw error;
+    if (data !== true) {
+      throw new Error('학부모 연결 개인정보를 삭제하지 못했습니다.');
+    }
+  },
+
+  async deleteKakaoUnlinkedIdentity(requestId: string): Promise<void> {
+    const { data, error } = await supabase.rpc('growing_delete_kakao_unlinked_identity', {
+      p_request_id: requestId,
+    });
+    if (error) throw error;
+    if (data !== true) {
+      throw new Error('연결 이력이 있거나 삭제할 수 없는 상담 요청입니다.');
+    }
+  },
+
+  async createKakaoLinkCode(studentId: string, ttlMinutes = 10): Promise<KakaoLinkCode> {
+    const { data, error } = await supabase.rpc('growing_create_kakao_link_code', {
+      p_student_id: studentId,
+      p_ttl_minutes: ttlMinutes,
+    });
+    if (error) throw error;
+
+    const raw = Array.isArray(data) ? data[0] : data;
+    if (!raw || typeof raw !== 'object') {
+      throw new Error('연결코드 발급 결과를 확인할 수 없습니다.');
+    }
+    const row = raw as Row;
+    const code = s(row.code).toUpperCase();
+    const codeStudentId = s(row.student_id);
+    const expiresAt = s(row.expires_at);
+    if (!/^[0-9A-F]{8}$/.test(code) || codeStudentId !== studentId || Number.isNaN(new Date(expiresAt).getTime())) {
+      throw new Error('연결코드 발급 결과가 올바르지 않습니다.');
+    }
+    return { code, studentId: codeStudentId, expiresAt };
+  },
+
   async updateKakaoParentRequestStatus(id: string, status: KakaoParentRequestStatus): Promise<KakaoParentRequest> {
     const resolvedAt = status === 'resolved' || status === 'dismissed' ? new Date().toISOString() : null;
     const { data: row, error } = await supabase
@@ -655,13 +715,25 @@ export const api = {
 
   async saveKakaoChannelConfig(
     ownerId: string,
-    config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }
+    config: KakaoChannelConfigInput
   ): Promise<KakaoChannelConfig> {
+    const skillSecret = config.skillSecret.trim();
+    const eventSecret = config.eventSecret?.trim() ?? '';
+    if ((!config.id || skillSecret) && skillSecret.length < 32) {
+      throw new Error('Skill secret은 32자 이상이어야 합니다.');
+    }
+    if (eventSecret && eventSecret.length < 16) {
+      throw new Error('카카오 Admin 키는 16자 이상이어야 합니다.');
+    }
     const payload = {
       owner_id: ownerId,
       channel_name: config.channelName,
-      skill_secret: config.skillSecret,
-      event_secret: config.eventSecret || null,
+      // Secrets are write-only. On update, null tells the DB trigger to retain
+      // the existing hash without sending the plaintext back to the browser.
+      skill_secret: skillSecret || null,
+      event_secret: eventSecret || null,
+      kakao_channel_public_id: config.channelPublicId || null,
+      kakao_channel_uuid: config.channelUuid || null,
       enabled: config.enabled,
       auto_reply: config.autoReply,
       updated_at: new Date().toISOString(),
@@ -669,7 +741,9 @@ export const api = {
     const query = config.id
       ? supabase.from('growing_kakao_channels').update(payload).eq('id', config.id)
       : supabase.from('growing_kakao_channels').insert(payload);
-    const { data: row, error } = await query.select().single();
+    const { data: row, error } = await query
+      .select('id, channel_name, kakao_channel_public_id, kakao_channel_uuid, skill_secret_configured, event_admin_key_configured, enabled, auto_reply, created_at, updated_at')
+      .single();
     if (error) throw error;
     return toKakaoChannelConfig(row);
   },

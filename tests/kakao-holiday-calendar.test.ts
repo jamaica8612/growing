@@ -89,7 +89,9 @@ describe('Kakao holiday calendar', () => {
   it('parses relative, weekly, specific, generic-today, and menu periods', () => {
     const today = '2026-07-16';
     expect(parseSchedulePeriod('내일 수업하나요?', today)).toMatchObject({ startDate: '2026-07-17', kind: 'single' });
+    expect(parseSchedulePeriod('낼 수업해?', today)).toMatchObject({ startDate: '2026-07-17', kind: 'single' });
     expect(parseSchedulePeriod('모레 학원 쉬나요?', today)).toMatchObject({ startDate: '2026-07-18', kind: 'single' });
+    expect(parseSchedulePeriod('글피 수업하나요?', today)).toMatchObject({ startDate: '2026-07-19', kind: 'single' });
     expect(parseSchedulePeriod('이번 주 휴강일', today)).toEqual({
       startDate: '2026-07-16', endDate: '2026-07-19', kind: 'week',
     });
@@ -97,6 +99,9 @@ describe('Kakao holiday calendar', () => {
       startDate: '2026-07-19', endDate: '2026-07-19', kind: 'week',
     });
     expect(parseSchedulePeriod('다음 주 수업 있나요?', today)).toEqual({
+      startDate: '2026-07-20', endDate: '2026-07-26', kind: 'week',
+    });
+    expect(parseSchedulePeriod('담주 수업 있어요?', today)).toEqual({
       startDate: '2026-07-20', endDate: '2026-07-26', kind: 'week',
     });
     expect(parseSchedulePeriod('다음 달 휴강일', today)).toEqual({
@@ -107,13 +112,30 @@ describe('Kakao holiday calendar', () => {
     });
     expect(parseSchedulePeriod('2026년 8월 17일 수업', today)).toMatchObject({ startDate: '2026-08-17', kind: 'single' });
     expect(parseSchedulePeriod('2026-8-17 학원 가나요?', today)).toMatchObject({ startDate: '2026-08-17', kind: 'single' });
+    expect(parseSchedulePeriod('2026.8.17 수업하나요?', today)).toMatchObject({ startDate: '2026-08-17', kind: 'single' });
+    expect(parseSchedulePeriod('8/17 학원 가나요?', today)).toMatchObject({ startDate: '2026-08-17', kind: 'single' });
+    expect(parseSchedulePeriod('8/17 학원 가나요?', '2026-09-01')).toMatchObject({ startDate: '2027-08-17', kind: 'single' });
     expect(parseSchedulePeriod('2026-02-30 학원 가나요?', today).kind).toBe('invalid');
+    expect(parseSchedulePeriod('2026/8 수업하나요?', today).kind).toBe('invalid');
+    expect(parseSchedulePeriod('8월 17 수업하나요?', today).kind).toBe('invalid');
+    expect(parseSchedulePeriod('17일 수업하나요?', today).kind).toBe('invalid');
     expect(parseSchedulePeriod('2월 30일 수업하나요?', today).kind).toBe('invalid');
     expect(parseSchedulePeriod('5월 5일 수업하나요?', today)).toMatchObject({
       startDate: '2027-05-05', kind: 'single',
     });
     expect(parseSchedulePeriod('수업하나요?', today)).toMatchObject({ startDate: today, kind: 'single' });
+    expect(parseSchedulePeriod('수업 하냐?', today)).toMatchObject({ startDate: today, kind: 'single' });
+    expect(parseSchedulePeriod('수업해?', today)).toMatchObject({ startDate: today, kind: 'single' });
+    expect(parseSchedulePeriod('학원 쉬어?', today)).toMatchObject({ startDate: today, kind: 'single' });
+    expect(parseSchedulePeriod('학원 가야?', today)).toMatchObject({ startDate: today, kind: 'single' });
     expect(parseSchedulePeriod('학원 가나요?', today)).toMatchObject({ startDate: today, kind: 'single' });
+    expect(parseSchedulePeriod('광복절 수업하나요?', today)).toMatchObject({ startDate: '2026-08-15', kind: 'single' });
+    expect(parseSchedulePeriod('광복절 대체공휴일 수업하나요?', today)).toMatchObject({ startDate: '2026-08-17', kind: 'single' });
+    expect(parseSchedulePeriod('추석 쉬나요?', today)).toMatchObject({ startDate: '2026-09-25', kind: 'single' });
+    expect(parseSchedulePeriod('설에 쉬나요?', today)).toMatchObject({ startDate: '2027-02-07', kind: 'single' });
+    expect(parseSchedulePeriod('2027년 추석 쉬나요?', today)).toMatchObject({ startDate: '2027-09-15', kind: 'single' });
+    expect(parseSchedulePeriod('2027 추석 쉬나요?', today)).toMatchObject({ startDate: '2027-09-15', kind: 'single' });
+    expect(parseSchedulePeriod('2028 추석 쉬나요?', today).kind).toBe('invalid');
     expect(parseSchedulePeriod('📅 휴강일 안내', today)).toEqual({
       startDate: today, endDate: '2026-08-14', kind: 'upcoming',
     });
@@ -123,7 +145,7 @@ describe('Kakao holiday calendar', () => {
 
   it('answers an invalid explicit date without querying external data or settings', async () => {
     await expect(getScheduleInfo({}, 'owner', '2026-02-30 학원 가나요?')).resolves.toEqual({
-      message: '날짜를 확인하지 못했습니다. 예: 2026년 8월 17일 수업하나요?',
+      message: '날짜를 확인하지 못했습니다. 예: 8월 17일 또는 2026-08-17처럼 입력해 주세요.',
     });
   });
 

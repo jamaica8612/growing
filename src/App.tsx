@@ -169,6 +169,9 @@ function AcademyApp({ session }: { session: Session }) {
   const pendingCounselCount = kakaoParentRequests.filter(
     r => r.requestType === 'counsel' && r.status === 'pending'
   ).length;
+  const pendingKakaoRequestCount = kakaoParentRequests.filter(
+    r => r.status === 'pending' || r.status === 'drafted'
+  ).length;
 
   // 아이비 상담 알림 상태
   const [counselNotification, setCounselNotification] = useState<{ studentName: string; message: string } | null>(null);
@@ -194,10 +197,11 @@ function AcademyApp({ session }: { session: Session }) {
         filter: `owner_id=eq.${session.user.id}`,
       }, (payload) => {
         const rec = payload.new as { request_type: string; message: string; student_id: string };
-        if (rec.request_type !== 'counsel') return;
-        const student = studentsRef.current.find(s => s.id === rec.student_id);
-        setCounselNotification({ studentName: student?.name ?? '학부모', message: rec.message });
-        void reload(); // 배지 카운트 즉시 갱신
+        if (rec.request_type === 'counsel') {
+          const student = studentsRef.current.find(s => s.id === rec.student_id);
+          setCounselNotification({ studentName: student?.name ?? '학부모', message: rec.message });
+        }
+        void reload(); // 모든 카카오 요청과 배지 카운트 즉시 갱신
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -394,6 +398,9 @@ function AcademyApp({ session }: { session: Session }) {
             events={kakaoEventLogs}
             onUpdateRequestStatus={data.handleKakaoRequestStatus}
             onDeleteRequest={data.handleDeleteKakaoRequest}
+            onDeleteParentLink={data.handleDeleteKakaoParentLink}
+            onDeleteUnlinkedIdentity={data.handleDeleteKakaoUnlinkedIdentity}
+            onCreateLinkCode={data.handleCreateKakaoLinkCode}
             onSaveChannel={data.handleSaveKakaoChannel}
             holidayAutoClose={data.holidaySettings.holidayAutoClose}
             calendarExceptions={data.holidaySettings.calendarExceptions}
@@ -453,7 +460,7 @@ function AcademyApp({ session }: { session: Session }) {
                   onClick={item.kind === 'kiosk' ? launchKiosk : () => go(item.id)}
                   badge={
                     item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length || undefined
-                    : item.id === 'kakao' ? pendingCounselCount || undefined
+                    : item.id === 'kakao' ? pendingKakaoRequestCount || undefined
                     : undefined
                   }
                   kioskStyle={item.kind === 'kiosk'}
@@ -648,7 +655,7 @@ function AcademyApp({ session }: { session: Session }) {
         {mobileQuickNavItems.map(item => {
           const Icon = item.icon;
           const badge = item.id === 'messaging' ? kioskAlerts.length + homeworkAlerts.length
-                      : item.id === 'kakao' ? pendingCounselCount
+                      : item.id === 'kakao' ? pendingKakaoRequestCount
                       : 0;
           return (
             <button

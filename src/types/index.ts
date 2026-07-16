@@ -176,10 +176,31 @@ export interface KakaoChannelConfig {
   channelName: string;
   skillSecret: string;
   eventSecret?: string;
+  channelPublicId?: string;
+  channelUuid?: string;
+  skillSecretConfigured?: boolean;
+  eventAdminKeyConfigured?: boolean;
   enabled: boolean;
   autoReply: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface KakaoChannelConfigInput {
+  id?: string;
+  channelName: string;
+  skillSecret: string;
+  eventSecret?: string;
+  channelPublicId?: string;
+  channelUuid?: string;
+  enabled: boolean;
+  autoReply: boolean;
+}
+
+export interface KakaoLinkCode {
+  code: string;
+  studentId: string;
+  expiresAt: string;
 }
 
 export type CalendarExceptionKind = 'closed' | 'open';

@@ -2,16 +2,21 @@
 
 export type SkillAction =
   | 'connect_student'
+  | 'connect_student_confirm'
   | 'schedule_info'
   | 'attendance_today'
   | 'homework_today'
   | 'counsel_request'
+  | 'counsel_consent_confirm'
+  | 'counsel_cancel'
+  | 'counsel_cancel_confirm'
   | 'ask_ai'
   | 'menu'
   | 'student_menu'
   | 'unlink_student';
 
 export interface KakaoSkillPayload {
+  requestId?: string;
   intent?: { name?: string };
   action?: {
     params?: Record<string, string>;
@@ -23,6 +28,8 @@ export interface KakaoSkillPayload {
       id?: string;
       properties?: {
         plusfriendUserKey?: string;
+        appUserId?: string;
+        app_user_id?: string;
         isFriend?: boolean;
       };
     };
@@ -34,21 +41,43 @@ export interface QuickReplyDef {
   action: string;
   messageText?: string;
   studentId?: string;
+  linkCode?: string;
+}
+
+const MAX_SIMPLE_TEXT_LENGTH = 950;
+const MAX_QUICK_REPLIES = 10;
+const MAX_QUICK_REPLY_LABEL_LENGTH = 14;
+
+function truncateText(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
 
 export function skillText(text: string, quickReplies: QuickReplyDef[] = []) {
+  const seenReplies = new Set<string>();
+  const safeQuickReplies = quickReplies
+    .filter(reply => {
+      const key = `${reply.action}\u0000${reply.studentId ?? ''}`;
+      if (seenReplies.has(key)) return false;
+      seenReplies.add(key);
+      return true;
+    })
+    .slice(0, MAX_QUICK_REPLIES)
+    .map(reply => ({
+      label: truncateText(reply.label, MAX_QUICK_REPLY_LABEL_LENGTH),
+      action: 'message',
+      messageText: truncateText(reply.messageText ?? reply.label, MAX_SIMPLE_TEXT_LENGTH),
+      extra: {
+        action: reply.action,
+        ...(reply.studentId ? { student_id: reply.studentId } : {}),
+        ...(reply.linkCode ? { link_code: reply.linkCode } : {}),
+      },
+    }));
+
   return {
     version: '2.0',
     template: {
-      outputs: [{ simpleText: { text } }],
-      quickReplies: quickReplies.map(reply => ({
-        label: reply.label,
-        action: 'message',
-        messageText: reply.messageText ?? reply.label,
-        extra: reply.studentId
-          ? { action: reply.action, student_id: reply.studentId }
-          : { action: reply.action },
-      })),
+      outputs: [{ simpleText: { text: truncateText(text, MAX_SIMPLE_TEXT_LENGTH) } }],
+      quickReplies: safeQuickReplies,
     },
   };
 }
@@ -58,7 +87,6 @@ export function makeMenuReplies(studentId?: string, showSwitch = false): QuickRe
     { label: '📅 휴강일 안내', action: 'schedule_info', studentId },
     { label: '📅 오늘 출결', action: 'attendance_today', studentId },
     { label: '📝 숙제 확인', action: 'homework_today', studentId },
-    { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문', studentId },
     { label: '💬 상담 요청', action: 'counsel_request', studentId },
   ];
   if (showSwitch) replies.push({ label: '🔄 자녀 전환', action: 'student_menu' });
@@ -86,20 +114,33 @@ export function isScheduleInquiry(value: string): boolean {
   const compact = value.trim().toLowerCase().replace(/\s+/g, '');
   if (!compact) return false;
 
-  if (/(휴강|공휴일|대체휴일|대체공휴일|임시공휴일|학원휴무)/.test(compact)) {
+  if (/(휴강|공휴일|대체휴일|대체공휴일|임시공휴일|학원휴무|명절)/.test(compact)) {
     return true;
   }
 
-  if (/(오늘|내일|모레).*(수업|학원|쉬|가나|가요)/.test(compact)) {
+  if (/(설날|설연휴|설에|설은|구정|추석|한가위|신정|새해첫날|삼일절|3[ㆍ·.]1절|광복절|개천절|한글날|어린이날|현충일|제헌절|성탄절|크리스마스|부처님오신날|석가탄신일|근로자의날|노동절)/.test(compact)) {
     return true;
   }
 
-  const hasExplicitDate = /\d{4}-\d{1,2}-\d{1,2}/.test(compact) || /\d{1,2}월\d{1,2}일/.test(compact);
-  if (hasExplicitDate && /(수업|학원)/.test(compact)) {
+  const hasRelativeDate = /(오늘|금일|내일|낼|모레|글피|이번주|금주|다음주|담주|차주|이번달|다음달)/.test(compact);
+  if (hasRelativeDate && /(수업|학원|쉬|휴무|휴강|일정|가나|가요|가는날)/.test(compact)) {
     return true;
   }
 
-  return /(수업하나요|수업해요|수업있나요|수업있어요|학원쉬나요|학원쉬어요|학원가나요|학원가요)/.test(compact);
+  const hasExplicitDate = /\d{4}(?:년|[-./])\d{1,2}(?:월|[-./])\d{1,2}일?/.test(compact) ||
+    /\d{1,2}(?:월|[-./])\d{1,2}일?/.test(compact);
+  if (hasExplicitDate && /(수업|학원|쉬|휴무|휴강|일정)/.test(compact)) {
+    return true;
+  }
+
+  return /(수업).*(하나요|하냐|하니|하나|해요|해|있나요|있냐|있니|있나|있어요|있어|없나요|없어|쉬나요|쉬어)|(학원).*(쉬나요|쉬어요|쉬어|가나요|가요|가야|가는날|여나요|열어요|문여나요)/.test(compact);
+}
+
+/** 이미 접수한 상담을 취소하거나 철회하려는 문장인지 판별한다. */
+export function isCounselCancellation(value: string): boolean {
+  const compact = value.trim().toLowerCase().replace(/\s+/g, '');
+  if (!compact || !/(상담|문의)/.test(compact)) return false;
+  return /(취소|철회|접수취소|삭제|안할게|하지않을게|그만)/.test(compact);
 }
 
 export function getAction(payload: KakaoSkillPayload): SkillAction {
@@ -111,6 +152,10 @@ export function getAction(payload: KakaoSkillPayload): SkillAction {
     '';
   const ev = explicit.toLowerCase();
   if (ev === 'unlink_student') return 'unlink_student';
+  if (ev === 'connect_student_confirm') return 'connect_student_confirm';
+  if (ev === 'counsel_consent_confirm') return 'counsel_consent_confirm';
+  if (ev === 'counsel_cancel_confirm') return 'counsel_cancel_confirm';
+  if (ev.includes('counsel_cancel') || isCounselCancellation(explicit)) return 'counsel_cancel';
   if (ev.includes('schedule_info') || ev.includes('holiday') || ev.includes('휴강') || ev.includes('공휴일')) return 'schedule_info';
   if (ev.includes('connect') || ev.includes('연결')) return 'connect_student';
   if (ev.includes('attendance') || ev.includes('출결') || ev.includes('등원')) return 'attendance_today';
@@ -124,13 +169,14 @@ export function getAction(payload: KakaoSkillPayload): SkillAction {
   const uv = utterance.toLowerCase();
   const uvCompact = uv.replace(/\s+/g, '');
   if (uvCompact.includes('연결해제')) return 'unlink_student';
+  const isDirectLinkCode = /^(?:연결)?[0-9a-f]{8}$/i.test(uvCompact);
+  if (/(학생연결|자녀연결|연결하고싶|연결해주세요|연결해줘)/.test(uvCompact) ||
+    isDirectLinkCode) return 'connect_student';
+  if (isCounselCancellation(utterance)) return 'counsel_cancel';
   if (isScheduleInquiry(utterance)) return 'schedule_info';
   if (uv.includes('상담')) return 'counsel_request';
 
-  // 3자 초과 자유 입력은 AI로 라우팅 (출결/숙제 포함)
-  const isMenuWord = ['메뉴', '처음', '시작', 'start', '안녕', '안녕하세요', '하이'].includes(uv);
-  if (utterance.length > 3 && !isMenuWord) return 'ask_ai';
-
+  // 지원 범위를 벗어난 자유 입력은 개인정보를 외부 AI로 보내지 않고 안전한 메뉴로 안내한다.
   return 'menu';
 }
 
@@ -150,10 +196,14 @@ export function parseConnectInput(payload: KakaoSkillPayload) {
   if (studentName && phone) return { studentName, phone };
 
   const utterance = payload.userRequest?.utterance ?? '';
-  // 전체 번호(10~11자리)를 4자리보다 먼저 매칭해야 번호가 잘리지 않음
-  const phoneMatch = utterance.match(/(\d{10,11}|\d{4})/);
-  const fallbackPhone = phoneMatch ? cleanPhone(phoneMatch[1]) : phone;
-  const fallbackName = studentName || utterance.replace(phoneMatch?.[1] ?? '', '').replace(/학생|연결|전화|번호|휴대폰/g, '').trim();
+  const fullPhoneMatch = utterance.match(/01[0-9][- ]?\d{3,4}[- ]?\d{4}/);
+  const shortPhoneMatch = fullPhoneMatch ? null : utterance.match(/\b\d{4}\b/);
+  const matchedPhone = fullPhoneMatch?.[0] ?? shortPhoneMatch?.[0] ?? '';
+  const fallbackPhone = matchedPhone ? cleanPhone(matchedPhone) : phone;
+  const fallbackName = studentName || utterance
+    .replace(matchedPhone, '')
+    .replace(/학생|연결|전화|번호|휴대폰/g, '')
+    .trim();
   return { studentName: fallbackName, phone: fallbackPhone };
 }
 

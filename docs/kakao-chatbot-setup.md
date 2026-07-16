@@ -4,17 +4,20 @@
 
 ## 1. 앱에서 채널 설정
 
-앱의 `카카오 관리` 화면에서 아래 값을 만든 뒤 저장한다.
+앱의 `카카오 관리` 화면에서 아래 값을 입력한 뒤 저장한다.
 
 - 채널명
 - Skill secret
-- Event secret
+- 카카오 디벨로퍼스 앱의 Primary Admin 키
+- 카카오톡 채널 공개 ID (`channel_public_id`, 예: `_AbCdE`)
+- 카카오톡 채널 UUID (`channel_uuid`, 예: `@growing`)
 - 이 채널 사용: 켜기
 
-저장 후 복사할 수 있는 URL은 두 종류다.
+Primary Admin 키는 카카오 디벨로퍼스의 `앱 > Admin 키`에서 확인한다. 앱에 저장할 때 SHA-256 해시로 바뀌며 평문은 다시 표시되지 않는다.
 
-- 헤더 방식: 카카오 관리자에서 커스텀 헤더를 넣을 수 있을 때 사용
-- secret 포함 URL: 헤더 입력이 어렵거나 지원되지 않을 때 사용
+- Admin 키를 URL 쿼리스트링에 넣지 않는다.
+- Admin 키를 브라우저나 클라이언트 코드에 넣지 않는다.
+- 키를 교체할 때만 앱의 Admin 키 입력란에 새 값을 저장한다.
 
 ## 2. 카카오 관리자에 등록할 URL
 
@@ -30,19 +33,24 @@ Event URL 기본형:
 https://xrrdokcjhjqdfvwtbenl.supabase.co/functions/v1/kakao-channel-event
 ```
 
-헤더를 넣을 수 있으면 아래 헤더를 등록한다.
+Skill URL 인증은 챗봇 관리자센터의 기존 Skill secret 설정을 사용한다.
 
 ```text
 x-kakao-skill-secret: 앱에서 생성한 Skill secret
-x-kakao-event-secret: 앱에서 생성한 Event secret
 ```
 
-헤더를 넣을 수 없으면 앱에서 복사한 secret 포함 URL을 사용한다.
+카카오 채널 관계 알림은 카카오 디벨로퍼스의 `카카오톡 채널 추가/차단 콜백`에 Event URL 기본형만 등록한다. 카카오가 아래 헤더를 자동 전송하며 별도 커스텀 헤더나 secret 포함 URL은 사용하지 않는다.
 
 ```text
-https://xrrdokcjhjqdfvwtbenl.supabase.co/functions/v1/kakao-skill?secret=...
-https://xrrdokcjhjqdfvwtbenl.supabase.co/functions/v1/kakao-channel-event?secret=...
+Authorization: KakaoAK {앱 Primary Admin 키}
+X-Kakao-Resource-ID: {카카오가 생성한 고유 리소스 ID}
 ```
+
+관계 알림 payload는 카카오 공식 평면 형식인 `event`, `id`, `id_type`, `channel_public_id`, `channel_uuid`, `updated_at`을 사용한다. `event`는 `added` 또는 `blocked`, `id_type`은 `app_user_id` 또는 `open_id`만 허용한다. 동일한 `X-Kakao-Resource-ID`가 재전송되면 이미 처리한 성공 요청으로 응답한다.
+
+웹훅은 Admin 키뿐 아니라 저장된 `channel_public_id`와 `channel_uuid`가 payload의 두 값과 모두 정확히 일치할 때만 처리한다. 두 채널 식별자 중 하나라도 비어 있거나 다르면 인증 실패로 응답하며 학생 연결이나 이벤트 로그를 변경하지 않는다. 같은 카카오 앱의 Admin 키를 여러 채널이 공유하더라도 다른 채널 이벤트가 섞이지 않게 하기 위한 필수 설정이다.
+
+`app_user_id`는 챗봇 스킬 payload의 `appUserId`와 정확히 일치할 때만 학생 연결 상태를 변경한다. 카카오가 `open_id`와 챗봇의 `plusfriendUserKey`가 같다고 보장하지 않으므로 두 값을 임의로 매칭하지 않는다. 연결 근거가 없는 `open_id` 이벤트는 로그에 `unmatched`로 남고 다른 학부모의 연결을 변경하지 않는다.
 
 ## 3. 챗봇 블록 구성
 
@@ -79,24 +87,25 @@ https://xrrdokcjhjqdfvwtbenl.supabase.co/functions/v1/kakao-channel-event?secret
 ```text
 학생 연결
 연결
-김서윤 1234
+A1B2C3D4
 ```
 
 파라미터가 있으면:
 
-- `studentName`
-- `phone`
+- `linkCode` 또는 `link_code`
 
 학부모 입력 예시:
 
 ```text
-김서윤 1234
+A1B2C3D4
 ```
 
 설명:
 
-- 학생 이름과 보호자 휴대폰 뒤 4자리가 DB와 맞으면 카카오 사용자와 학생을 연결한다.
-- 연결 전에는 출결/숙제/상담 요청을 처리하지 않는다.
+- 관리 화면에서 학생을 선택해 10분 유효한 1회용 연결코드를 발급한다.
+- 학부모가 코드를 입력하면 개인정보 처리 항목·목적·철회 방법을 안내하고 `동의하고 연결` 확인을 받는다.
+- 확인된 코드는 한 번만 사용할 수 있으며, 15분 동안 5회 실패하면 추가 시도를 잠시 제한한다.
+- 연결 전에는 출결·숙제 같은 학생 개인정보를 제공하지 않는다. 입학 상담은 연락처를 확인한 뒤 접수한다.
 
 ### 오늘 출결 확인
 
@@ -159,7 +168,10 @@ homework_today
 
 ```text
 counsel_request
+counsel_consent_confirm
 ```
+
+학생과 연결되지 않은 입학 상담은 바로 연락처를 저장하지 않는다. 먼저 상담 내용·휴대폰 번호의 수집 목적, 보유기간, 거부권과 개인정보 안내 URL을 보여주고 `동의하고 상담`을 누른 경우에만 10분 동안 입력을 받는다. 접수 데이터에는 동의 시각·고지 버전·고지문 해시를 함께 저장한다.
 
 응답 예시:
 
@@ -170,15 +182,21 @@ counsel_request
 
 ## 4. 테스트 순서
 
-1. 카카오 관리 화면에서 secret 생성 및 저장
-2. 카카오 챗봇 관리자에 Skill URL 등록
+1. 카카오 관리 화면에서 Skill secret, 실제 Kakao Primary Admin 키, 채널 Public ID·UUID를 저장
+2. 카카오 챗봇 관리자에 Skill URL과 `x-kakao-skill-secret` 헤더를 등록
 3. 연결 전 상태에서 `오늘 출결` 입력 -> 학생 연결 안내가 나오는지 확인
-4. `학생명 1234` 입력 -> 연결 성공 확인
-5. `오늘 출결`, `숙제 확인`, `상담 요청` 각각 테스트
-6. 앱의 카카오 관리 화면에서 최근 요청 로그와 상담 요청 큐 확인
+4. 앱의 연결 탭에서 학생 1회용 코드를 발급
+5. 학부모가 코드를 입력한 뒤 `동의하고 연결`을 눌러 연결 성공 확인
+6. 같은 코드 재사용과 잘못된 코드 6회 시도가 차단되는지 확인
+7. 연결되지 않은 상태에서 `상담 요청` -> 개인정보 안내 -> `동의하고 상담` -> 연락처 포함 상담 접수 순서를 테스트
+8. `오늘 출결`, `숙제 확인`, 연결된 학부모의 `상담 요청`, `상담 취소`를 각각 테스트
+9. 앱의 카카오 관리 화면에서 모든 요청 유형과 최근 요청 로그 확인
 
 ## 5. 운영 원칙
 
 - 학부모용 챗봇은 처음에는 정해진 업무 메뉴만 제공한다.
-- 자유 AI 답변은 나중에 추가하되, 원장 승인 또는 제한된 FAQ 범위 안에서만 사용한다.
-- 학생 연결은 보호자 전화번호 뒤 4자리 검증을 유지한다.
+- 학생 개인정보를 외부 생성형 AI로 보내는 자유 답변은 사용하지 않는다.
+- 학생 연결은 학원 발급 1회용 코드, 명시적 동의, 원자적 시도 횟수 제한으로 검증한다.
+- 연결 동의 전 개인정보 안내를 표시하며 상세 고지는 `https://jamaica8612.github.io/growing/privacy.html`에서 제공한다.
+- 미연결 입학 상담의 연락처·상담내용도 별도 동의를 받은 뒤에만 저장한다.
+- 이벤트 로그 30일, 처리 완료 요청 90일, 미처리 요청 최대 1년의 자동 삭제 작업이 매일 실행되는지 운영 점검한다.
