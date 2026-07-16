@@ -395,6 +395,9 @@ function AcademyApp({ session }: { session: Session }) {
             onUpdateRequestStatus={data.handleKakaoRequestStatus}
             onDeleteRequest={data.handleDeleteKakaoRequest}
             onSaveChannel={data.handleSaveKakaoChannel}
+            holidayAutoClose={data.holidaySettings.holidayAutoClose}
+            calendarExceptions={data.holidaySettings.calendarExceptions}
+            onSaveHolidaySettings={data.handleSaveHolidaySettings}
           />
         );
       case 'kiosk':

@@ -2,6 +2,7 @@
 
 export type SkillAction =
   | 'connect_student'
+  | 'schedule_info'
   | 'attendance_today'
   | 'homework_today'
   | 'counsel_request'
@@ -54,6 +55,7 @@ export function skillText(text: string, quickReplies: QuickReplyDef[] = []) {
 
 export function makeMenuReplies(studentId?: string, showSwitch = false): QuickReplyDef[] {
   const replies: QuickReplyDef[] = [
+    { label: '📅 휴강일 안내', action: 'schedule_info', studentId },
     { label: '📅 오늘 출결', action: 'attendance_today', studentId },
     { label: '📝 숙제 확인', action: 'homework_today', studentId },
     { label: '🤖 아이비 질문', action: 'ask_ai', messageText: '아이비에게 질문', studentId },
@@ -79,6 +81,27 @@ export function kstToday(): string {
   return now.toISOString().slice(0, 10);
 }
 
+/** 휴강·공휴일·가까운 날짜의 수업 여부를 묻는 문장인지 판별한다. */
+export function isScheduleInquiry(value: string): boolean {
+  const compact = value.trim().toLowerCase().replace(/\s+/g, '');
+  if (!compact) return false;
+
+  if (/(휴강|공휴일|대체휴일|대체공휴일|임시공휴일|학원휴무)/.test(compact)) {
+    return true;
+  }
+
+  if (/(오늘|내일|모레).*(수업|학원|쉬|가나|가요)/.test(compact)) {
+    return true;
+  }
+
+  const hasExplicitDate = /\d{4}-\d{1,2}-\d{1,2}/.test(compact) || /\d{1,2}월\d{1,2}일/.test(compact);
+  if (hasExplicitDate && /(수업|학원)/.test(compact)) {
+    return true;
+  }
+
+  return /(수업하나요|수업해요|수업있나요|수업있어요|학원쉬나요|학원쉬어요|학원가나요|학원가요)/.test(compact);
+}
+
 export function getAction(payload: KakaoSkillPayload): SkillAction {
   // Explicit action from button/block params
   const explicit =
@@ -88,6 +111,7 @@ export function getAction(payload: KakaoSkillPayload): SkillAction {
     '';
   const ev = explicit.toLowerCase();
   if (ev === 'unlink_student') return 'unlink_student';
+  if (ev.includes('schedule_info') || ev.includes('holiday') || ev.includes('휴강') || ev.includes('공휴일')) return 'schedule_info';
   if (ev.includes('connect') || ev.includes('연결')) return 'connect_student';
   if (ev.includes('attendance') || ev.includes('출결') || ev.includes('등원')) return 'attendance_today';
   if (ev.includes('homework') || ev.includes('숙제')) return 'homework_today';
@@ -100,6 +124,7 @@ export function getAction(payload: KakaoSkillPayload): SkillAction {
   const uv = utterance.toLowerCase();
   const uvCompact = uv.replace(/\s+/g, '');
   if (uvCompact.includes('연결해제')) return 'unlink_student';
+  if (isScheduleInquiry(utterance)) return 'schedule_info';
   if (uv.includes('상담')) return 'counsel_request';
 
   // 3자 초과 자유 입력은 AI로 라우팅 (출결/숙제 포함)

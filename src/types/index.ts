@@ -181,3 +181,16 @@ export interface KakaoChannelConfig {
   createdAt: string;
   updatedAt: string;
 }
+
+export type CalendarExceptionKind = 'closed' | 'open';
+
+export interface CalendarException {
+  date: string;
+  kind: CalendarExceptionKind;
+  title: string;
+}
+
+export interface HolidaySettings {
+  holidayAutoClose: boolean;
+  calendarExceptions: CalendarException[];
+}

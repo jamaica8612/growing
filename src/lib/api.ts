@@ -22,9 +22,11 @@ import type {
   MessageLog,
   MakeupReservation,
   MakeupReservationStatus,
+  HolidaySettings,
 } from '../types';
 import { type MessageTemplates, mergeTemplates } from './messageTemplates';
 import { deriveLegacyClassScheduleFields } from './classSchedules';
+import { normalizeHolidaySettings } from './holidaySettings';
 
 type Row = Record<string, unknown>;
 
@@ -211,6 +213,7 @@ export interface AcademySnapshot {
   kakaoChannels: KakaoChannelConfig[];
   kioskPin: string;
   messageTemplates: MessageTemplates;
+  holidaySettings: HolidaySettings;
 }
 
 export const api = {
@@ -263,6 +266,10 @@ export const api = {
       kakaoChannels: (kakaoChannels.data ?? []).map(toKakaoChannelConfig),
       kioskPin: (settings.data?.kiosk_pin as string) ?? '1234',
       messageTemplates: mergeTemplates(settings.data?.message_templates as Partial<MessageTemplates> | null),
+      holidaySettings: normalizeHolidaySettings(
+        settings.data?.holiday_auto_close,
+        settings.data?.calendar_exceptions,
+      ),
     };
   },
 
@@ -680,6 +687,20 @@ export const api = {
       .from('growing_settings')
       .upsert({ owner_id: ownerId, message_templates: templates, updated_at: new Date().toISOString() });
     if (error) throw error;
+  },
+
+  async setHolidaySettings(ownerId: string, settings: HolidaySettings): Promise<HolidaySettings> {
+    const normalized = normalizeHolidaySettings(settings.holidayAutoClose, settings.calendarExceptions);
+    const { error } = await supabase
+      .from('growing_settings')
+      .upsert({
+        owner_id: ownerId,
+        holiday_auto_close: normalized.holidayAutoClose,
+        calendar_exceptions: normalized.calendarExceptions,
+        updated_at: new Date().toISOString(),
+      });
+    if (error) throw error;
+    return normalized;
   },
 
   // ---- 아이비 기억 설정 ----

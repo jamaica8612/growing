@@ -16,6 +16,7 @@ import {
   createPushAuthHeaders,
   isPushInternalSecretConfigured,
 } from '../_shared/push-auth.ts';
+import { getHolidayForDate, getScheduleInfo } from './holiday-calendar.ts';
 
 // The Edge Function intentionally uses the dynamic database shape. Supabase's
 // generic factory must be instantiated before ReturnType is taken, otherwise
@@ -28,6 +29,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-kakao-skill-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+const SCHEDULE_RESPONSE_TIMEOUT_MS = 2_500;
+const SCHEDULE_UNAVAILABLE_MESSAGE = '일정 확인이 잠시 지연되고 있습니다. 잠시 후 다시 질문해 주세요.';
 
 interface StudentRow {
   id: string;
@@ -355,6 +359,31 @@ async function sendPushToOwner(
   }
 }
 
+async function withResponseTimeout<T>(task: Promise<T>, fallback: T, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const guardedTask = task.catch(error => {
+    console.error('Kakao schedule lookup failed', error);
+    return fallback;
+  });
+  const deadline = new Promise<T>(resolve => {
+    timeout = setTimeout(() => resolve(fallback), timeoutMs);
+  });
+  try {
+    return await Promise.race([guardedTask, deadline]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
+function runInBackground(task: Promise<unknown>, label: string): void {
+  const guardedTask = task.catch(error => console.error(`${label} failed`, error));
+  const runtime = (globalThis as typeof globalThis & {
+    EdgeRuntime?: { waitUntil(promise: Promise<unknown>): void };
+  }).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(guardedTask);
+  else void guardedTask;
+}
+
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
@@ -442,6 +471,24 @@ Deno.serve(async req => {
       return jsonResponse(connectResponse);
     }
 
+    // 휴강 일정은 학생 연결 여부와 관계없이 학원 설정을 기준으로 안내한다.
+    // 카카오 스킬의 5초 제한을 위해 링크 조회를 생략하고 이벤트 기록은 백그라운드로 보낸다.
+    if (action === 'schedule_info') {
+      const utterance = payload.userRequest?.utterance?.trim() ?? '';
+      const { message } = await withResponseTimeout(
+        getScheduleInfo(supabase, channelOwnerId, utterance),
+        { message: SCHEDULE_UNAVAILABLE_MESSAGE },
+        SCHEDULE_RESPONSE_TIMEOUT_MS,
+      );
+      const response = skillText(message, [
+        { label: '📅 휴강일 안내', action: 'schedule_info' },
+        { label: '학생 연결', action: 'connect_student' },
+        { label: '💬 상담 요청', action: 'counsel_request' },
+      ]);
+      runInBackground(logEvent(supabase, payload, channelOwnerId, 'schedule_info', response), 'Kakao schedule event log');
+      return jsonResponse(response);
+    }
+
     // 링크 전체 조회 (counsel_request 포함 이후 모든 핸들러에서 사용)
     const links = await findActiveLinks(supabase, channelOwnerId, kakaoUserKey);
 
@@ -489,7 +536,11 @@ Deno.serve(async req => {
       await createParentRequest(supabase, ownerId, counselStudentId, kakaoUserKey, 'counsel', savedMessage, payload);
       const counselMenuReplies = links.length > 0
         ? makeMenuReplies(counselStudentId ?? undefined, links.length > 1)
-        : [{ label: '학생 연결', action: 'connect_student' }, { label: '💬 상담 요청', action: 'counsel_request' }];
+        : [
+          { label: '📅 휴강일 안내', action: 'schedule_info' },
+          { label: '학생 연결', action: 'connect_student' },
+          { label: '💬 상담 요청', action: 'counsel_request' },
+        ];
       const response = skillText(confirmMsg, counselMenuReplies);
       await logEvent(supabase, payload, ownerId, 'counsel_queued', response);
 
@@ -512,6 +563,7 @@ Deno.serve(async req => {
             ? `상담 요청이 접수되었습니다.\n원장님이 ${phone}으로 연락드리겠습니다.`
             : '상담 요청이 접수되었습니다.\n원장님이 확인 후 연락드리겠습니다.\n\n연락처를 남겨주시면 더 빨리 연락드릴 수 있어요 😊';
           const response = skillText(confirmText, [
+            { label: '📅 휴강일 안내', action: 'schedule_info' },
             { label: '학생 연결', action: 'connect_student' },
             { label: '💬 상담 요청', action: 'counsel_request' },
           ]);
@@ -520,7 +572,8 @@ Deno.serve(async req => {
           return jsonResponse(response);
         }
       }
-      const response = skillText('안녕하세요! 그로잉영어입니다. 😊\n\n카카오톡 하나로 이런 게 다 돼요! 👇\n✅ 오늘 우리 아이 출석했는지 바로 확인\n✅ 숙제 했는지 실시간 체크\n✅ "이번 달 결석 몇 번이에요?" "보강 남은 거 있어요?" — AI가 24시간 답변\n✅ 상담 요청도 한 번에\n\n재원생 학부모님은 학생 연결 후 바로 이용하세요.\n입학 문의는 상담 요청 버튼을 눌러주세요! 🙌', [
+      const response = skillText('안녕하세요! 그로잉영어입니다. 😊\n\n카카오톡 하나로 이런 게 다 돼요! 👇\n✅ 휴강일과 공휴일 수업 일정 확인\n✅ 오늘 우리 아이 출석했는지 바로 확인\n✅ 숙제 했는지 실시간 체크\n✅ "이번 달 결석 몇 번이에요?" "보강 남은 거 있어요?" — AI가 24시간 답변\n✅ 상담 요청도 한 번에\n\n재원생 학부모님은 학생 연결 후 바로 이용하세요.\n입학 문의는 상담 요청 버튼을 눌러주세요! 🙌', [
+        { label: '📅 휴강일 안내', action: 'schedule_info' },
         { label: '학생 연결', action: 'connect_student' },
         { label: '💬 상담 요청', action: 'counsel_request' },
       ]);
@@ -580,6 +633,7 @@ Deno.serve(async req => {
       let unlinkResponse;
       if (remainingLinks.length === 0) {
         unlinkResponse = skillText(`${student.name} 학생 연결을 해제했습니다.`, [
+          { label: '📅 휴강일 안내', action: 'schedule_info' },
           { label: '학생 연결', action: 'connect_student' },
           { label: '💬 상담 요청', action: 'counsel_request' },
         ]);
@@ -600,13 +654,22 @@ Deno.serve(async req => {
     }
 
     if (action === 'attendance_today') {
+      const today = kstToday();
+      const holiday = await getHolidayForDate(supabase, link.owner_id, today);
+      if (holiday.isClosed) {
+        const response = skillText(
+          `오늘은 ${holiday.name}로 휴강입니다.\n${student.name} 학생의 출결을 따로 확인하지 않으셔도 됩니다.`,
+          makeMenuReplies(student.id, links.length > 1),
+        );
+        await logEvent(supabase, payload, link.owner_id, 'attendance_holiday', response);
+        return jsonResponse(response);
+      }
       if (!autoReply) {
         await createParentRequest(supabase, link.owner_id, student.id, kakaoUserKey, 'attendance', '출결 확인 요청', payload);
         const response = skillText(`${student.name} 학생 출결 확인 요청을 접수했습니다.\n원장님이 확인 후 알려드리겠습니다.`, makeMenuReplies(student.id, links.length > 1));
         await logEvent(supabase, payload, link.owner_id, 'attendance_queued', response);
         return jsonResponse(response);
       }
-      const today = kstToday();
       const { data, error } = await supabase
         .from('growing_attendance')
         .select('id, student_id, date, status, homework_status, check_in_time, check_out_time')

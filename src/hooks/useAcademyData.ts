@@ -14,6 +14,7 @@ import type {
   KakaoParentRequestStatus,
   KakaoEventLog,
   KakaoChannelConfig,
+  HolidaySettings,
 } from '../types';
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
@@ -38,6 +39,10 @@ export function useAcademyData(userId: string) {
   const [kakaoChannels, setKakaoChannels] = useState<KakaoChannelConfig[]>([]);
   const [kioskPin, setKioskPin] = useState('1234');
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplates>(DEFAULT_TEMPLATES);
+  const [holidaySettings, setHolidaySettings] = useState<HolidaySettings>({
+    holidayAutoClose: true,
+    calendarExceptions: [],
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +64,7 @@ export function useAcademyData(userId: string) {
       setKakaoChannels(snap.kakaoChannels);
       setKioskPin(snap.kioskPin);
       setMessageTemplates(snap.messageTemplates);
+      setHolidaySettings(snap.holidaySettings);
     } catch (e) {
       console.error('Failed to load academy data:', e);
       setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.');
@@ -390,8 +396,21 @@ export function useAcademyData(userId: string) {
       setMessageTemplates(templates);
     });
 
+  const handleSaveHolidaySettings = async (settings: HolidaySettings): Promise<boolean> => {
+    try {
+      const saved = await api.setHolidaySettings(userId, settings);
+      setHolidaySettings(saved);
+      return true;
+    } catch (e) {
+      // Keep the local editor draft intact on failure. Unlike the shared guard,
+      // this save reports its result to the editor instead of reloading all data.
+      console.error('Failed to save holiday settings:', e);
+      return false;
+    }
+  };
+
   // ---- Backup: export current data / restore a JSON backup into the DB ----
-  const getAllData = () => ({ students, classes, attendance, payments, counselLogs });
+  const getAllData = () => ({ students, classes, attendance, payments, counselLogs, holidaySettings });
 
   const handleImportData = async (data: {
     students: Student[];
@@ -399,6 +418,7 @@ export function useAcademyData(userId: string) {
     attendance: Attendance[];
     payments: Payment[];
     counselLogs: CounselLog[];
+    holidaySettings?: HolidaySettings;
   }): Promise<boolean> => {
     let succeeded = false;
     await guard(async () => {
@@ -452,6 +472,10 @@ export function useAcademyData(userId: string) {
         if (!studentId) continue;
         await api.addCounselLog({ ...l, studentId });
       }
+      if (data.holidaySettings) {
+        const savedHolidaySettings = await api.setHolidaySettings(userId, data.holidaySettings);
+        setHolidaySettings(savedHolidaySettings);
+      }
       await load();
       succeeded = true;
     });
@@ -488,6 +512,7 @@ export function useAcademyData(userId: string) {
     kakaoChannels,
     kioskPin,
     messageTemplates,
+    holidaySettings,
     handleAddStudent,
     handleUpdateStudent,
     handleWithdrawStudent,
@@ -518,6 +543,7 @@ export function useAcademyData(userId: string) {
     handleSaveKakaoChannel,
     handleChangeKioskPin,
     handleSaveMessageTemplates,
+    handleSaveHolidaySettings,
     getAllData,
     handleImportData,
     handleResetData,

@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock3, Copy, KeyRound, Link2, MessageCircle, ShieldCheck, Trash2, UserX } from 'lucide-react';
-import type { KakaoChannelConfig, KakaoEventLog, KakaoParentLink, KakaoParentRequest, KakaoParentRequestStatus, Student } from '../types';
+import { CalendarDays, CheckCircle2, Clock3, Copy, KeyRound, Link2, MessageCircle, Plus, ShieldCheck, Trash2, UserX } from 'lucide-react';
+import type {
+  CalendarException,
+  CalendarExceptionKind,
+  HolidaySettings,
+  KakaoChannelConfig,
+  KakaoEventLog,
+  KakaoParentLink,
+  KakaoParentRequest,
+  KakaoParentRequestStatus,
+  Student,
+} from '../types';
+import { MAX_CALENDAR_EXCEPTIONS, normalizeCalendarExceptions } from '../lib/holidaySettings';
 
 interface KakaoManagerProps {
   students: Student[];
@@ -11,6 +22,9 @@ interface KakaoManagerProps {
   onUpdateRequestStatus: (id: string, status: KakaoParentRequestStatus) => void;
   onDeleteRequest: (id: string) => void;
   onSaveChannel: (config: { id?: string; channelName: string; skillSecret: string; eventSecret?: string; enabled: boolean; autoReply: boolean }) => void;
+  holidayAutoClose: boolean;
+  calendarExceptions: CalendarException[];
+  onSaveHolidaySettings: (settings: HolidaySettings) => Promise<boolean>;
 }
 
 const requestTypeLabel: Record<KakaoParentRequest['requestType'], string> = {
@@ -37,6 +51,7 @@ const statusPillClass: Record<KakaoParentRequestStatus, string> = {
 const intentLabel: Record<string, string> = {
   connect_student: '학생 연결',
   unlink_student: '연결 해제',
+  schedule_info: '휴강 일정',
   attendance_today: '출결 확인',
   homework_today: '숙제 확인',
   counsel_request: '상담 요청',
@@ -51,6 +66,8 @@ const eventStatusLabel = (status: string): string => {
     counsel_prompt: '상담 안내',
     counsel_queued: '상담 접수',
     counsel_queued_unlinked: '상담 접수(미연결)',
+    schedule_info: '휴강 안내',
+    attendance_holiday: '휴강일 안내',
     attendance_queued: '출결 답변',
     homework_queued: '숙제 답변',
     unverified: '미인증',
@@ -86,7 +103,19 @@ const makeSecret = () => {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
-export function KakaoManager({ students, channels, links, requests, events, onUpdateRequestStatus, onDeleteRequest, onSaveChannel }: KakaoManagerProps) {
+export function KakaoManager({
+  students,
+  channels,
+  links,
+  requests,
+  events,
+  onUpdateRequestStatus,
+  onDeleteRequest,
+  onSaveChannel,
+  holidayAutoClose,
+  calendarExceptions,
+  onSaveHolidaySettings,
+}: KakaoManagerProps) {
   const [activeTab, setActiveTab] = useState<'inbox' | 'links' | 'settings'>('inbox');
   const [showArchived, setShowArchived] = useState(false);
   const primaryChannel = channels[0];
@@ -95,6 +124,15 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
   const [skillSecret, setSkillSecret] = useState(primaryChannel?.skillSecret || '');
   const [eventSecret, setEventSecret] = useState(primaryChannel?.eventSecret || '');
   const [enabled, setEnabled] = useState(primaryChannel?.enabled ?? true);
+  const [holidayAutoCloseDraft, setHolidayAutoCloseDraft] = useState(holidayAutoClose);
+  const [calendarExceptionsDraft, setCalendarExceptionsDraft] = useState(calendarExceptions);
+  const [exceptionDate, setExceptionDate] = useState('');
+  const [exceptionTitle, setExceptionTitle] = useState('');
+  const [exceptionKind, setExceptionKind] = useState<CalendarExceptionKind>('closed');
+  const [holidaySaveStatus, setHolidaySaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const holidaySaving = holidaySaveStatus === 'saving';
+  const replacingException = calendarExceptionsDraft.some(item => item.date === exceptionDate);
+  const exceptionLimitReached = calendarExceptionsDraft.length >= MAX_CALENDAR_EXCEPTIONS && !replacingException;
   // 저장 후 props 변경 시 폼 상태 동기화
   useEffect(() => {
     if (!primaryChannel) return;
@@ -107,6 +145,41 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
     });
     return () => cancelAnimationFrame(frame);
   }, [primaryChannel]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setHolidayAutoCloseDraft(holidayAutoClose);
+      setCalendarExceptionsDraft(calendarExceptions);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [calendarExceptions, holidayAutoClose]);
+
+  const addCalendarException = () => {
+    if (holidaySaving || exceptionLimitReached || !exceptionDate || !exceptionTitle.trim()) return;
+    setHolidaySaveStatus('idle');
+    setCalendarExceptionsDraft(current => normalizeCalendarExceptions([
+      ...current,
+      { date: exceptionDate, kind: exceptionKind, title: exceptionTitle },
+    ]));
+    setExceptionDate('');
+    setExceptionTitle('');
+    setExceptionKind('closed');
+  };
+
+  const saveHolidaySettings = async () => {
+    if (holidaySaveStatus === 'saving') return;
+    setHolidaySaveStatus('saving');
+    try {
+      const saved = await onSaveHolidaySettings({
+        holidayAutoClose: holidayAutoCloseDraft,
+        calendarExceptions: calendarExceptionsDraft,
+      });
+      setHolidaySaveStatus(saved ? 'success' : 'error');
+    } catch (error) {
+      console.error('Holiday settings save callback failed:', error);
+      setHolidaySaveStatus('error');
+    }
+  };
 
   const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
   const skillUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/kakao-skill` : 'Supabase URL 설정 필요';
@@ -189,6 +262,7 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
       </div>
 
       {activeTab === 'settings' && (
+      <>
       <section className="gd-card">
         <div className="kakao-card-head">
           <div>
@@ -295,6 +369,154 @@ export function KakaoManager({ students, channels, links, requests, events, onUp
           </button>
         </div>
       </section>
+      <section className="gd-card">
+        <div className="kakao-card-head">
+          <div>
+            <h3>휴강일 자동 안내</h3>
+            <p>카카오 챗봇이 공휴일과 학원 예외 일정을 확인해 휴강 여부를 바로 답합니다.</p>
+          </div>
+          <CalendarDays size={20} />
+        </div>
+
+        <div className="ka-auto-toggle">
+          <div className="ka-auto-tx">
+            <b>대한민국 공휴일 자동 휴강</b>
+            <span>
+              {holidayAutoCloseDraft
+                ? '공휴일·대체공휴일은 기본 휴강으로 안내합니다.'
+                : '공휴일도 기본 정상 수업으로 안내하며, 등록한 예외만 적용합니다.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={`ka-switch${holidayAutoCloseDraft ? ' on' : ''}`}
+            disabled={holidaySaving}
+            onClick={() => {
+              setHolidayAutoCloseDraft(value => !value);
+              setHolidaySaveStatus('idle');
+            }}
+            aria-pressed={holidayAutoCloseDraft}
+            aria-label="공휴일 자동 휴강 켜기/끄기"
+          >
+            <span />
+          </button>
+        </div>
+
+        <div className="ka-holiday-editor">
+          <div className="ka-holiday-fields">
+            <div className="ka-field">
+              <label htmlFor="holiday-exception-date">날짜</label>
+              <input
+                id="holiday-exception-date"
+                className="gd-field"
+                type="date"
+                disabled={holidaySaving}
+                value={exceptionDate}
+                onChange={event => setExceptionDate(event.target.value)}
+              />
+            </div>
+            <div className="ka-field">
+              <label htmlFor="holiday-exception-kind">수업 여부</label>
+              <select
+                id="holiday-exception-kind"
+                className="gd-field"
+                disabled={holidaySaving}
+                value={exceptionKind}
+                onChange={event => setExceptionKind(event.target.value as CalendarExceptionKind)}
+              >
+                <option value="closed">휴강</option>
+                <option value="open">정상 수업</option>
+              </select>
+            </div>
+            <div className="ka-field ka-holiday-title-field">
+              <label htmlFor="holiday-exception-title">일정명</label>
+              <input
+                id="holiday-exception-title"
+                className="gd-field"
+                value={exceptionTitle}
+                disabled={holidaySaving}
+                maxLength={80}
+                placeholder="예: 여름방학, 공휴일 정상 수업"
+                onChange={event => setExceptionTitle(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addCalendarException();
+                  }
+                }}
+              />
+            </div>
+            <button
+              className="pay-btn ghost ka-holiday-add"
+              type="button"
+              disabled={holidaySaving || exceptionLimitReached || !exceptionDate || !exceptionTitle.trim()}
+              onClick={addCalendarException}
+            >
+              <Plus size={15} /> 추가/변경
+            </button>
+          </div>
+
+          {exceptionLimitReached && (
+            <p className="ka-holiday-limit" role="alert">
+              예외 일정은 최대 {MAX_CALENDAR_EXCEPTIONS}개까지 등록할 수 있습니다. 기존 날짜는 변경할 수 있습니다.
+            </p>
+          )}
+
+          {calendarExceptionsDraft.length === 0 ? (
+            <div className="gd-empty ka-holiday-empty">
+              <CalendarDays size={24} />
+              <span>등록한 학원 휴강·정상 수업 예외가 없습니다.</span>
+            </div>
+          ) : (
+            <div className="ka-holiday-list" role="list" aria-label="학원 일정 예외">
+              {calendarExceptionsDraft.map(exception => (
+                <div className="ka-holiday-row" role="listitem" key={exception.date}>
+                  <time dateTime={exception.date}>{exception.date}</time>
+                  <span className={`ka-holiday-kind ${exception.kind}`}>
+                    {exception.kind === 'closed' ? '휴강' : '정상 수업'}
+                  </span>
+                  <b>{exception.title}</b>
+                  <button
+                    className="pay-btn ghost sm"
+                    type="button"
+                    disabled={holidaySaving}
+                    title={`${exception.title} 삭제`}
+                    aria-label={`${exception.title} 삭제`}
+                    onClick={() => {
+                      setCalendarExceptionsDraft(current => current.filter(item => item.date !== exception.date));
+                      setHolidaySaveStatus('idle');
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="kakao-actions" style={{ marginTop: '0.9rem' }}>
+          <button
+            className="pay-btn primary"
+            type="button"
+            disabled={holidaySaving}
+            aria-busy={holidaySaving}
+            onClick={() => void saveHolidaySettings()}
+          >
+            {holidaySaving ? '저장 중…' : '휴강 설정 저장'}
+          </button>
+          <span
+            className={`ka-holiday-save-status ${holidaySaveStatus}`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {holidaySaveStatus === 'success' && '휴강 설정을 저장했습니다.'}
+            {holidaySaveStatus === 'error' && '저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'}
+          </span>
+        </div>
+      </section>
+      </>
       )}
 
       {activeTab === 'links' && (

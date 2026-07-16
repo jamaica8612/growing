@@ -1,11 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Download, Upload, AlertTriangle, CheckCircle, KeyRound, BrainCircuit, Trash2, BookOpen, MessageSquare, FolderOpen, FileSpreadsheet, FileArchive, File, X } from 'lucide-react';
-import type { Student, Class, Attendance, Payment, CounselLog } from '../types';
+import type { Student, Class, Attendance, Payment, CounselLog, HolidaySettings } from '../types';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { isNormalizedHolidaySettings } from '../lib/holidaySettings';
 
 // Bump when the backup file shape changes so old/foreign files can be detected.
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 interface BackupProps {
   onImportData: (data: {
@@ -14,6 +15,7 @@ interface BackupProps {
     attendance: Attendance[];
     payments: Payment[];
     counselLogs: CounselLog[];
+    holidaySettings?: HolidaySettings;
   }) => Promise<boolean>;
   onResetData: () => void;
   getAllData: () => {
@@ -22,6 +24,7 @@ interface BackupProps {
     attendance: Attendance[];
     payments: Payment[];
     counselLogs: CounselLog[];
+    holidaySettings: HolidaySettings;
   };
   kioskPin: string;
   onChangeKioskPin: (newPin: string) => void;
@@ -263,6 +266,10 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           throw new Error('이 백업 파일은 더 최신 버전에서 생성되었습니다. 프로그램을 업데이트한 후 다시 시도해 주세요.');
         }
 
+        if (json.holidaySettings !== undefined && !isNormalizedHolidaySettings(json.holidaySettings)) {
+          throw new Error('휴강 설정 데이터 형식이 올바르지 않습니다.');
+        }
+
         if (window.confirm('클라우드에 저장된 기존 데이터가 모두 지워지고 백업 파일 데이터로 덮어씌워집니다. 진행하시겠습니까?')) {
           const restored = await onImportData({
             students: json.students,
@@ -270,6 +277,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
             attendance: json.attendance,
             payments: json.payments,
             counselLogs: json.counselLogs,
+            holidaySettings: json.holidaySettings,
           });
 
           if (!restored) {

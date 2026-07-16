@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type KakaoSkillPayload,
   getAction,
+  isScheduleInquiry,
   isCounselPlaceholder,
   makeMenuReplies,
   parseConnectInput,
@@ -22,6 +23,7 @@ const textPayload = (utterance: string): KakaoSkillPayload => ({
 describe('getAction — 버튼(clientExtra) 라우팅', () => {
   it.each([
     ['connect_student', 'connect_student'],
+    ['schedule_info', 'schedule_info'],
     ['attendance_today', 'attendance_today'],
     ['homework_today', 'homework_today'],
     ['counsel_request', 'counsel_request'],
@@ -38,6 +40,21 @@ describe('getAction — 버튼(clientExtra) 라우팅', () => {
 });
 
 describe('getAction — 자유 입력 라우팅', () => {
+  it.each([
+    '휴강일 알려주세요',
+    '대체공휴일에도 수업하나요?',
+    '이번 공휴일은 학원 쉬나요',
+    '내일 수업 있어요?',
+    '오늘 학원 가나요?',
+    '8월 17일 학원 가나요?',
+    '2026-08-17 학원 가나요?',
+    '학원 가나요?',
+    '내일 쉬나요?',
+    '수업하나요',
+  ])('일정 질문 "%s" → schedule_info', utterance => {
+    expect(getAction(textPayload(utterance))).toBe('schedule_info');
+  });
+
   it('"상담" 단독 입력 → counsel_request', () => {
     expect(getAction(textPayload('상담'))).toBe('counsel_request');
   });
@@ -113,6 +130,11 @@ describe('isCounselPlaceholder', () => {
 });
 
 describe('makeMenuReplies', () => {
+  it('휴강일 안내 버튼을 항상 포함한다', () => {
+    const reply = makeMenuReplies('sid-1').find(r => r.action === 'schedule_info');
+    expect(reply).toEqual({ label: '📅 휴강일 안내', action: 'schedule_info', studentId: 'sid-1' });
+  });
+
   it('학생 연결 시 연결 해제 버튼 포함', () => {
     const labels = makeMenuReplies('sid-1').map(r => r.label);
     expect(labels).toContain('🔗 연결 해제');
@@ -128,6 +150,16 @@ describe('makeMenuReplies', () => {
   it('학생 미지정 시 연결 해제 버튼 없음', () => {
     const labels = makeMenuReplies().map(r => r.label);
     expect(labels).not.toContain('🔗 연결 해제');
+  });
+});
+
+describe('isScheduleInquiry', () => {
+  it.each(['휴강', '대체 공휴일', '내일 수업', '오늘 학원 가나요', '내일 쉬나요', '8월 17일 학원 가나요', '2026-08-17 학원 가나요', '학원 가나요', '수업 있나요'])('"%s" → true', value => {
+    expect(isScheduleInquiry(value)).toBe(true);
+  });
+
+  it.each(['이번 달 출석 어때요?', '숙제 잘 하고 있나요', '입학 상담'])('"%s" → false', value => {
+    expect(isScheduleInquiry(value)).toBe(false);
   });
 });
 
