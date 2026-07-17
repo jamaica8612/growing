@@ -56,40 +56,40 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy kakao-skill
-        run: supabase functions deploy kakao-skill --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        run: supabase functions deploy kakao-skill --project-ref xrrdokcjhjqdfvwtbenl --use-api --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # Gateway JWT verification is intentionally disabled because this endpoint
       # authenticates only signed server-to-server requests with PUSH_INTERNAL_SECRET.
       - name: Deploy send-push
-        run: supabase functions deploy send-push --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        run: supabase functions deploy send-push --project-ref xrrdokcjhjqdfvwtbenl --use-api --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy send-alimtalk
-        run: supabase functions deploy send-alimtalk --project-ref xrrdokcjhjqdfvwtbenl
+        run: supabase functions deploy send-alimtalk --project-ref xrrdokcjhjqdfvwtbenl --use-api
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # This public route verifies the student with a masked roster, contact
       # suffix, and a short-lived HMAC token inside the function.
       - name: Deploy exam-public
-        run: supabase functions deploy exam-public --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        run: supabase functions deploy exam-public --project-ref xrrdokcjhjqdfvwtbenl --use-api --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy exam-generate
-        run: supabase functions deploy exam-generate --project-ref xrrdokcjhjqdfvwtbenl
+        run: supabase functions deploy exam-generate --project-ref xrrdokcjhjqdfvwtbenl --use-api
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy kakao-channel-event
-        run: supabase functions deploy kakao-channel-event --project-ref xrrdokcjhjqdfvwtbenl --no-verify-jwt
+        run: supabase functions deploy kakao-channel-event --project-ref xrrdokcjhjqdfvwtbenl --use-api --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy assistant
-        run: supabase functions deploy assistant --project-ref xrrdokcjhjqdfvwtbenl
+        run: supabase functions deploy assistant --project-ref xrrdokcjhjqdfvwtbenl --use-api
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

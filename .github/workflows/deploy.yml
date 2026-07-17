@@ -46,9 +46,11 @@ jobs:
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > ~/.ssh/oracle_growing
+          private_key="${ORACLE_SSH_PRIVATE_KEY#$'\xEF\xBB\xBF'}"
+          known_hosts="${ORACLE_SSH_KNOWN_HOSTS#$'\xEF\xBB\xBF'}"
+          printf '%s\n' "$private_key" | tr -d '\r' > ~/.ssh/oracle_growing
           chmod 600 ~/.ssh/oracle_growing
-          printf '%s\n' "$ORACLE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$known_hosts" | tr -d '\r' > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy static site
@@ -58,9 +60,13 @@ jobs:
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
         run: |
           set -euo pipefail
+          oracle_host="${ORACLE_HOST#$'\xEF\xBB\xBF'}"
+          oracle_user="${ORACLE_USER#$'\xEF\xBB\xBF'}"
+          oracle_host="${oracle_host//$'\r'/}"
+          oracle_user="${oracle_user//$'\r'/}"
           rsync -az --delete-delay --delay-updates --chmod=D755,F644 \
             -e "ssh -i ~/.ssh/oracle_growing -o IdentitiesOnly=yes" \
-            dist/ "$ORACLE_USER@$ORACLE_HOST:/opt/stacks/growing/current/"
+            dist/ "$oracle_user@$oracle_host:/opt/stacks/growing/current/"
 
   deploy:
     needs:
