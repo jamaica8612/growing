@@ -6,20 +6,20 @@
 
   // 재원생 (status: active / paused / withdrawn)
   const students = [
-    { id: 's1',  name: '김서윤', school: '그로잉초', grade: '초 4', parentContact: '010-2841-7790', status: 'active' },
-    { id: 's2',  name: '이준호', school: '그로잉초', grade: '초 4', parentContact: '010-3320-1187', status: 'active' },
-    { id: 's3',  name: '박지민', school: '한들초',  grade: '초 5', parentContact: '010-9921-4456', status: 'active' },
-    { id: 's4',  name: '최예린', school: '한들초',  grade: '초 5', parentContact: '010-4417-8830', status: 'active' },
-    { id: 's5',  name: '정시우', school: '그로잉초', grade: '초 5', parentContact: '010-7755-2093', status: 'active' },
-    { id: 's6',  name: '강하은', school: '솔빛중',  grade: '중 1', parentContact: '010-2266-9981', status: 'active' },
-    { id: 's7',  name: '윤도현', school: '솔빛중',  grade: '중 1', parentContact: '',             status: 'active' },
-    { id: 's8',  name: '임채원', school: '솔빛중',  grade: '중 2', parentContact: '010-8814-3320', status: 'active' },
-    { id: 's9',  name: '한지후', school: '대청중',  grade: '중 2', parentContact: '010-5590-7741', status: 'active' },
-    { id: 's10', name: '오서연', school: '대청중',  grade: '중 2', parentContact: '010-3308-6612', status: 'active' },
-    { id: 's11', name: '신민준', school: '한들초',  grade: '초 6', parentContact: '010-9043-2218', status: 'active' },
-    { id: 's12', name: '배수아', school: '한들초',  grade: '초 6', parentContact: '010-6671-5540', status: 'active' },
-    { id: 's13', name: '문지안', school: '솔빛중',  grade: '중 1', parentContact: '010-2299-7783', status: 'paused' },
-    { id: 's14', name: '권태양', school: '그로잉초', grade: '초 4', parentContact: '010-7012-9934', status: 'active' },
+    { id: 's1',  name: '샘플학생01', school: '그로잉초', grade: '초 4', parentContact: '010-****-0001', status: 'active' },
+    { id: 's2',  name: '샘플학생02', school: '그로잉초', grade: '초 4', parentContact: '010-****-0002', status: 'active' },
+    { id: 's3',  name: '샘플학생03', school: '한들초',  grade: '초 5', parentContact: '010-****-0003', status: 'active' },
+    { id: 's4',  name: '샘플학생04', school: '한들초',  grade: '초 5', parentContact: '010-****-0004', status: 'active' },
+    { id: 's5',  name: '샘플학생05', school: '그로잉초', grade: '초 5', parentContact: '010-****-0005', status: 'active' },
+    { id: 's6',  name: '샘플학생06', school: '솔빛중',  grade: '중 1', parentContact: '010-****-0006', status: 'active' },
+    { id: 's7',  name: '샘플학생07', school: '솔빛중',  grade: '중 1', parentContact: '',              status: 'active' },
+    { id: 's8',  name: '샘플학생08', school: '솔빛중',  grade: '중 2', parentContact: '010-****-0008', status: 'active' },
+    { id: 's9',  name: '샘플학생09', school: '대청중',  grade: '중 2', parentContact: '010-****-0009', status: 'active' },
+    { id: 's10', name: '샘플학생10', school: '대청중',  grade: '중 2', parentContact: '010-****-0010', status: 'active' },
+    { id: 's11', name: '샘플학생11', school: '한들초',  grade: '초 6', parentContact: '010-****-0011', status: 'active' },
+    { id: 's12', name: '샘플학생12', school: '한들초',  grade: '초 6', parentContact: '010-****-0012', status: 'active' },
+    { id: 's13', name: '샘플학생13', school: '솔빛중',  grade: '중 1', parentContact: '010-****-0013', status: 'paused' },
+    { id: 's14', name: '샘플학생14', school: '그로잉초', grade: '초 4', parentContact: '010-****-0014', status: 'active' },
   ];
 
   // 반/시간표 — 월요일(오늘) 수업 3개 반
@@ -58,7 +58,7 @@
     { id: 'a5', studentId: 's4', classId: 'c2', date: TODAY, status: 'makeup', checkInTime: '16:31', checkOutTime: '', homeworkStatus: '', makeupForDate: '2026-05-28' },
     // s5, s11, s12 미체크 / Grammar 전원 미체크
 
-    // ─ 박지민(s3) 5월 이력 (타임라인 데모용) ─
+    // ─ 샘플학생03(s3) 5월 이력 (타임라인 데모용) ─
     { id: 'h1', studentId: 's3', classId: 'c2', date: '2026-05-07', status: 'present', checkInTime: '16:24', checkOutTime: '18:02', homeworkStatus: 'done' },
     { id: 'h2', studentId: 's3', classId: 'c2', date: '2026-05-09', status: 'absent', memo: '감기로 결석 (학부모 연락)' },
     { id: 'h3', studentId: 's3', classId: 'c2', date: '2026-05-12', status: 'makeup', checkInTime: '15:02', checkOutTime: '16:30', homeworkStatus: 'done', makeupForDate: '2026-05-09' },
@@ -97,7 +97,7 @@
     { id: 'p11', studentId: 's10', billingMonth, status: 'paid',  amount: 220000, paymentDate: '2026-06-01', method: 'card' },
     { id: 'p12', studentId: 's14', billingMonth, status: 'paid',  amount: 180000, paymentDate: '2026-05-31', method: 'card' },
     { id: 'p4', studentId: 's4',  billingMonth, status: 'paid',   amount: 200000, paymentDate: '2026-06-01', method: 'card' },
-    // 박지민(s3) 5월 완납 — 타임라인 데모
+    // 샘플학생03(s3) 5월 완납 — 타임라인 데모
     { id: 'p3b', studentId: 's3', billingMonth: '2026-05', status: 'paid', amount: 200000, paymentDate: '2026-05-03', method: 'transfer' },
   ];
 

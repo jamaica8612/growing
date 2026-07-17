@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'growing-pwa-v3';
+const CACHE_VERSION = 'growing-pwa-v4';
 const APP_SHELL = [
   './',
   './manifest.webmanifest',

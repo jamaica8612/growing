@@ -13,6 +13,11 @@ dist-ssr
 *.local
 supabase/.temp/
 
+# Local environment files (keep only the placeholder template in Git)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

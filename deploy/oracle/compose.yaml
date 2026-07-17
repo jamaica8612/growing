@@ -1,0 +1,30 @@
+services:
+  growing:
+    image: nginx:stable-alpine
+    container_name: growing
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - ./current:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: familymap_default
