@@ -50,7 +50,7 @@ const PARENT_REQUEST_LIMIT = 5;
 const PARENT_REQUEST_WINDOW_MS = 15 * 60 * 1000;
 const KAKAO_CONSENT_VERSION = '2026-07-17-v1';
 const KAKAO_COUNSEL_CONSENT_VERSION = '2026-07-17-counsel-v1';
-const KAKAO_PRIVACY_URL = 'https://jamaica8612.github.io/growing/privacy.html';
+const KAKAO_PRIVACY_URL = 'https://growing.jamaifamily.duckdns.org/privacy.html';
 const KAKAO_CONSENT_NOTICE = [
   '학생 연결을 위해 카카오 사용자 정보와 연결할 학생 정보를 이용합니다.',
   '입력한 휴대폰 번호는 학원 등록정보 확인에만 사용하며 그로잉 연결정보·운영로그에는 별도 저장하지 않습니다.',

@@ -38,7 +38,7 @@ npm run verify
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-브라우저에서 `http://localhost:5173/growing/` 또는 Vite가 안내하는 `/growing/` 경로를 연다.
+브라우저에서 `http://localhost:5173/` 또는 Vite가 안내하는 `/` 경로를 연다.
 
 ## Edge Function Deployment Check
 

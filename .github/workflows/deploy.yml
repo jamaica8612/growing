@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to Oracle
 
 on:
   push:
@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: growing-production
@@ -19,7 +17,7 @@ jobs:
     uses: ./.github/workflows/deploy-functions.yml
     secrets: inherit
 
-  build-pages:
+  build-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,27 +32,49 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Pages artifact
+      - name: Build production site
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Configure Oracle SSH
+        shell: bash
+        env:
+          ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          ORACLE_SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > ~/.ssh/oracle_growing
+          chmod 600 ~/.ssh/oracle_growing
+          printf '%s\n' "$ORACLE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
+      - name: Deploy static site
+        shell: bash
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete-delay --delay-updates --chmod=D755,F644 \
+            -e "ssh -i ~/.ssh/oracle_growing -o IdentitiesOnly=yes" \
+            dist/ "$ORACLE_USER@$ORACLE_HOST:/opt/stacks/growing/current/"
 
   deploy:
     needs:
       - deploy-functions
-      - build-pages
+      - build-web
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: production
+      url: https://growing.jamaifamily.duckdns.org
     runs-on: ubuntu-latest
     steps:
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Verify Oracle deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 5 --retry-delay 3 \
+            https://growing.jamaifamily.duckdns.org/ > /dev/null
