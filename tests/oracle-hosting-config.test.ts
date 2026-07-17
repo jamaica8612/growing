@@ -14,6 +14,10 @@ const deployWorkflow = readFileSync(
   new URL('../.github/workflows/deploy.yml', import.meta.url),
   'utf8',
 );
+const edgeDeployWorkflow = readFileSync(
+  new URL('../.github/workflows/deploy-functions.yml', import.meta.url),
+  'utf8',
+);
 const oracleCompose = readFileSync(
   new URL('../deploy/oracle/compose.yaml', import.meta.url),
   'utf8',
@@ -43,7 +47,9 @@ describe('Oracle root-domain hosting configuration', () => {
     expect(deployWorkflow).toContain('name: Deploy to Oracle');
     expect(deployWorkflow).toContain('/opt/stacks/growing/current/');
     expect(deployWorkflow).toContain('--delete-delay --delay-updates');
+    expect(deployWorkflow).toContain("${ORACLE_HOST#$'\\xEF\\xBB\\xBF'}");
     expect(deployWorkflow).not.toContain('actions/deploy-pages');
+    expect(edgeDeployWorkflow.match(/--use-api/g)).toHaveLength(7);
   });
 
   it('keeps the web container private behind the shared Caddy network', () => {
