@@ -400,7 +400,6 @@ function AcademyApp({ session }: { session: Session }) {
             onDeleteRequest={data.handleDeleteKakaoRequest}
             onDeleteParentLink={data.handleDeleteKakaoParentLink}
             onDeleteUnlinkedIdentity={data.handleDeleteKakaoUnlinkedIdentity}
-            onCreateLinkCode={data.handleCreateKakaoLinkCode}
             onSaveChannel={data.handleSaveKakaoChannel}
             holidayAutoClose={data.holidaySettings.holidayAutoClose}
             calendarExceptions={data.holidaySettings.calendarExceptions}

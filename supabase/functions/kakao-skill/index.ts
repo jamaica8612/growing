@@ -2,12 +2,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
 import {
   type KakaoSkillPayload,
   type QuickReplyDef,
+  cleanPhone,
   extractPhone,
   getAction,
   getParam,
   isCounselPlaceholder,
   kstToday,
   makeMenuReplies,
+  parseConnectInput,
   skillText,
 } from './logic.ts';
 import {
@@ -18,8 +20,8 @@ import { getHolidayForDate, getScheduleInfo } from './holiday-calendar.ts';
 import {
   CONNECT_ATTEMPT_LIMIT,
   CONNECT_ATTEMPT_WINDOW_MS,
-  extractKakaoLinkCode,
   getKakaoAppUserId,
+  normalizeConnectCredentials,
   readKakaoSkillPayload,
   safeEventStatus,
   sha256Hex,
@@ -50,12 +52,11 @@ const KAKAO_CONSENT_VERSION = '2026-07-17-v1';
 const KAKAO_COUNSEL_CONSENT_VERSION = '2026-07-17-counsel-v1';
 const KAKAO_PRIVACY_URL = 'https://jamaica8612.github.io/growing/privacy.html';
 const KAKAO_CONSENT_NOTICE = [
-  '학생 연결 시 다음 정보를 처리합니다.',
-  '• 항목: 카카오 사용자키, 연결 학생, 동의 시각',
-  '• 목적: 본인 확인 및 출결·숙제 조회',
-  '• 보유: 연결 중, 해제 후 1년 이내 삭제',
-  '• 거부: 동의하지 않아도 휴강 안내·일반 상담은 이용 가능',
-  '• 철회: 연결 해제로 조회 중지, 삭제는 학원에 요청',
+  '학생 연결을 위해 카카오 사용자 정보와 연결할 학생 정보를 이용합니다.',
+  '입력한 휴대폰 번호는 학원 등록정보 확인에만 사용하며 그로잉 연결정보·운영로그에는 별도 저장하지 않습니다.',
+  '연결 정보는 연결 중 보유하고, 연결 해제 후 1년 이내 삭제합니다.',
+  '챗봇의 연결 해제로 언제든 동의를 철회하고 조회 권한을 중지할 수 있습니다.',
+  '동의하지 않아도 휴강 안내와 상담은 이용할 수 있습니다.',
   `자세히: ${KAKAO_PRIVACY_URL}`,
 ].join('\n');
 const KAKAO_COUNSEL_CONSENT_NOTICE = [
@@ -129,6 +130,10 @@ function jsonResponse(obj: unknown, status = 200): Response {
       'Content-Type': 'application/json; charset=utf-8',
     },
   });
+}
+
+interface StudentConnectRow extends StudentRow {
+  parent_contact: string | null;
 }
 
 function requiredEnv(name: string): string {
@@ -267,6 +272,27 @@ async function createParentRequest(
   });
   if (error) throw error;
   return data === true;
+}
+
+async function findStudentByExactConnectCredentials(
+  supabase: UntypedSupabaseClient,
+  ownerId: string,
+  studentName: string,
+  phone: string,
+): Promise<StudentRow | null> {
+  const { data, error } = await supabase
+    .from('growing_students')
+    .select('id, name, status, parent_contact')
+    .eq('owner_id', ownerId)
+    .eq('name', studentName)
+    .eq('status', 'active');
+  if (error) throw error;
+
+  const matches = ((data ?? []) as StudentConnectRow[])
+    .filter(student => cleanPhone(student.parent_contact ?? '') === phone);
+  if (matches.length !== 1) return null;
+  const [{ id, name, status }] = matches;
+  return { id, name, status };
 }
 
 async function consumeRateLimit(
@@ -498,33 +524,15 @@ async function handleKakaoSkillRequest(req: Request, signal: AbortSignal): Promi
     }
 
     if (action === 'connect_student') {
-      const linkCode = extractKakaoLinkCode(
-        getParam(payload, 'linkCode', 'link_code', 'code') || payload.userRequest?.utterance || '',
-      );
-      if (!linkCode) {
+      const connectInput = parseConnectInput(payload);
+      const credentials = normalizeConnectCredentials(connectInput.studentName, connectInput.phone);
+      if (!credentials) {
         const response = skillText(
-          '학원에서 발급받은 8자리 연결코드를 입력해 주세요.\n' +
-          '예: A1B2C3D4',
+          '학생 이름과 학원에 등록된 학부모 휴대폰 번호 전체를 한 메시지에 입력해 주세요.\n' +
+          '예: 김서윤 010-1234-5678\n\n' +
+          '입력한 이름·휴대폰 번호는 등록정보 확인에만 사용하고 그로잉 연결정보·운영로그에는 별도 저장하지 않습니다.',
         );
         await logEvent(supabase, payload, channelOwnerId, 'connect_prompt', response);
-        return jsonResponse(response);
-      }
-
-      const response = skillText(
-        `${KAKAO_CONSENT_NOTICE}\n\n동의하고 연결하시겠어요?`,
-        [
-          { label: '동의하고 연결', action: 'connect_student_confirm', linkCode },
-          { label: '연결하지 않기', action: 'menu' },
-        ],
-      );
-      await logEvent(supabase, payload, channelOwnerId, 'connect_consent_prompt', response);
-      return jsonResponse(response);
-    }
-
-    if (action === 'connect_student_confirm') {
-      const linkCode = extractKakaoLinkCode(getParam(payload, 'linkCode', 'link_code', 'code'));
-      if (!linkCode) {
-        const response = skillText('연결 확인 정보가 만료되었습니다. 연결코드를 다시 입력해 주세요.');
         return jsonResponse(response);
       }
 
@@ -542,14 +550,58 @@ async function handleKakaoSkillRequest(req: Request, signal: AbortSignal): Promi
         return jsonResponse(response);
       }
 
-      const { data: claimData, error: claimError } = await supabase.rpc('growing_claim_kakao_link_code', {
+      const student = await findStudentByExactConnectCredentials(
+        supabase,
+        channelOwnerId,
+        credentials.studentName,
+        credentials.phone,
+      );
+      if (!student) {
+        const response = skillText('학생 이름 또는 휴대폰 번호가 등록정보와 일치하지 않습니다. 다시 확인하거나 학원에 문의해 주세요.');
+        await logEvent(supabase, payload, channelOwnerId, 'connect_failed', response);
+        return jsonResponse(response);
+      }
+
+      const connectNonce = crypto.randomUUID().replaceAll('-', '');
+      const { data: pendingSaved, error: pendingError } = await supabase.rpc('growing_set_kakao_connect_pending', {
         p_owner_id: channelOwnerId,
-        p_code: linkCode,
+        p_kakao_user_key: kakaoUserKey,
+        p_student_id: student.id,
+        p_state_nonce: connectNonce,
+      });
+      if (pendingError) throw pendingError;
+      if (pendingSaved !== true) {
+        const response = skillText('학생 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도하거나 학원에 문의해 주세요.');
+        await logEvent(supabase, payload, channelOwnerId, 'connect_failed', response);
+        return jsonResponse(response);
+      }
+
+      const response = skillText(
+        `${student.name} 학생으로 확인되었습니다.\n\n${KAKAO_CONSENT_NOTICE}\n\n동의하고 연결하시겠어요?`,
+        [
+          { label: '동의하고 연결', action: 'connect_student_confirm', connectNonce },
+          { label: '연결하지 않기', action: 'menu' },
+        ],
+      );
+      await logEvent(supabase, payload, channelOwnerId, 'connect_consent_prompt', response);
+      return jsonResponse(response);
+    }
+
+    if (action === 'connect_student_confirm') {
+      const connectNonce = getParam(payload, 'connectNonce', 'connect_nonce');
+      if (!/^[a-f0-9]{32,64}$/i.test(connectNonce)) {
+        const response = skillText('연결 확인 정보가 만료되었습니다. 학생 이름과 휴대폰 번호를 한 메시지에 다시 입력해 주세요.');
+        await logEvent(supabase, payload, channelOwnerId, 'connect_failed', response);
+        return jsonResponse(response);
+      }
+      const { data: claimData, error: claimError } = await supabase.rpc('growing_claim_kakao_pending_link', {
+        p_owner_id: channelOwnerId,
         p_kakao_user_key: kakaoUserKey,
         p_plusfriend_user_key: plusfriendUserKey,
         p_app_user_id: getKakaoAppUserId(payload),
-        p_request_id: payload.requestId ?? '',
         p_consent_text_hash: await sha256Hex(KAKAO_CONSENT_NOTICE),
+        p_consent_version: KAKAO_CONSENT_VERSION,
+        p_state_nonce: connectNonce,
       });
       if (claimError) throw claimError;
       const claim = claimData as {
@@ -558,7 +610,7 @@ async function handleKakaoSkillRequest(req: Request, signal: AbortSignal): Promi
         student_name?: string;
       } | null;
       if (!claim?.matched || !claim.student_id || !claim.student_name) {
-        const response = skillText('연결코드가 올바르지 않거나 만료되었습니다. 학원에서 새 코드를 발급받아 주세요.');
+        const response = skillText('연결 확인 정보가 만료되었습니다. 학생 이름과 휴대폰 번호를 한 메시지에 다시 입력해 주세요.');
         await logEvent(supabase, payload, channelOwnerId, 'connect_failed', response);
         return jsonResponse(response);
       }

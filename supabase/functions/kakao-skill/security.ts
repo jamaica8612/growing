@@ -124,11 +124,6 @@ export function normalizeConnectCredentials(studentName: string, phone: string):
   return { studentName: normalizedName, phone: normalizedPhone };
 }
 
-export function extractKakaoLinkCode(value: string): string {
-  const compact = value.trim().toUpperCase().replace(/^연결\s*/, '');
-  return /^[0-9A-F]{8}$/.test(compact) ? compact : '';
-}
-
 export function getKakaoAppUserId(payload: KakaoSkillPayload): string {
   const properties = payload.userRequest?.user?.properties;
   const value = properties?.appUserId ?? properties?.app_user_id;

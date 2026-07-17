@@ -7,7 +7,6 @@ import type {
   KakaoChannelConfig,
   KakaoChannelConfigInput,
   KakaoEventLog,
-  KakaoLinkCode,
   KakaoParentLink,
   KakaoParentRequest,
   KakaoParentRequestStatus,
@@ -25,7 +24,6 @@ interface KakaoManagerProps {
   onDeleteRequest: (id: string) => void;
   onDeleteParentLink: (id: string) => Promise<void | undefined>;
   onDeleteUnlinkedIdentity: (requestId: string) => Promise<void | undefined>;
-  onCreateLinkCode: (studentId: string) => Promise<KakaoLinkCode | undefined>;
   onSaveChannel: (config: KakaoChannelConfigInput) => void;
   holidayAutoClose: boolean;
   calendarExceptions: CalendarException[];
@@ -118,7 +116,6 @@ export function KakaoManager({
   onUpdateRequestStatus,
   onDeleteParentLink,
   onDeleteUnlinkedIdentity,
-  onCreateLinkCode,
   onSaveChannel,
   holidayAutoClose,
   calendarExceptions,
@@ -136,11 +133,6 @@ export function KakaoManager({
   const [channelPublicId, setChannelPublicId] = useState(primaryChannel?.channelPublicId || '');
   const [channelUuid, setChannelUuid] = useState(primaryChannel?.channelUuid || '');
   const [enabled, setEnabled] = useState(primaryChannel?.enabled ?? true);
-  const [linkCodeStudentId, setLinkCodeStudentId] = useState('');
-  const [issuedLinkCode, setIssuedLinkCode] = useState<KakaoLinkCode | null>(null);
-  const [linkCodeIssuing, setLinkCodeIssuing] = useState(false);
-  const [linkCodeCopied, setLinkCodeCopied] = useState(false);
-  const [linkCodeError, setLinkCodeError] = useState('');
   const [deletingLinkId, setDeletingLinkId] = useState('');
   const [deletingIdentityRequestId, setDeletingIdentityRequestId] = useState('');
   const [holidayAutoCloseDraft, setHolidayAutoCloseDraft] = useState(holidayAutoClose);
@@ -211,39 +203,6 @@ export function KakaoManager({
     } catch (error) {
       console.error('Holiday settings save callback failed:', error);
       setHolidaySaveStatus('error');
-    }
-  };
-
-  const issueLinkCode = async () => {
-    if (!linkCodeStudentId || linkCodeIssuing) return;
-    setLinkCodeIssuing(true);
-    setIssuedLinkCode(null);
-    setLinkCodeCopied(false);
-    setLinkCodeError('');
-    try {
-      const result = await onCreateLinkCode(linkCodeStudentId);
-      if (result) {
-        setIssuedLinkCode(result);
-      } else {
-        setLinkCodeError('연결코드를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-      }
-    } catch (error) {
-      console.error('Kakao link code issue callback failed:', error);
-      setLinkCodeError('연결코드를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setLinkCodeIssuing(false);
-    }
-  };
-
-  const copyLinkCode = async () => {
-    if (!issuedLinkCode) return;
-    try {
-      await navigator.clipboard.writeText(issuedLinkCode.code);
-      setLinkCodeCopied(true);
-      setLinkCodeError('');
-    } catch (error) {
-      console.error('Kakao link code copy failed:', error);
-      setLinkCodeError('복사하지 못했습니다. 코드를 직접 전달해 주세요.');
     }
   };
 
@@ -319,14 +278,7 @@ export function KakaoManager({
             role="tab"
             aria-selected={activeTab === key}
             className={`ka-tab${activeTab === key ? ' on' : ''}`}
-            onClick={() => {
-              setActiveTab(key);
-              if (key !== 'links') {
-                setIssuedLinkCode(null);
-                setLinkCodeCopied(false);
-                setLinkCodeError('');
-              }
-            }}
+            onClick={() => setActiveTab(key)}
           >
             {label}
             {count ? <span className="ka-n">{count}</span> : null}
@@ -378,8 +330,8 @@ export function KakaoManager({
       <section className="gd-card">
         <div className="kakao-card-head">
           <div>
-            <h3>채널 분리 설정</h3>
-            <p>저장한 인증값으로 카카오 요청을 검증하고 해당 학원 데이터에만 연결합니다.</p>
+            <h3>챗봇 설정</h3>
+            <p>학생 연결에는 Skill secret만 사용합니다. Admin 키와 채널 ID는 차단·재추가 자동 동기화를 사용할 때만 설정합니다.</p>
           </div>
           <KeyRound size={20} />
         </div>
@@ -411,8 +363,8 @@ export function KakaoManager({
             />
           </div>
           {channelIdentityIncomplete && (
-            <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.82rem', margin: '0.2rem 0' }}>
-              채널 웹훅을 연결하려면 Public ID와 UUID를 모두 입력하세요.
+            <p style={{ color: 'var(--color-muted)', fontSize: '0.82rem', margin: '0.2rem 0' }}>
+              채널 차단·재추가 자동 동기화를 사용하려면 Public ID와 UUID를 모두 입력하세요.
             </p>
           )}
           <div className="ka-field">
@@ -487,8 +439,8 @@ export function KakaoManager({
               </span>
             )}
             {primaryChannel && !primaryChannel.eventAdminKeyConfigured && !eventSecret && (
-              <span role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>
-                미등록 · 실제 Kakao Primary Admin 키를 입력하세요.
+              <span style={{ color: 'var(--color-muted)', fontSize: '0.8rem' }}>
+                선택 설정 · 채널 차단·재추가 자동 동기화를 사용할 때만 입력하세요.
               </span>
             )}
             {eventSecretInvalid && (
@@ -517,6 +469,9 @@ export function KakaoManager({
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0' }}>
             Skill 요청은 <b>x-kakao-skill-secret</b> 헤더에 저장한 Skill secret을 넣으세요. 채널 웹훅은 카카오가 보내는 <b>Authorization: KakaoAK {'{Admin 키}'}</b> 헤더로 검증합니다. 인증값을 URL에 넣지 마세요.
+          </p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0' }}>
+            Admin 키·Public ID·UUID가 없어도 학생 연결과 챗봇 조회 기능은 사용할 수 있습니다.
           </p>
           <label className="kakao-toggle">
             <input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)} />
@@ -717,83 +672,28 @@ export function KakaoManager({
         <section className="gd-card">
           <div className="kakao-card-head">
             <div>
-              <h3>1회용 연결코드 발급</h3>
-              <p>재원생을 선택해 학부모에게 전달할 8자리 코드를 발급합니다.</p>
+              <h3>학생 연결 방법</h3>
+              <p>관리자가 연결코드를 발급할 필요 없이 학부모가 챗봇에서 직접 연결합니다.</p>
             </div>
-            <KeyRound size={20} />
+            <Link2 size={20} />
           </div>
-          <div className="ka-fields">
-            <div className="ka-field">
-              <label htmlFor="kakao-link-code-student">학생</label>
-              <select
-                id="kakao-link-code-student"
-                className="gd-field"
-                value={linkCodeStudentId}
-                disabled={linkCodeIssuing || activeStudents.length === 0}
-                onChange={event => {
-                  setLinkCodeStudentId(event.target.value);
-                  setIssuedLinkCode(null);
-                  setLinkCodeCopied(false);
-                  setLinkCodeError('');
-                }}
-              >
-                <option value="">학생을 선택하세요</option>
-                {activeStudents.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.name}{student.grade ? ` · ${student.grade}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="kakao-actions">
-              <button
-                className="pay-btn primary"
-                type="button"
-                disabled={!linkCodeStudentId || linkCodeIssuing}
-                aria-busy={linkCodeIssuing}
-                onClick={() => void issueLinkCode()}
-              >
-                {linkCodeIssuing ? '발급 중…' : '8자리 코드 발급'}
-              </button>
-            </div>
-          </div>
-
-          {activeStudents.length === 0 && (
-            <div className="gd-empty">
-              <UserX size={24} />
-              <span>연결코드를 발급할 재원생이 없습니다.</span>
-            </div>
-          )}
-
-          {issuedLinkCode && (
-            <div className="ka-holiday-editor" role="status" aria-live="polite">
-              <p style={{ margin: '0 0 0.5rem', color: 'var(--color-muted)', fontSize: '0.84rem' }}>
-                {studentById.get(issuedLinkCode.studentId)?.name ?? '선택한 학생'} 연결코드
-              </p>
-              <div className="ka-url">
-                <code style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '0.18em' }}>{issuedLinkCode.code}</code>
-                <button className="pay-btn ghost sm" type="button" onClick={() => void copyLinkCode()}>
-                  <Copy size={14} /> {linkCodeCopied ? '복사됨' : '복사'}
-                </button>
-              </div>
-              <p style={{ margin: '0.65rem 0 0', color: 'var(--color-muted)', fontSize: '0.82rem' }}>
-                이 코드는 지금 화면에서 한 번만 확인할 수 있으며 10분 후 만료됩니다. 만료 시각: <time dateTime={issuedLinkCode.expiresAt}>{fmtDateTime(issuedLinkCode.expiresAt)}</time>
-              </p>
-            </div>
-          )}
-
-          {linkCodeError && (
-            <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.82rem', margin: '0.75rem 0 0' }}>
-              {linkCodeError}
+          <ol style={{ margin: '0.8rem 0', paddingLeft: '1.25rem', lineHeight: 1.8 }}>
+            <li>학부모가 카카오 챗봇에서 <b>학생 연결</b>을 선택합니다.</li>
+            <li>학생 이름과 학원에 등록된 학부모 휴대폰 전체 번호를 한 메시지에 입력합니다.</li>
+            <li>짧은 개인정보 안내를 확인하고 <b>동의하고 연결</b>을 누르면 바로 연결됩니다.</li>
+          </ol>
+          <div className="ka-holiday-editor">
+            <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.84rem' }}>
+              이름과 휴대폰 번호가 재원생 정보와 정확히 일치해야 합니다. 입력값은 등록정보 대조에만 사용하고 그로잉의 연결정보와 운영로그에는 별도로 저장하지 않습니다. 연결이 안 되면 먼저 학생 관리에서 학부모 연락처를 확인하세요.
             </p>
-          )}
+          </div>
         </section>
 
         <section className="gd-card">
           <div className="kakao-card-head">
             <div>
               <h3>학부모 연결 상태</h3>
-              <p>학원에서 발급한 8자리 1회용 코드를 학부모가 입력하면 학생과 안전하게 연결됩니다.</p>
+              <p>학생 이름과 등록된 학부모 휴대폰 번호가 일치하고 동의를 마치면 연결됩니다.</p>
               <p style={{ color: 'var(--color-danger)', marginTop: '0.35rem' }}>
                 개인정보 삭제는 되돌릴 수 없습니다. 해당 학생 요청을 함께 삭제하며, 마지막 자녀 연결이면 사용자 이벤트도 삭제합니다.
               </p>
@@ -901,7 +801,9 @@ export function KakaoManager({
                   <div>
                     <b>{student.name}</b>
                     <br />
-                    <span>{student.grade || '학년 없음'}</span>
+                    <span>
+                      {student.grade || '학년 없음'} · {student.parentContact.trim() ? '학부모 연락처 등록됨' : '학부모 연락처 미등록'}
+                    </span>
                   </div>
                   <span className="ka-state pending">대기</span>
                 </div>

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_KAKAO_REQUEST_BYTES,
-  extractKakaoLinkCode,
   getKakaoAppUserId,
   normalizeConnectCredentials,
   readKakaoSkillPayload,
@@ -50,13 +49,6 @@ describe('Kakao skill request security', () => {
     expect(normalizeConnectCredentials('김서윤', '5678')).toBeNull();
     expect(normalizeConnectCredentials('%', '01012345678')).toBeNull();
     expect(normalizeConnectCredentials('김', '01012345678')).toBeNull();
-  });
-
-  it('accepts only an exact eight-character academy link code', () => {
-    expect(extractKakaoLinkCode('연결 a1b2c3d4')).toBe('A1B2C3D4');
-    expect(extractKakaoLinkCode('A1B2C3D4')).toBe('A1B2C3D4');
-    expect(extractKakaoLinkCode('A1B2C3')).toBe('');
-    expect(extractKakaoLinkCode('입학 문의 A1B2C3D4')).toBe('');
   });
 
   it('reads the official app user id variants and sanitizes log status', () => {

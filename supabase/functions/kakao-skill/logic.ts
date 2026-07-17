@@ -41,7 +41,7 @@ export interface QuickReplyDef {
   action: string;
   messageText?: string;
   studentId?: string;
-  linkCode?: string;
+  connectNonce?: string;
 }
 
 const MAX_SIMPLE_TEXT_LENGTH = 950;
@@ -69,7 +69,7 @@ export function skillText(text: string, quickReplies: QuickReplyDef[] = []) {
       extra: {
         action: reply.action,
         ...(reply.studentId ? { student_id: reply.studentId } : {}),
-        ...(reply.linkCode ? { link_code: reply.linkCode } : {}),
+        ...(reply.connectNonce ? { connect_nonce: reply.connectNonce } : {}),
       },
     }));
 
@@ -169,9 +169,8 @@ export function getAction(payload: KakaoSkillPayload): SkillAction {
   const uv = utterance.toLowerCase();
   const uvCompact = uv.replace(/\s+/g, '');
   if (uvCompact.includes('연결해제')) return 'unlink_student';
-  const isDirectLinkCode = /^(?:연결)?[0-9a-f]{8}$/i.test(uvCompact);
   if (/(학생연결|자녀연결|연결하고싶|연결해주세요|연결해줘)/.test(uvCompact) ||
-    isDirectLinkCode) return 'connect_student';
+    isConnectCredentialInput(utterance)) return 'connect_student';
   if (isCounselCancellation(utterance)) return 'counsel_cancel';
   if (isScheduleInquiry(utterance)) return 'schedule_info';
   if (uv.includes('상담')) return 'counsel_request';
@@ -197,14 +196,24 @@ export function parseConnectInput(payload: KakaoSkillPayload) {
 
   const utterance = payload.userRequest?.utterance ?? '';
   const fullPhoneMatch = utterance.match(/01[0-9][- ]?\d{3,4}[- ]?\d{4}/);
-  const shortPhoneMatch = fullPhoneMatch ? null : utterance.match(/\b\d{4}\b/);
-  const matchedPhone = fullPhoneMatch?.[0] ?? shortPhoneMatch?.[0] ?? '';
+  if (!fullPhoneMatch) return { studentName, phone };
+  const matchedPhone = fullPhoneMatch?.[0] ?? '';
   const fallbackPhone = matchedPhone ? cleanPhone(matchedPhone) : phone;
   const fallbackName = studentName || utterance
     .replace(matchedPhone, '')
     .replace(/학생|연결|전화|번호|휴대폰/g, '')
     .trim();
   return { studentName: fallbackName, phone: fallbackPhone };
+}
+
+function isConnectCredentialInput(utterance: string): boolean {
+  const fullPhone = utterance.match(/01[0-9][- ]?\d{3,4}[- ]?\d{4}/)?.[0];
+  if (!fullPhone) return false;
+  const possibleName = utterance
+    .replace(fullPhone, '')
+    .replace(/학생|자녀|연결|휴대폰|전화번호|전화/g, '')
+    .trim();
+  return /^[가-힣]{2,10}$/.test(possibleName) || /^[A-Za-z][A-Za-z '-]{1,29}$/.test(possibleName);
 }
 
 /** 상담 사유 없이 버튼/키워드만 입력한 경우인지 판별 */

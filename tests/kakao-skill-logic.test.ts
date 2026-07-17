@@ -88,10 +88,15 @@ describe('getAction — 자유 입력 라우팅', () => {
     expect(getAction(textPayload('연결해제 해주세요'))).toBe('unlink_student');
   });
 
-  it('학생 연결 의도와 8자리 연결코드 입력 → connect_student', () => {
+  it('학생 연결 의도와 이름 + 전체 휴대폰 입력 → connect_student', () => {
     expect(getAction(textPayload('학생 연결하고 싶어요'))).toBe('connect_student');
-    expect(getAction(textPayload('연결 A1B2C3D4'))).toBe('connect_student');
-    expect(getAction(textPayload('A1B2C3D4'))).toBe('connect_student');
+    expect(getAction(textPayload('김서윤 010-1234-5678'))).toBe('connect_student');
+    expect(getAction(textPayload('김서윤 학생 연결 01012345678'))).toBe('connect_student');
+  });
+
+  it('예전 8자리 연결코드는 더 이상 학생 연결로 라우팅하지 않는다', () => {
+    expect(getAction(textPayload('연결 A1B2C3D4'))).toBe('menu');
+    expect(getAction(textPayload('A1B2C3D4'))).toBe('menu');
   });
 
   it('상담 내용에 포함된 휴대폰 번호는 학생 연결로 오분류하지 않는다', () => {
@@ -117,8 +122,8 @@ describe('getAction — 자유 입력 라우팅', () => {
 });
 
 describe('parseConnectInput', () => {
-  it('이름 + 뒷 4자리', () => {
-    expect(parseConnectInput(textPayload('김서윤 1234'))).toEqual({ studentName: '김서윤', phone: '1234' });
+  it('이름 + 뒷 4자리는 연결정보로 사용하지 않는다', () => {
+    expect(parseConnectInput(textPayload('김서윤 1234'))).toEqual({ studentName: '', phone: '' });
   });
 
   it('이름 + 전체 휴대폰 번호(11자리)가 4자리로 잘리지 않는다', () => {
@@ -136,9 +141,9 @@ describe('parseConnectInput', () => {
   });
 
   it('"학생/연결" 등 군더더기 단어 제거', () => {
-    expect(parseConnectInput(textPayload('김서윤 학생 연결 1234'))).toEqual({
+    expect(parseConnectInput(textPayload('김서윤 학생 연결 010-1234-5678'))).toEqual({
       studentName: '김서윤',
-      phone: '1234',
+      phone: '01012345678',
     });
   });
 
@@ -235,6 +240,19 @@ describe('skillText', () => {
   it('messageText 기본값은 label', () => {
     const res = skillText('안내', [{ label: '💬 상담 요청', action: 'counsel_request' }]);
     expect(res.template.quickReplies[0].messageText).toBe('💬 상담 요청');
+  });
+
+  it('학생 연결 동의 버튼은 해당 확인 요청 nonce를 함께 전달한다', () => {
+    const nonce = 'a'.repeat(32);
+    const res = skillText('연결 동의', [{
+      label: '동의하고 연결',
+      action: 'connect_student_confirm',
+      connectNonce: nonce,
+    }]);
+    expect(res.template.quickReplies[0].extra).toEqual({
+      action: 'connect_student_confirm',
+      connect_nonce: nonce,
+    });
   });
 
   it('카카오 simpleText/quick reply 길이와 개수 제한을 중앙에서 보장한다', () => {

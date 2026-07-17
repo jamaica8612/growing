@@ -197,12 +197,6 @@ export interface KakaoChannelConfigInput {
   autoReply: boolean;
 }
 
-export interface KakaoLinkCode {
-  code: string;
-  studentId: string;
-  expiresAt: string;
-}
-
 export type CalendarExceptionKind = 'closed' | 'open';
 
 export interface CalendarException {

@@ -6,6 +6,11 @@ const migration = readFileSync(
   'utf8',
 ).toLowerCase();
 
+const simpleParentLinkMigration = readFileSync(
+  new URL('../supabase/migrations/20260717195500_kakao_simple_parent_link.sql', import.meta.url),
+  'utf8',
+).toLowerCase();
+
 describe('Kakao launch hardening migration', () => {
   it('uses single-use salted link codes and explicit consent versioning', () => {
     expect(migration).toContain('create table if not exists public.growing_kakao_link_codes');
@@ -87,5 +92,83 @@ describe('Kakao launch hardening migration', () => {
     expect(migration).toContain("interval '90 days'");
     expect(migration).toContain('coalesce(revoked_at, channel_blocked_at)');
     expect(migration).toContain("'growing-kakao-retention'");
+  });
+});
+
+describe('Kakao simple parent-link migration', () => {
+  it('binds a ten-minute connect_pending state to a validated nonce', () => {
+    expect(simpleParentLinkMigration).toContain(
+      'drop constraint if exists growing_kakao_conversation_states_state_check',
+    );
+    expect(simpleParentLinkMigration).toContain('add column if not exists state_nonce text');
+    expect(simpleParentLinkMigration).toContain("state = 'counsel_prompt' and state_nonce is null");
+    expect(simpleParentLinkMigration).toContain("state_nonce ~ '^[0-9a-f]{32,64}$'");
+    expect(simpleParentLinkMigration).toContain('create or replace function public.growing_set_kakao_connect_pending');
+    expect(simpleParentLinkMigration).toContain('p_state_nonce text');
+    expect(simpleParentLinkMigration).toContain("student.status = 'active'");
+    expect(simpleParentLinkMigration).toContain("'connect_pending'");
+    expect(simpleParentLinkMigration).toContain("interval '10 minutes'");
+    expect(simpleParentLinkMigration).toContain('state_nonce = excluded.state_nonce');
+    expect(simpleParentLinkMigration).toContain('privacy_consent_at = null');
+  });
+
+  it('claims only the nonce-bound pending student and rechecks expiry and ownership', () => {
+    expect(simpleParentLinkMigration).toContain('create or replace function public.growing_claim_kakao_pending_link');
+    expect(simpleParentLinkMigration).toContain('pg_advisory_xact_lock');
+    expect(simpleParentLinkMigration).toContain('for update');
+    expect(simpleParentLinkMigration).toContain('v_expires_at <= v_now');
+    expect(simpleParentLinkMigration).toContain('state.state_nonce = p_state_nonce');
+    expect(simpleParentLinkMigration).toContain('student.owner_id = p_owner_id');
+    expect(simpleParentLinkMigration).toContain("student.status = 'active'");
+    expect(simpleParentLinkMigration).toContain("return jsonb_build_object('matched', false)");
+  });
+
+  it('keeps the v1 consent contract and records a unique claim nonce', () => {
+    expect(simpleParentLinkMigration).toContain(
+      "p_consent_version is distinct from '2026-07-17-v1'",
+    );
+    expect(simpleParentLinkMigration).not.toContain("'2026-07-17-v2'");
+    expect(simpleParentLinkMigration).toContain('add column if not exists connect_claim_nonce text');
+    expect(simpleParentLinkMigration).toContain(
+      'create unique index if not exists uq_growing_kakao_parent_links_connect_claim_nonce',
+    );
+    expect(simpleParentLinkMigration).toContain('where connect_claim_nonce is not null');
+    expect(simpleParentLinkMigration).toContain("parent_phone = ''");
+    expect(simpleParentLinkMigration).toContain('consent_at = excluded.consent_at');
+    expect(simpleParentLinkMigration).toContain('consent_text_hash = excluded.consent_text_hash');
+    expect(simpleParentLinkMigration).toContain('connect_claim_nonce = excluded.connect_claim_nonce');
+    expect(simpleParentLinkMigration).toContain('revoked_at = null');
+    expect(simpleParentLinkMigration).toContain(
+      'when growing_kakao_parent_links.channel_blocked_at is null then null',
+    );
+    expect(simpleParentLinkMigration).toContain('delete from public.growing_kakao_conversation_states');
+  });
+
+  it('recovers a committed active claim idempotently without reopening blocked links', () => {
+    expect(simpleParentLinkMigration).toContain('link.connect_claim_nonce = p_state_nonce');
+    expect(simpleParentLinkMigration).toContain('link.consent_version = p_consent_version');
+    expect(simpleParentLinkMigration).toContain('link.consent_text_hash = p_consent_text_hash');
+    expect(simpleParentLinkMigration).toContain('link.revoked_at is null');
+    expect(simpleParentLinkMigration).toContain('link.channel_blocked_at is null');
+    expect(simpleParentLinkMigration).toContain('link.blocked_at is null');
+    expect(simpleParentLinkMigration).toContain("'replayed', true");
+    expect(simpleParentLinkMigration).toContain("'replayed', false");
+  });
+
+  it('drops old overloads and exposes only the nonce-bound RPC contracts to service_role', () => {
+    expect(simpleParentLinkMigration).toContain(
+      'growing_set_kakao_connect_pending(uuid, text, uuid, text)',
+    );
+    expect(simpleParentLinkMigration).toContain(
+      'drop function if exists public.growing_set_kakao_connect_pending(\n  uuid,\n  text,\n  uuid\n)',
+    );
+    expect(simpleParentLinkMigration).toContain(
+      'drop function if exists public.growing_claim_kakao_pending_link(\n  uuid,\n  text,\n  text,\n  text,\n  text\n)',
+    );
+    expect(simpleParentLinkMigration).toContain(
+      'growing_claim_kakao_pending_link(\n  uuid,\n  text,\n  text,\n  text,\n  text,\n  text,\n  text\n)',
+    );
+    expect(simpleParentLinkMigration.match(/from public, anon, authenticated/g)).toHaveLength(2);
+    expect(simpleParentLinkMigration.match(/to service_role/g)).toHaveLength(2);
   });
 });

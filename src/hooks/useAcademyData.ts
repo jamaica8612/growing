@@ -387,9 +387,6 @@ export function useAcademyData(userId: string) {
       await load();
     });
 
-  const handleCreateKakaoLinkCode = (studentId: string) =>
-    guard(() => api.createKakaoLinkCode(studentId, 10));
-
   const handleSaveKakaoChannel = (config: KakaoChannelConfigInput) =>
     guard(async () => {
       const saved = await api.saveKakaoChannelConfig(userId, config);
@@ -558,7 +555,6 @@ export function useAcademyData(userId: string) {
     handleDeleteKakaoRequest,
     handleDeleteKakaoParentLink,
     handleDeleteKakaoUnlinkedIdentity,
-    handleCreateKakaoLinkCode,
     handleSaveKakaoChannel,
     handleChangeKioskPin,
     handleSaveMessageTemplates,

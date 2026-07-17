@@ -14,7 +14,6 @@ import type {
   KakaoEventLog,
   KakaoChannelConfig,
   KakaoChannelConfigInput,
-  KakaoLinkCode,
   StudentStatus,
   AttendanceStatus,
   HomeworkStatus,
@@ -673,27 +672,6 @@ export const api = {
     if (data !== true) {
       throw new Error('연결 이력이 있거나 삭제할 수 없는 상담 요청입니다.');
     }
-  },
-
-  async createKakaoLinkCode(studentId: string, ttlMinutes = 10): Promise<KakaoLinkCode> {
-    const { data, error } = await supabase.rpc('growing_create_kakao_link_code', {
-      p_student_id: studentId,
-      p_ttl_minutes: ttlMinutes,
-    });
-    if (error) throw error;
-
-    const raw = Array.isArray(data) ? data[0] : data;
-    if (!raw || typeof raw !== 'object') {
-      throw new Error('연결코드 발급 결과를 확인할 수 없습니다.');
-    }
-    const row = raw as Row;
-    const code = s(row.code).toUpperCase();
-    const codeStudentId = s(row.student_id);
-    const expiresAt = s(row.expires_at);
-    if (!/^[0-9A-F]{8}$/.test(code) || codeStudentId !== studentId || Number.isNaN(new Date(expiresAt).getTime())) {
-      throw new Error('연결코드 발급 결과가 올바르지 않습니다.');
-    }
-    return { code, studentId: codeStudentId, expiresAt };
   },
 
   async updateKakaoParentRequestStatus(id: string, status: KakaoParentRequestStatus): Promise<KakaoParentRequest> {
