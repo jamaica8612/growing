@@ -14,6 +14,10 @@ const deployWorkflow = readFileSync(
   new URL('../.github/workflows/deploy.yml', import.meta.url),
   'utf8',
 );
+const pagesDeployWorkflow = readFileSync(
+  new URL('../.github/workflows/deploy-pages.yml', import.meta.url),
+  'utf8',
+);
 const edgeDeployWorkflow = readFileSync(
   new URL('../.github/workflows/deploy-functions.yml', import.meta.url),
   'utf8',
@@ -50,6 +54,14 @@ describe('Oracle root-domain hosting configuration', () => {
     expect(deployWorkflow).toContain("${ORACLE_HOST#$'\\xEF\\xBB\\xBF'}");
     expect(deployWorkflow).not.toContain('actions/deploy-pages');
     expect(edgeDeployWorkflow.match(/--use-api/g)).toHaveLength(7);
+  });
+
+  it('keeps a GitHub Pages fallback at the legacy PWA scope', () => {
+    expect(pagesDeployWorkflow).toContain('npm run build -- --base=/growing/');
+    expect(pagesDeployWorkflow).toContain("manifest.id = '/growing/'");
+    expect(pagesDeployWorkflow).toContain("manifest.start_url = '/growing/'");
+    expect(pagesDeployWorkflow).toContain("manifest.scope = '/growing/'");
+    expect(pagesDeployWorkflow).toContain('actions/deploy-pages@v4');
   });
 
   it('keeps the web container private behind the shared Caddy network', () => {
