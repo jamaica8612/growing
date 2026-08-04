@@ -199,10 +199,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const handleSaveReservation = () => {
     if (!reservationTarget || !reservationDate || !reservationTime) return;
-    if (reservationReason === 'absence' && reservationAbsenceDate && reservationAbsenceDate > reservationDate) {
-      alert('결석일은 보강일보다 늦을 수 없습니다.');
-      return;
-    }
     onSaveMakeupReservation({
       studentId: reservationTarget.studentId,
       classId: reservationTarget.classId,
@@ -586,7 +582,6 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                       className="gd-field"
                       value={reservationAbsenceDate}
                       onChange={e => setReservationAbsenceDate(e.target.value)}
-                      max={reservationDate}
                       disabled={reservationReason !== 'absence'}
                     />
                   </label>
