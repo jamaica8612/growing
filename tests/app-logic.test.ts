@@ -155,9 +155,9 @@ describe('알림장 (noticeDrafts)', () => {
 describe('날짜 유틸 (dateUtils)', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('localToday는 로컬 기준 YYYY-MM-DD를 반환한다 (자정 직전에도 당일 유지)', () => {
+  it('localToday는 KST 기준 YYYY-MM-DD를 반환한다 (자정 직전에도 당일 유지)', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 0, 31, 23, 30, 0));
+    vi.setSystemTime(new Date('2026-01-31T14:30:00.000Z')); // 2026-01-31 23:30 KST
     expect(localToday()).toBe('2026-01-31');
   });
 
