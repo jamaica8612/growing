@@ -299,6 +299,7 @@ function AcademyApp({ session }: { session: Session }) {
             classes={classes}
             makeupReservations={makeupReservationStore.reservations}
             onSaveMakeupReservation={makeupReservationStore.saveReservation}
+            onDeleteMakeupReservation={makeupReservationStore.deleteReservation}
             onSaveAttendance={data.handleSaveAttendance}
             onDeleteAttendance={data.handleDeleteAttendance}
           />

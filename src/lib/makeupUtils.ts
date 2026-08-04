@@ -1,4 +1,4 @@
-import type { Attendance, Class, Student } from '../types';
+import type { Attendance, Class, MakeupReservation, Student } from '../types';
 import { localToday } from './dateUtils';
 
 export interface MakeupNeededItem {
@@ -33,6 +33,20 @@ export interface MakeupSummary {
 
 export const hasMakeupForAbsence = (attendance: Attendance[], studentId: string, classId: string, absentDate: string) =>
   attendance.some(record => record.studentId === studentId && record.classId === classId && record.status === 'makeup' && record.makeupForDate === absentDate);
+
+export const getScheduledMakeupsForAttendanceDate = (
+  reservations: MakeupReservation[],
+  studentId: string,
+  classId: string,
+  date: string,
+) => reservations
+  .filter(record =>
+    record.studentId === studentId &&
+    record.classId === classId &&
+    record.status === 'scheduled' &&
+    record.scheduledDate === date
+  )
+  .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
 
 export const getMakeupSummary = (students: Student[], classes: Class[], attendance: Attendance[]): MakeupSummary => {
   const today = localToday();

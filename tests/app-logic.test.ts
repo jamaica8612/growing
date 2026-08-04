@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildParentNoticeDraft, getNoticeDraftMeta } from '../src/lib/noticeDrafts';
 import { localMonth, localToday } from '../src/lib/dateUtils';
-import { getMakeupSummary, hasMakeupForAbsence } from '../src/lib/makeupUtils';
-import { isAttendedStatus, normalizeAttendanceStatus } from '../src/lib/attendanceStatus';
+import { getMakeupSummary, getScheduledMakeupsForAttendanceDate, hasMakeupForAbsence } from '../src/lib/makeupUtils';
+import { isAttendedStatus, normalizeAttendanceStatus, resolveMakeupForDate } from '../src/lib/attendanceStatus';
 import {
   deriveLegacyClassScheduleFields,
   getClassScheduleLabel,
@@ -196,6 +196,17 @@ describe('보강 계산 (makeupUtils)', () => {
     expect(hasMakeupForAbsence([makeupDone], 'stu-1', 'cls-2', '2026-06-01')).toBe(false);
     expect(hasMakeupForAbsence([makeupDone], 'stu-1', 'cls-1', '2026-06-02')).toBe(false);
   });
+
+  it('출석 화면에는 선택한 날짜와 반의 예약만 표시한다', () => {
+    const rows = [
+      reservation({ id: 'same-day', scheduledDate: '2026-06-15', scheduledTime: '18:00' }),
+      reservation({ id: 'other-day', scheduledDate: '2026-06-16' }),
+      reservation({ id: 'other-class', classId: 'cls-2' }),
+      reservation({ id: 'cancelled', status: 'cancelled' }),
+    ];
+    expect(getScheduledMakeupsForAttendanceDate(rows, 'stu-1', 'cls-1', '2026-06-15').map(item => item.id))
+      .toEqual(['same-day']);
+  });
 });
 
 describe('출결 상태 (attendanceStatus)', () => {
@@ -208,6 +219,12 @@ describe('출결 상태 (attendanceStatus)', () => {
     expect(isAttendedStatus('absent')).toBe(false);
     expect(isAttendedStatus('late')).toBe(true);
     expect(isAttendedStatus('makeup')).toBe(true);
+  });
+
+  it('보강 결석일은 명시적으로 비우면 삭제되고 다른 상태로 바꾸면 제거된다', () => {
+    expect(resolveMakeupForDate('makeup', undefined, '2026-06-01', true)).toBeUndefined();
+    expect(resolveMakeupForDate('makeup', undefined, '2026-06-01', false)).toBe('2026-06-01');
+    expect(resolveMakeupForDate('present', '2026-06-01', '2026-06-01', true)).toBeUndefined();
   });
 });
 

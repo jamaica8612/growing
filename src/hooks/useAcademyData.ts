@@ -20,6 +20,7 @@ import type {
 import { api } from '../lib/api';
 import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplates';
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
+import { resolveMakeupForDate } from '../lib/attendanceStatus';
 import type { PayssamRow } from '../lib/payssam';
 
 // Centralises all academy data: loads it from Supabase for the signed-in owner
@@ -181,7 +182,12 @@ export function useAcademyData(userId: string) {
           // 부분 업데이트: 전달된 시각만 갱신하고 나머지는 기존 값 유지
           checkInTime: data.checkInTime !== undefined ? data.checkInTime : existing.checkInTime,
           checkOutTime: data.checkOutTime !== undefined ? data.checkOutTime : existing.checkOutTime,
-          makeupForDate: data.status === 'makeup' ? (data.makeupForDate ?? existing.makeupForDate) : undefined,
+          makeupForDate: resolveMakeupForDate(
+            data.status,
+            data.makeupForDate,
+            existing.makeupForDate,
+            Object.prototype.hasOwnProperty.call(data, 'makeupForDate'),
+          ),
           supplementMinutes: data.status === 'supplement' ? (data.supplementMinutes ?? existing.supplementMinutes) : undefined,
         });
         setAttendance(prev => prev.map(a => (a.id === updated.id ? updated : a)));

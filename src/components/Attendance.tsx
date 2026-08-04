@@ -4,6 +4,7 @@ import { Calendar, CalendarPlus, Clock, X } from 'lucide-react';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { getStudentIdsForDay } from '../lib/classSchedules';
+import { getScheduledMakeupsForAttendanceDate } from '../lib/makeupUtils';
 
 interface AttendanceProps {
   attendance: Attendance[];
@@ -11,6 +12,7 @@ interface AttendanceProps {
   classes: Class[];
   makeupReservations: MakeupReservation[];
   onSaveMakeupReservation: (reservation: Omit<MakeupReservation, 'id' | 'createdAt' | 'status' | 'completedAt'> & { id?: string; status?: MakeupReservation['status'] }) => void;
+  onDeleteMakeupReservation: (id: string) => void;
   onSaveAttendance: (attendanceData: Omit<Attendance, 'id'> & { memo?: string }) => void;
   onDeleteAttendance: (attendanceId: string) => void;
 }
@@ -28,6 +30,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   classes,
   makeupReservations,
   onSaveMakeupReservation,
+  onDeleteMakeupReservation,
   onSaveAttendance,
   onDeleteAttendance,
 }) => {
@@ -196,6 +199,10 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
 
   const handleSaveReservation = () => {
     if (!reservationTarget || !reservationDate || !reservationTime) return;
+    if (reservationReason === 'absence' && reservationAbsenceDate && reservationAbsenceDate > reservationDate) {
+      alert('결석일은 보강일보다 늦을 수 없습니다.');
+      return;
+    }
     onSaveMakeupReservation({
       studentId: reservationTarget.studentId,
       classId: reservationTarget.classId,
@@ -450,19 +457,35 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               );
                             })()}
                             {(() => {
-                              const nextReservation = makeupReservations
-                                .filter(item => item.studentId === studentId && item.status === 'scheduled')
-                                .sort((a, b) => `${a.scheduledDate} ${a.scheduledTime}`.localeCompare(`${b.scheduledDate} ${b.scheduledTime}`))[0];
+                              const dayReservations = getScheduledMakeupsForAttendanceDate(
+                                makeupReservations,
+                                studentId,
+                                cls.id,
+                                selectedDate,
+                              );
                               return (
                                 <div className="at-reserve-row">
                                   <button type="button" className="pay-btn ghost sm" onClick={() => openReservationModal(studentId, cls.id)}>
                                     <CalendarPlus size={14} /> 보강 예약
                                   </button>
-                                  {nextReservation && (
-                                    <span className="at-reserve-note">
-                                      예약 {nextReservation.scheduledDate} {nextReservation.scheduledTime}
+                                  {dayReservations.map(reservation => (
+                                    <span className="at-reserve-note" key={reservation.id}>
+                                      예약 {reservation.scheduledTime}
+                                      <button
+                                        type="button"
+                                        className="at-reserve-delete"
+                                        aria-label={`${reservation.scheduledTime} 보강 예약 삭제`}
+                                        title="보강 예약 삭제"
+                                        onClick={() => {
+                                          if (window.confirm(`${selectedDate} ${reservation.scheduledTime} 보강 예약을 삭제할까요?`)) {
+                                            onDeleteMakeupReservation(reservation.id);
+                                          }
+                                        }}
+                                      >
+                                        <X size={13} />
+                                      </button>
                                     </span>
-                                  )}
+                                  ))}
                                 </div>
                               );
                             })()}
@@ -563,6 +586,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                       className="gd-field"
                       value={reservationAbsenceDate}
                       onChange={e => setReservationAbsenceDate(e.target.value)}
+                      max={reservationDate}
                       disabled={reservationReason !== 'absence'}
                     />
                   </label>

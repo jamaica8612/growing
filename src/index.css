@@ -2620,6 +2620,7 @@ textarea.form-control {
 .at-cell { min-width: 0; padding-top: 0.1rem; }
 .at-reserve-row { margin-top: 0.45rem; display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
 .at-reserve-note { font-size: 0.72rem; color: var(--color-info, #0369a1); font-weight: 700; }
+.at-reserve-delete { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.25rem; padding: 0; border: 0; background: transparent; color: var(--color-danger); cursor: pointer; vertical-align: middle; }
 .at-who { display: flex; flex-direction: column; gap: 0.15rem; }
 .at-name { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; font-weight: 800; color: var(--color-primary-dark); flex-wrap: wrap; }
 .at-meta { font-size: 0.72rem; color: var(--color-text-muted); }
