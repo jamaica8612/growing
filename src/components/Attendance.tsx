@@ -447,7 +447,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
                               return (
                                 <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.73rem' }}>
                                   <span style={{ color: 'var(--color-text-muted)' }}>결석일:</span>
-                                  <input type="date" className="form-control" style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }} max={selectedDate} value={linkedDate} onChange={e => handleMakeupForDateChange(studentId, cls.id, e.target.value)} />
+                                  <input type="date" className="form-control" style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', width: '130px' }} value={linkedDate} onChange={e => handleMakeupForDateChange(studentId, cls.id, e.target.value)} />
                                   {linkedDate && <span style={{ color: hasAbsence ? 'var(--color-accent-mint)' : 'var(--color-warning)' }}>{hasAbsence ? '✓ 연결됨' : '⚠ 결석 없음'}</span>}
                                 </div>
                               );
