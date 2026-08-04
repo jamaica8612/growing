@@ -20,7 +20,7 @@ export interface KakaoSkillPayload {
   intent?: { name?: string };
   action?: {
     params?: Record<string, string>;
-    clientExtra?: Record<string, string>;
+    clientExtra?: Record<string, string> | null;
   };
   userRequest?: {
     utterance?: string;

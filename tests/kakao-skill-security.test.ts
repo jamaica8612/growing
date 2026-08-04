@@ -23,6 +23,14 @@ describe('Kakao skill request security', () => {
     });
   });
 
+  it('treats Kakao clientExtra null as an omitted optional map', () => {
+    expect(validateKakaoSkillPayload({
+      action: { params: {}, clientExtra: null },
+    })).toMatchObject({
+      action: { params: {}, clientExtra: null },
+    });
+  });
+
   it('rejects oversized and malformed payloads', async () => {
     const oversized = new Request('https://example.test/kakao-skill', {
       method: 'POST',

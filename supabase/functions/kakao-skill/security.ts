@@ -11,8 +11,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function validateStringMap(value: unknown, field: string): void {
-  if (value === undefined) return;
+function validateStringMap(value: unknown, field: string, allowNull = false): void {
+  if (value === undefined || (allowNull && value === null)) return;
   if (!isRecord(value) || Object.keys(value).length > 20) {
     throw new TypeError(`${field} is invalid`);
   }
@@ -69,7 +69,7 @@ export function validateKakaoSkillPayload(value: unknown): KakaoSkillPayload {
   if (action !== undefined) {
     if (!isRecord(action)) throw new TypeError('action is invalid');
     validateStringMap(action.params, 'action.params');
-    validateStringMap(action.clientExtra, 'action.clientExtra');
+    validateStringMap(action.clientExtra, 'action.clientExtra', true);
   }
 
   return value as KakaoSkillPayload;
