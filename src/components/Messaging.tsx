@@ -369,6 +369,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     if (targets.length === 0) return;
     if (isBatchDraftStale) return;
     setIsBatchSending(true);
+    let failed = 0;
     for (const draft of targets) {
       patchBatchDraft(draft.studentId, { status: 'sending', errorMessage: undefined });
       try {
@@ -383,6 +384,7 @@ export const Messaging: React.FC<MessagingProps> = ({
         });
         patchBatchDraft(draft.studentId, { status: 'sent', selected: false });
       } catch (error) {
+        failed += 1;
         patchBatchDraft(draft.studentId, {
           status: 'failed',
           errorMessage: error instanceof Error ? error.message : '발송 실패',
@@ -391,7 +393,6 @@ export const Messaging: React.FC<MessagingProps> = ({
     }
     await refreshLogs();
     setIsBatchSending(false);
-    const failed = batchDrafts.filter(d => d.status === 'failed').length;
     if (failed > 0) {
       showToast(`발송 완료 (실패 ${failed}건)`);
     } else {

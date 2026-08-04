@@ -1,0 +1,1 @@
+ALTER TABLE growing_classes ADD COLUMN IF NOT EXISTS color text DEFAULT NULL;;

@@ -35,9 +35,9 @@ export function MakeupManager({
   const [filter, setFilter] = useState<Filter>('needed');
   const [search, setSearch] = useState('');
   const [processingItem, setProcessingItem] = useState<MakeupNeededItem | null>(null);
-  const [makeupDate, setMakeupDate] = useState(new Date().toISOString().split('T')[0]);
+  const [makeupDate, setMakeupDate] = useState(localToday);
   const [makeupClassId, setMakeupClassId] = useState('');
-  const [supplementDate, setSupplementDate] = useState(new Date().toISOString().split('T')[0]);
+  const [supplementDate, setSupplementDate] = useState(localToday);
   const [supplementStudentId, setSupplementStudentId] = useState('');
   const [supplementClassId, setSupplementClassId] = useState('');
   const [supplementMinutes, setSupplementMinutes] = useState(30);
@@ -171,7 +171,7 @@ export function MakeupManager({
   const openProcessModal = (item: MakeupNeededItem) => {
     const [firstRecommendation] = getMakeupRecommendations(item.student, item.absentRecord, classes, attendance);
     setProcessingItem(item);
-    setMakeupDate(firstRecommendation?.date ?? new Date().toISOString().split('T')[0]);
+    setMakeupDate(firstRecommendation?.date ?? localToday());
     setMakeupClassId(firstRecommendation?.classId ?? item.absentRecord.classId ?? item.class?.id ?? '');
   };
 

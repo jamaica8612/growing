@@ -2,22 +2,23 @@ import React, { useState, useEffect } from 'react';
 import type { Student, Class, DayOfWeek } from '../types';
 import { Sprout, Home, Lock, CheckCircle, Volume2 } from 'lucide-react';
 import { getStudentIdsForDay } from '../lib/classSchedules';
+import { localToday } from '../lib/dateUtils';
 
 interface KioskProps {
   students: Student[];
   classes: Class[];
   kioskPin: string;
-  onSaveAttendance: (attendanceData: { studentId: string; classId: string; date: string; status: 'present'; checkInTime?: string; checkOutTime?: string }) => void;
-  onQueueAlert: (studentId: string, kind: 'in' | 'out', date: string, time: string) => void;
+  onRecordEvent: (studentId: string, classId: string, kind: 'in' | 'out', date: string, time: string) => Promise<boolean>;
   onExitKiosk: () => void;
 }
 
-export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSaveAttendance, onQueueAlert, onExitKiosk }) => {
+export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onRecordEvent, onExitKiosk }) => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [successState, setSuccessState] = useState<{ active: boolean; type: 'in' | 'out'; name: string } | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id ?? '');
+  const [isSaving, setIsSaving] = useState(false);
   useEffect(() => {
     // Try to lock the OS rotation to landscape. Works when the PWA is installed
     // (display: standalone). Falls back to CSS rotation below when unsupported.
@@ -93,10 +94,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
   };
 
   // Handle student check-in/out selection
-  const handleCheckAction = (type: 'in' | 'out') => {
-    if (!selectedStudent) return;
+  const handleCheckAction = async (type: 'in' | 'out') => {
+    if (!selectedStudent || isSaving) return;
 
-    const todayDateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const todayDateStr = localToday();
     const currentTimeStr = new Date().toLocaleTimeString('ko-KR', {
       hour: '2-digit',
       minute: '2-digit',
@@ -110,17 +111,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
       ? selectedClassId
       : studentClasses[0]?.id || '';
 
-    // 등원/하원 시각을 정식 필드에 기록 (반대쪽 값은 useAcademyData가 유지)
-    onSaveAttendance({
-      studentId: selectedStudent.id,
-      classId,
-      date: todayDateStr,
-      status: 'present',
-      ...(type === 'in' ? { checkInTime: currentTimeStr } : { checkOutTime: currentTimeStr }),
-    });
-
-    // Queue a parent check-in/out notification for later sending.
-    onQueueAlert(selectedStudent.id, type, todayDateStr, currentTimeStr);
+    setIsSaving(true);
+    const saved = await onRecordEvent(selectedStudent.id, classId, type, todayDateStr, currentTimeStr);
+    setIsSaving(false);
+    if (!saved) return;
 
     // Play chime sound
     playSynthesizedChime(type);
@@ -206,10 +200,10 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onSav
             <div className="kk-modal-meta">{selectedStudent.school} | {selectedStudent.grade}</div>
             <div className="kk-modal-name">{selectedStudent.name} 학생</div>
             <div className="kk-modal-btns">
-              <button className="kk-btn in" onClick={() => handleCheckAction('in')}>
+              <button className="kk-btn in" disabled={isSaving} onClick={() => void handleCheckAction('in')}>
                 <Sprout size={32} /> 등원 완료 🌱
               </button>
-              <button className="kk-btn out" onClick={() => handleCheckAction('out')}>
+              <button className="kk-btn out" disabled={isSaving} onClick={() => void handleCheckAction('out')}>
                 <Home size={32} /> 하원 완료 🏡
               </button>
             </div>

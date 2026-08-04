@@ -17,4 +17,4 @@ set schedules = (
 )
 where schedules = '[]'::jsonb
   and days is not null
-  and array_length(days, 1) > 0;
+  and array_length(days, 1) > 0;;

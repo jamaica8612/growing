@@ -3,6 +3,7 @@ import { BookOpen, Check, Copy, Printer, Save, Wand2 } from 'lucide-react';
 import type { Attendance, Class, CounselLog, Payment, Student } from '../types';
 import { getStudentReportSummary } from '../lib/reportSummary';
 import { AttendanceCalendar } from './AttendanceCalendar';
+import { localMonth, localToday } from '../lib/dateUtils';
 
 interface StudentReportPreviewProps {
   student: Student;
@@ -14,7 +15,7 @@ interface StudentReportPreviewProps {
   onUpdateCounselLog: (log: CounselLog) => void;
 }
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = localToday;
 
 // 담쟁이 아이콘 (인라인 SVG)
 const IvyIcon = ({ size = 22 }: { size?: number }) => (
@@ -33,7 +34,7 @@ export function StudentReportPreview({
   onAddCounselLog,
   onUpdateCounselLog,
 }: StudentReportPreviewProps) {
-  const [month, setMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [month, setMonth] = useState(localMonth);
   const [toast, setToast] = useState<string | null>(null);
 
   const existingLog = counselLogs.find(

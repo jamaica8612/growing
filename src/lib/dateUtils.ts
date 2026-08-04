@@ -1,10 +1,24 @@
-/** 로컬(KST) 기준 오늘 날짜 YYYY-MM-DD */
-export function localToday(): string {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function kstDateParts(date: Date): { year: string; month: string; day: string } {
+  const parts = KST_DATE_FORMATTER.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value ?? '';
+  return { year: get('year'), month: get('month'), day: get('day') };
 }
 
-/** 로컬(KST) 기준 이번 달 YYYY-MM */
+/** 한국 표준시 기준 날짜 YYYY-MM-DD */
+export function localToday(date = new Date()): string {
+  const { year, month, day } = kstDateParts(date);
+  return `${year}-${month}-${day}`;
+}
+
+/** 한국 표준시 기준 월 YYYY-MM */
 export function localMonth(date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const { year, month } = kstDateParts(date);
+  return `${year}-${month}`;
 }

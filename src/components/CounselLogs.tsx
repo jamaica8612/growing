@@ -3,6 +3,7 @@ import type { Student, CounselLog, CounselLogType } from '../types';
 import type { Attendance, Payment, Class } from '../types';
 import { MessageSquare, Search, Plus, Calendar, Trash2, Award, User, X, Copy, Check, Download, TrendingUp, Printer } from 'lucide-react';
 import { getStudentReportSummary } from '../lib/reportSummary';
+import { localMonth, localToday } from '../lib/dateUtils';
 
 interface CounselLogsProps {
   counselLogs: CounselLog[];
@@ -32,7 +33,7 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
   // Report Modal States
   const [reportOpen, setReportOpen] = useState(false);
   const [reportStudentId, setReportStudentId] = useState('');
-  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [reportMonth, setReportMonth] = useState(localMonth);
 
   // Form Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -68,7 +69,7 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     try {
       onAddCounselLog({
         studentId: formStudentId,
-        date: new Date().toISOString().split('T')[0],
+        date: localToday(),
         title: formTitle.trim(),
         content: formContent.trim(),
         type: formType,
@@ -130,7 +131,7 @@ export const CounselLogs: React.FC<CounselLogsProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `상담일지_${new Date().toISOString().split('T')[0]}.md`;
+    a.download = `상담일지_${localToday()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -413,8 +413,7 @@ function AcademyApp({ session }: { session: Session }) {
             students={students}
             classes={classes}
             kioskPin={kioskPin}
-            onSaveAttendance={data.handleSaveAttendance}
-            onQueueAlert={data.handleQueueKioskAlert}
+            onRecordEvent={data.handleRecordKioskEvent}
             onExitKiosk={goDashboard}
           />
         );

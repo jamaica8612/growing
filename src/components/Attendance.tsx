@@ -5,6 +5,7 @@ import { AttendanceCalendar } from './AttendanceCalendar';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { getStudentIdsForDay } from '../lib/classSchedules';
 import { getScheduledMakeupsForAttendanceDate } from '../lib/makeupUtils';
+import { localMonth, localToday } from '../lib/dateUtils';
 
 interface AttendanceProps {
   attendance: Attendance[];
@@ -34,18 +35,18 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   onSaveAttendance,
   onDeleteAttendance,
 }) => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(localToday);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [attendanceMemos, setAttendanceMemos] = useState<Record<string, string>>({});
   const [makeupForDates, setMakeupForDates] = useState<Record<string, string>>({});
   const [pendingAbsent, setPendingAbsent] = useState<{ studentId: string; classId: string; date: string } | null>(null);
   const [reservationTarget, setReservationTarget] = useState<{ studentId: string; classId: string } | null>(null);
-  const [reservationDate, setReservationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reservationDate, setReservationDate] = useState(localToday);
   const [reservationTime, setReservationTime] = useState('17:00');
   const [reservationAbsenceDate, setReservationAbsenceDate] = useState('');
   const [reservationReason, setReservationReason] = useState<MakeupReservation['reason']>('absence');
   const [reservationMemo, setReservationMemo] = useState('');
-  const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [reportMonth, setReportMonth] = useState(localMonth);
 
   const handleSelectedDateChange = (date: string) => {
     setSelectedDate(date);
@@ -59,7 +60,7 @@ export const AttendanceManager: React.FC<AttendanceProps> = ({
   const getAttendanceRecord = useCallback((studentId: string, classId: string, date: string) =>
     attendance.find(a => a.studentId === studentId && a.classId === classId && a.date === date), [attendance]);
 
-  const todayDateStr = new Date().toISOString().split('T')[0];
+  const todayDateStr = localToday();
 
   const getCurrentTimeStr = (): string =>
     new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });

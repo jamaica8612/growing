@@ -15,4 +15,4 @@ create policy "owners manage own subscriptions"
   on growing_push_subscriptions
   for all
   using (auth.uid() = owner_id)
-  with check (auth.uid() = owner_id);
+  with check (auth.uid() = owner_id);;

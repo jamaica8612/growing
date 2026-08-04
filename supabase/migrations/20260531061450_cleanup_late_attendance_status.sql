@@ -7,4 +7,4 @@ alter table public.growing_attendance
 
 alter table public.growing_attendance
   add constraint growing_attendance_status_check
-  check (status = any (array['present','absent','makeup']));
+  check (status = any (array['present','absent','makeup']));;

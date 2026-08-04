@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Student, Class, Attendance, EditableAttendanceStatus, Payment } from '../types';
 import { normalizeAttendanceStatus } from '../lib/attendanceStatus';
 import { BarChart3, CalendarRange, AlertTriangle, Percent, TrendingDown, Copy, Check, MessageSquare } from 'lucide-react';
+import { localMonth } from '../lib/dateUtils';
 
 interface AttendanceStatsProps {
   students: Student[];
@@ -37,7 +38,7 @@ const rateColor = (rate: number) =>
   rate >= 90 ? 'var(--color-success)' : rate >= 75 ? 'var(--color-warning)' : 'var(--color-danger)';
 
 export const AttendanceStats: React.FC<AttendanceStatsProps> = ({ students, classes, attendance, payments, onSendDraftToMessaging }) => {
-  const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+  const currentMonth = localMonth();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 

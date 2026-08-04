@@ -165,6 +165,12 @@ describe('날짜 유틸 (dateUtils)', () => {
     expect(localMonth(new Date(2026, 0, 5))).toBe('2026-01');
     expect(localMonth(new Date(2026, 11, 31))).toBe('2026-12');
   });
+
+  it('UTC 날짜가 전날이어도 KST 자정 이후 날짜를 반환한다', () => {
+    const afterKstMidnight = new Date('2026-01-31T15:30:00.000Z');
+    expect(localToday(afterKstMidnight)).toBe('2026-02-01');
+    expect(localMonth(afterKstMidnight)).toBe('2026-02');
+  });
 });
 
 describe('보강 계산 (makeupUtils)', () => {

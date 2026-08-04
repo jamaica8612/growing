@@ -36,4 +36,4 @@ create index if not exists idx_growing_makeup_reservations_owner_date
   on growing_makeup_reservations (owner_id, scheduled_date);
 
 create index if not exists idx_growing_makeup_reservations_student
-  on growing_makeup_reservations (student_id, status);
+  on growing_makeup_reservations (student_id, status);;

@@ -29,4 +29,4 @@ create index if not exists growing_assistant_notes_scope_idx
   on growing_assistant_notes (owner_id, scope);
 
 create index if not exists growing_assistant_notes_student_idx
-  on growing_assistant_notes (owner_id, student_id);
+  on growing_assistant_notes (owner_id, student_id);;

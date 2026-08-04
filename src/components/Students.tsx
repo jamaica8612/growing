@@ -11,6 +11,7 @@ import { generateCounselBriefing } from '../lib/assistant';
 import { StudentTagBadges } from './StudentTagBadges';
 import { StudentTimeline } from './StudentTimeline';
 import { StudentReportPreview } from './StudentReportPreview';
+import { localMonth, localToday } from '../lib/dateUtils';
 
 // 태그 severity → CSS 클래스 매핑 (index.css는 .danger/.warn/.info 사용)
 const TAG_SEV: Record<StudentTagSeverity, string> = { danger: 'danger', warning: 'warn', info: 'info' };
@@ -126,7 +127,7 @@ export const Students: React.FC<StudentsProps> = ({
       grade: formGrade,
       contact: formContact.trim(),
       parentContact: formParentContact.trim(),
-      registrationDate: editingStudent ? editingStudent.registrationDate : new Date().toISOString().split('T')[0],
+      registrationDate: editingStudent ? editingStudent.registrationDate : localToday(),
       status: formStatus,
       memo: formMemo.trim(),
     };
@@ -160,7 +161,7 @@ export const Students: React.FC<StudentsProps> = ({
     try {
       onAddCounselLog({
         studentId: activeDetailStudent.id,
-        date: new Date().toISOString().split('T')[0],
+        date: localToday(),
         title: logTitle.trim(),
         content: logContent.trim(),
         type: logType,
@@ -258,7 +259,7 @@ export const Students: React.FC<StudentsProps> = ({
       : new Set(classes.find(c => c.id === classFilter)?.studentIds ?? []);
 
   // Students with an unpaid bill in the current billing month.
-  const currentBillingMonth = new Date().toISOString().substring(0, 7);
+  const currentBillingMonth = localMonth();
   const unpaidStudentIds = new Set(
     payments.filter(p => p.billingMonth === currentBillingMonth && p.status === 'unpaid').map(p => p.studentId)
   );

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const messageLogMigration = readFileSync(
-  new URL('../supabase/migrations/20260602_alimtalk_message_logs.sql', import.meta.url),
+  new URL('../supabase/migrations/20260602000000_alimtalk_message_logs.sql', import.meta.url),
   'utf8',
 ).toLowerCase();
 

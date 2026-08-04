@@ -1,0 +1,3 @@
+ALTER TABLE growing_classes
+  ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS waitlist TEXT[] DEFAULT '{}';;

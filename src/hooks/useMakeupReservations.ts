@@ -39,6 +39,16 @@ export function useMakeupReservations(userId: string) {
 
   const saveReservation = useCallback((input: SaveMakeupReservationInput) => {
     void guard(async () => {
+      const requestedStatus = input.status ?? 'scheduled';
+      const duplicate = requestedStatus !== 'cancelled' && input.sourceAbsenceDate
+        ? reservations.find(item =>
+            item.id !== input.id &&
+            item.studentId === input.studentId &&
+            item.sourceAbsenceDate === input.sourceAbsenceDate &&
+            item.status !== 'cancelled'
+          )
+        : undefined;
+      if (duplicate) throw new Error('이미 이 결석일에 연결된 보강 예약이 있습니다.');
       if (input.id) {
         const existing = reservations.find(item => item.id === input.id);
         if (!existing) return;
@@ -79,6 +89,15 @@ export function useMakeupReservations(userId: string) {
       if (!existing) return;
       const merged = { ...existing, ...patch };
       const nextStatus = patch.status ?? existing.status;
+      const duplicate = nextStatus !== 'cancelled' && merged.sourceAbsenceDate
+        ? reservations.find(item =>
+            item.id !== id &&
+            item.studentId === merged.studentId &&
+            item.sourceAbsenceDate === merged.sourceAbsenceDate &&
+            item.status !== 'cancelled'
+          )
+        : undefined;
+      if (duplicate) throw new Error('이미 이 결석일에 연결된 보강 예약이 있습니다.');
       const updated = await api.updateMakeupReservation(id, {
         scheduledDate: merged.scheduledDate,
         scheduledTime: merged.scheduledTime,

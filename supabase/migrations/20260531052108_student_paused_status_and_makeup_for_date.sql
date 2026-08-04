@@ -8,4 +8,4 @@ alter table public.growing_students
 
 -- 2. 보강 연결 날짜 컬럼
 alter table public.growing_attendance
-  add column if not exists makeup_for_date date;
+  add column if not exists makeup_for_date date;;

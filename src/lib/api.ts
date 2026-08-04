@@ -456,6 +456,19 @@ export const api = {
   },
 
   async insertMakeupReservation(r: Omit<MakeupReservation, 'id' | 'createdAt' | 'completedAt'>): Promise<MakeupReservation> {
+    if (r.sourceAbsenceDate && r.status !== 'cancelled') {
+      const { data: existing, error: lookupError } = await supabase
+        .from('growing_makeup_reservations')
+        .select('id')
+        .eq('student_id', r.studentId)
+        .eq('source_absence_date', r.sourceAbsenceDate)
+        .neq('status', 'cancelled')
+        .limit(1);
+      if (lookupError) throw lookupError;
+      if (existing && existing.length > 0) {
+        throw new Error('이미 이 결석일에 연결된 보강 예약이 있습니다.');
+      }
+    }
     const { data: row, error } = await supabase
       .from('growing_makeup_reservations')
       .insert({
@@ -511,6 +524,16 @@ export const api = {
 
   // ---- Payments ----
   async insertPayment(p: Omit<Payment, 'id'>): Promise<Payment> {
+    const { data: existing, error: lookupError } = await supabase
+      .from('growing_payments')
+      .select('id')
+      .eq('student_id', p.studentId)
+      .eq('billing_month', p.billingMonth)
+      .limit(1);
+    if (lookupError) throw lookupError;
+    if (existing && existing.length > 0) {
+      throw new Error('이미 이 학생의 해당 월 청구가 있습니다.');
+    }
     const { data: row, error } = await supabase
       .from('growing_payments')
       .insert({
@@ -529,6 +552,17 @@ export const api = {
 
   async insertPayments(ps: Omit<Payment, 'id'>[]): Promise<Payment[]> {
     if (ps.length === 0) return [];
+    const studentIds = Array.from(new Set(ps.map(payment => payment.studentId)));
+    const billingMonths = Array.from(new Set(ps.map(payment => payment.billingMonth)));
+    const { data: existing, error: lookupError } = await supabase
+      .from('growing_payments')
+      .select('student_id, billing_month')
+      .in('student_id', studentIds)
+      .in('billing_month', billingMonths);
+    if (lookupError) throw lookupError;
+    const existingKeys = new Set((existing ?? []).map(row => `${s(row.student_id)}|${s(row.billing_month)}`));
+    const duplicate = ps.find(payment => existingKeys.has(`${payment.studentId}|${payment.billingMonth}`));
+    if (duplicate) throw new Error('이미 해당 월 청구가 있는 학생이 포함되어 있습니다. 새로고침 후 다시 시도해 주세요.');
     const { data: rows, error } = await supabase
       .from('growing_payments')
       .insert(
@@ -610,6 +644,26 @@ export const api = {
   },
 
   // ---- Kiosk alerts ----
+  async recordKioskEvent(
+    studentId: string,
+    classId: string,
+    kind: 'in' | 'out',
+    date: string,
+    time: string,
+  ): Promise<{ attendance: Attendance; alert: KioskAlert }> {
+    const { data, error } = await supabase.rpc('growing_record_kiosk_event', {
+      p_student_id: studentId,
+      p_class_id: classId,
+      p_kind: kind,
+      p_date: date,
+      p_time: time,
+    });
+    if (error) throw error;
+    const result = data as { attendance?: Row; alert?: Row } | null;
+    if (!result?.attendance || !result.alert) throw new Error('키오스크 저장 결과가 올바르지 않습니다.');
+    return { attendance: toAttendance(result.attendance), alert: toKioskAlert(result.alert) };
+  },
+
   async addKioskAlert(studentId: string, kind: 'in' | 'out', date: string, time: string): Promise<KioskAlert> {
     const { data: row, error } = await supabase
       .from('growing_kiosk_alerts')
@@ -801,13 +855,14 @@ export const api = {
     const { error } = await supabase.from('growing_message_logs').insert({
       student_id: log.studentId ?? null,
       alert_type: log.alertType,
+      channel: 'copy',
+      provider: 'manual',
       recipient_phone: log.recipientPhone,
       recipient_name: log.recipientName ?? null,
       subject: log.subject,
       message: log.message,
       status: log.status,
       error_message: null,
-      sent_at: log.status === 'sent' ? new Date().toISOString() : null,
     });
     if (error) throw error;
   },
@@ -815,23 +870,27 @@ export const api = {
   async getMessageLogs(limit = 50): Promise<MessageLog[]> {
     const { data, error } = await supabase
       .from('growing_message_logs')
-      .select('id, student_id, alert_type, recipient_phone, recipient_name, subject, message, status, error_message, created_at, sent_at')
+      .select('id, student_id, alert_type, recipient_phone, recipient_name, subject, message, status, error_message, created_at')
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map(r => ({
-      id: s(r.id),
-      studentId: r.student_id ? s(r.student_id) : null,
-      alertType: s(r.alert_type) as MessageLog['alertType'],
-      recipientPhone: s(r.recipient_phone),
-      recipientName: r.recipient_name ? s(r.recipient_name) : null,
-      subject: s(r.subject),
-      message: s(r.message),
-      status: s(r.status) as MessageLog['status'],
-      errorMessage: r.error_message ? s(r.error_message) : null,
-      createdAt: s(r.created_at),
-      sentAt: r.sent_at ? s(r.sent_at) : null,
-    }));
+    return (data ?? []).map(r => {
+      const status = s(r.status) as MessageLog['status'];
+      const createdAt = s(r.created_at);
+      return {
+        id: s(r.id),
+        studentId: r.student_id ? s(r.student_id) : null,
+        alertType: s(r.alert_type) as MessageLog['alertType'],
+        recipientPhone: s(r.recipient_phone),
+        recipientName: r.recipient_name ? s(r.recipient_name) : null,
+        subject: s(r.subject),
+        message: s(r.message),
+        status,
+        errorMessage: r.error_message ? s(r.error_message) : null,
+        createdAt,
+        sentAt: status === 'sent' ? createdAt : null,
+      };
+    });
   },
 
   // ---- Bulk: delete all of the signed-in owner's academy rows (RLS-scoped) ----

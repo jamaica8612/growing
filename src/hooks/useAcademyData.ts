@@ -22,6 +22,7 @@ import { type MessageTemplates, DEFAULT_TEMPLATES } from '../lib/messageTemplate
 import { buildMonthlyBillingPreview } from '../lib/billingPreview';
 import { resolveMakeupForDate } from '../lib/attendanceStatus';
 import type { PayssamRow } from '../lib/payssam';
+import { localToday } from '../lib/dateUtils';
 
 // Centralises all academy data: loads it from Supabase for the signed-in owner
 // and exposes the same handler surface the UI used with localStorage, so the
@@ -112,18 +113,34 @@ export function useAcademyData(userId: string) {
       const student = students.find(s => s.id === id);
       if (!student) return;
       const updatedStudent = await api.updateStudent({ ...student, status: 'inactive' });
-      const affectedClasses = classes.filter(c => c.studentIds.includes(id));
+      const affectedClasses = classes.filter(c =>
+        c.studentIds.includes(id) || c.schedules.some(schedule => schedule.studentIds?.includes(id))
+      );
       await Promise.all(
         affectedClasses.map(c => {
           const tuitionOverrides = { ...(c.tuitionOverrides ?? {}) };
           delete tuitionOverrides[id];
-          return api.updateClass({ ...c, studentIds: c.studentIds.filter(sid => sid !== id), tuitionOverrides });
+          return api.updateClass({
+            ...c,
+            studentIds: c.studentIds.filter(sid => sid !== id),
+            schedules: c.schedules.map(schedule => schedule.studentIds === undefined
+              ? schedule
+              : { ...schedule, studentIds: schedule.studentIds.filter(sid => sid !== id) }),
+            tuitionOverrides,
+          });
         })
       );
       setClasses(prev => prev.map(c => {
         const tuitionOverrides = { ...(c.tuitionOverrides ?? {}) };
         delete tuitionOverrides[id];
-        return { ...c, studentIds: c.studentIds.filter(sid => sid !== id), tuitionOverrides };
+        return {
+          ...c,
+          studentIds: c.studentIds.filter(sid => sid !== id),
+          schedules: c.schedules.map(schedule => schedule.studentIds === undefined
+            ? schedule
+            : { ...schedule, studentIds: schedule.studentIds.filter(sid => sid !== id) }),
+          tuitionOverrides,
+        };
       }));
       setStudents(prev => prev.map(p => (p.id === id ? updatedStudent : p)));
     });
@@ -260,6 +277,12 @@ export function useAcademyData(userId: string) {
 
   const handleAddManualPayment = (data: Omit<Payment, 'id'>) =>
     guard(async () => {
+      const existing = payments.find(payment =>
+        payment.studentId === data.studentId && payment.billingMonth === data.billingMonth
+      );
+      if (existing) {
+        throw new Error('이미 이 학생의 해당 월 청구가 있습니다. 기존 청구를 수정해 주세요.');
+      }
       const created = await api.insertPayment(data);
       setPayments(prev => [...prev, created]);
     });
@@ -287,7 +310,7 @@ export function useAcademyData(userId: string) {
           if (row.isPaid && existing.status !== 'paid') {
             const up = await api.updatePayment(existing.id, {
               status: 'paid',
-              paymentDate: row.paymentDate || new Date().toISOString().split('T')[0],
+              paymentDate: row.paymentDate || localToday(),
               paymentMethod: row.paymentMethod || 'card',
             });
             setPayments(prev => prev.map(p => (p.id === up.id ? up : p)));
@@ -332,6 +355,24 @@ export function useAcademyData(userId: string) {
     });
 
   // ---- Kiosk alerts ----
+  const handleRecordKioskEvent = async (
+    studentId: string,
+    classId: string,
+    kind: 'in' | 'out',
+    date: string,
+    time: string,
+  ): Promise<boolean> => {
+    const result = await guard(() => api.recordKioskEvent(studentId, classId, kind, date, time));
+    if (!result) return false;
+    setAttendance(prev => {
+      const index = prev.findIndex(item => item.id === result.attendance.id);
+      if (index < 0) return [...prev, result.attendance];
+      return prev.map(item => item.id === result.attendance.id ? result.attendance : item);
+    });
+    setKioskAlerts(prev => [...prev, result.alert]);
+    return true;
+  };
+
   const handleQueueKioskAlert = (studentId: string, kind: 'in' | 'out', date: string, time: string) =>
     guard(async () => {
       const created = await api.addKioskAlert(studentId, kind, date, time);
@@ -552,6 +593,7 @@ export function useAcademyData(userId: string) {
     handleUpdateCounselLog,
     handleDeleteCounselLog,
     handleQueueKioskAlert,
+    handleRecordKioskEvent,
     handleDismissKioskAlert,
     handleClearKioskAlerts,
     handleQueueHomeworkAlert,

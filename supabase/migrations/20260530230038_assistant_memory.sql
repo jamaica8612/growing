@@ -16,4 +16,4 @@ create policy "owner_insert" on growing_assistant_memory
   for insert with check (auth.uid() = owner_id);
 
 create policy "owner_update" on growing_assistant_memory
-  for update using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+  for update using (auth.uid() = owner_id) with check (auth.uid() = owner_id);;
