@@ -284,6 +284,18 @@ const TOOL_DECLARATIONS = [
     },
   },
   {
+    name: 'get_makeup_reservations',
+    description: '보강/보충 예약 현황을 조회한다. 특정 학생의 예약을 이름으로 찾거나, 오늘·특정 날짜의 전체 예약을 확인할 수 있다.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        studentName: { type: 'STRING', description: '학생 이름(부분 검색, 선택). 생략 시 전체 학생 조회.' },
+        status: { type: 'STRING', enum: ['scheduled', 'completed', 'cancelled', 'all'], description: '예약 상태 필터. 기본 scheduled(예정된 것만)' },
+        date: { type: 'STRING', description: '특정 날짜 YYYY-MM-DD 필터(선택). 생략 시 날짜 제한 없음.' },
+      },
+    },
+  },
+  {
     name: 'list_data_sources',
     description: '아이비가 읽을 수 있는 모든 데이터 테이블(growing_*) 목록을 조회한다. 전용 도구로 다루지 않는 데이터(키오스크/숙제 알림, 발송 로그, 설정, 향후 추가되는 기능 등)를 query_table로 읽기 전에 먼저 사용한다.',
     parameters: { type: 'OBJECT', properties: {} },
@@ -387,6 +399,7 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
   growing_students: '학생 기본 정보',
   growing_classes: '반/시간표 정보',
   growing_attendance: '출결·등하원·숙제 기록',
+  growing_makeup_reservations: '보강 예약 일정',
   growing_payments: '수납·미납 기록',
   growing_counsel_logs: '상담·진도·시험 일지',
   growing_kiosk_alerts: '키오스크 등하원 알림 대기열',
@@ -559,16 +572,18 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       const today = kstToday();
       const day = kstDayOfWeek();
       const month = kstMonth();
-      const [students, classesRes, attRes, payRes] = await Promise.all([
+      const [students, classesRes, attRes, payRes, makeupRes] = await Promise.all([
         fetchStudents(sb),
         sb.from('growing_classes').select('*'),
         sb.from('growing_attendance').select('*').eq('date', today),
         sb.from('growing_payments').select('*').eq('billing_month', month).eq('status', 'unpaid'),
+        sb.from('growing_makeup_reservations').select('*').eq('scheduled_date', today).eq('status', 'scheduled'),
       ]);
       if (classesRes.error) throw classesRes.error;
       if (attRes.error) throw attRes.error;
       if (payRes.error) throw payRes.error;
       const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
+      const classNameById = new Map((classesRes.data ?? []).map((c: Json) => [c.id, c.name]));
       // 출결 대상은 재원생만(휴원/퇴원생은 오늘 명단에서 제외).
       const activeIds = new Set(students.filter((s: Json) => s.status === 'active').map((s: Json) => s.id as string));
       const todayClasses = (classesRes.data ?? []).filter((c: Json) => ((c.days as string[]) ?? []).includes(day));
@@ -588,11 +603,19 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
           }),
         };
       });
+      const todayMakeupReservations = (makeupRes.data ?? []).map((r: Json) => ({
+        studentName: nameById.get(r.student_id) ?? '(알 수 없음)',
+        className: classNameById.get(r.class_id) ?? '(반 정보 없음)',
+        time: r.scheduled_time,
+        reason: r.reason === 'absence' ? '결석 보강' : r.reason === 'supplement' ? '추가 보충' : '기타',
+        memo: r.memo ?? '',
+      }));
       return {
         today, dayOfWeek: day,
         activeStudentCount: students.filter((s: Json) => s.status === 'active').length,
         todayClassCount: todayClasses.length,
         classes,
+        todayMakeupReservations,
         unpaidThisMonth: { count: (payRes.data ?? []).length, amount: (payRes.data ?? []).reduce((s, p: Json) => s + (p.amount as number), 0) },
       };
     }
@@ -926,6 +949,51 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       };
     }
 
+    case 'get_makeup_reservations': {
+      const studentName = (args.studentName as string) ?? '';
+      const status = (args.status as string) ?? 'scheduled';
+      const dateFilter = (args.date as string) ?? '';
+
+      const [students, classesRes] = await Promise.all([
+        fetchStudents(sb),
+        sb.from('growing_classes').select('id, name'),
+      ]);
+      if (classesRes.error) throw classesRes.error;
+
+      let targetIds: string[] | null = null;
+      if (studentName) {
+        const matched = students.filter((s: Json) => matchName(norm(s.name), studentName));
+        if (matched.length === 0) return { found: false, message: `'${studentName}' 학생을 찾지 못했습니다.` };
+        targetIds = matched.map((s: Json) => s.id as string);
+      }
+
+      let q = sb.from('growing_makeup_reservations').select('*').order('scheduled_date');
+      if (status !== 'all') q = q.eq('status', status);
+      if (dateFilter) q = q.eq('scheduled_date', dateFilter);
+      if (targetIds) q = q.in('student_id', targetIds);
+
+      const { data, error } = await q;
+      if (error) throw error;
+
+      const nameById = new Map(students.map((s: Json) => [s.id, s.name]));
+      const classNameById = new Map((classesRes.data ?? []).map((c: Json) => [c.id, c.name]));
+      const REASON_KO: Record<string, string> = { absence: '결석 보강', supplement: '추가 보충', other: '기타' };
+      const STATUS_KO: Record<string, string> = { scheduled: '예정', completed: '완료', cancelled: '취소' };
+
+      const rows = (data ?? []).map((r: Json) => ({
+        studentName: nameById.get(r.student_id) ?? '(알 수 없음)',
+        className: classNameById.get(r.class_id) ?? '(반 정보 없음)',
+        scheduledDate: r.scheduled_date,
+        scheduledTime: r.scheduled_time,
+        reason: REASON_KO[r.reason as string] ?? norm(r.reason),
+        status: STATUS_KO[r.status as string] ?? norm(r.status),
+        sourceAbsenceDate: r.source_absence_date ?? null,
+        memo: norm(r.memo),
+      }));
+
+      return { found: rows.length > 0, count: rows.length, reservations: rows };
+    }
+
     case 'list_data_sources': {
       const { data, error } = await sb.rpc('growing_list_tables');
       if (error) throw error;
@@ -1063,8 +1131,9 @@ function systemPrompt(memory: string): string {
 - propose_* 도구가 action_proposed: true를 반환하면 "아래 내용으로 변경하시겠어요? 확인 버튼을 눌러 승인해 주세요."처럼 안내합니다.
 - 데이터를 근거로 답할 때는 마지막에 어떤 자료를 봤는지 한 줄로 덧붙입니다(예: "(오늘 현황·이번 달 수납 기준)"). 여러 자료가 필요하면 한 번에 여러 도구를 호출해도 됩니다.
 - 사용자에게 내부 구현명, DB 테이블명, 컬럼명, RPC 이름, 도구 이름을 그대로 노출하지 않습니다. 특히 list_data_sources 결과를 설명할 때는 "학생 정보", "출결 기록", "수납 기록"처럼 업무용 이름으로만 말합니다. 사용자가 개발자용 내부 이름을 명시적으로 요청한 경우에만 테이블명을 보여줍니다.
-- "브리핑" 또는 "오늘 어때" 같은 요청에는 get_today_overview로 오늘 수업·출결·미납을 확인하고, 필요하면 출결 요약도 함께 본 뒤, 챙겨야 할 학생(잦은 결석·미납 등)을 짚어 간결한 아침 브리핑으로 정리합니다.
+- "브리핑" 또는 "오늘 어때" 같은 요청에는 get_today_overview로 오늘 수업·출결·미납을 확인하고, 필요하면 출결 요약도 함께 본 뒤, 챙겨야 할 학생(잦은 결석·미납 등)을 짚어 간결한 아침 브리핑으로 정리합니다. get_today_overview 결과의 todayMakeupReservations 필드에 오늘 예정된 보강/보충 예약 목록이 있으니 브리핑 시 함께 안내합니다.
 - 학생별 등하원 시간(등원 시간, 하원 시간) 질문에는 반드시 get_today_overview를 사용한다. 결과의 classes[].students[].checkInTime / checkOutTime 필드에 포함되어 있다. 별도 테이블 조회 없이 바로 답할 수 있다.
+- 특정 학생의 보강 예약 현황이나 오늘/특정 날짜의 보강 예약 질문에는 get_makeup_reservations 도구를 사용합니다.
 - 항상 한국어로 간결하고 정중하게(존댓말) 답하며, 금액은 천 단위 구분(예: 150,000원), 목록은 보기 좋게 정리합니다.
 - 학부모에게 보낼 문구를 요청받으면 따뜻하고 정중한 안내문을 작성합니다.
 - 대화에서 운영에 반복적으로 유용할 안정적 사실·선호를 알게 되면 remember_note로 간결히 저장합니다. 추측·일시적 정보·민감정보는 저장하지 않습니다.
