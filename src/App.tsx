@@ -22,6 +22,7 @@ import { DataQuality } from './components/DataQuality';
 import { MakeupManager } from './components/MakeupManager';
 import { KakaoManager } from './components/KakaoManager';
 import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
+import { ListeningMaterials } from './components/ListeningMaterials';
 import {
   MOBILE_QUICK_NAV_ITEMS,
   PRIMARY_NAV_GROUPS,
@@ -289,6 +290,8 @@ function AcademyApp({ session }: { session: Session }) {
             onDeleteClass={data.handleDeleteClass}
           />
         );
+      case 'listening':
+        return <ListeningMaterials key={session.user.id} ownerId={session.user.id} />;
       case 'exams':
         return <Exams ownerId={session.user.id} classes={classes} students={students} onSendGuideToMessaging={handleAssistantDraftToMessaging} />;
       case 'attendance':

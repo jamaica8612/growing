@@ -209,3 +209,16 @@ export interface HolidaySettings {
   holidayAutoClose: boolean;
   calendarExceptions: CalendarException[];
 }
+
+export interface ListeningMaterial {
+  id: string;
+  title: string;
+  description: string;
+  storagePath: string;
+  originalFileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  publicUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}

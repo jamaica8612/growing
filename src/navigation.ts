@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   ClipboardList,
   CreditCard,
+  Headphones,
   LayoutDashboard,
   MessageCircle,
   MessageSquare,
@@ -20,6 +21,7 @@ export type TabId =
   | 'dashboard'
   | 'students'
   | 'classes'
+  | 'listening'
   | 'attendance'
   | 'makeup'
   | 'stats'
@@ -64,6 +66,7 @@ export const PRIMARY_NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'students', label: '학생 관리', icon: Users, mobile: true },
       { id: 'classes', label: '반 / 시간표', icon: BookOpen },
+      { id: 'listening', label: '듣기 자료', icon: Headphones },
       { id: 'exams', label: '평가 관리', icon: ClipboardList },
       { id: 'payments', label: '수납 관리', icon: CreditCard },
     ],
@@ -104,8 +107,10 @@ export const SCREEN_ACTIONS: Record<TabId, ScreenAction[]> = {
   ],
   classes: [
     { to: 'attendance', label: '출결 입력' },
+    { to: 'listening', label: '듣기 자료' },
     { to: 'exams', label: '평가 만들기', primary: true },
   ],
+  listening: [{ to: 'exams', label: '평가 만들기', primary: true }],
   exams: [{ to: 'messaging', label: '시험 결과 안내', primary: true }],
   payments: [
     { to: 'messaging', label: '미납 안내 보내기', primary: true },
@@ -142,6 +147,7 @@ export const WORKFLOW_SHORTCUTS: Record<string, NavItem[]> = {
   classes: [
     { id: 'attendance', label: '출결 입력', icon: CalendarCheck },
     { id: 'makeup', label: '보강/보충', icon: CalendarCheck },
+    { id: 'listening', label: '듣기 자료', icon: Headphones },
     { id: 'exams', label: '평가 관리', icon: ClipboardList },
     { id: 'stats', label: '출결 리포트', icon: BarChart3 },
   ],
@@ -177,11 +183,12 @@ export const FLOW_TAB_GROUPS: FlowTabGroup[] = [
   },
   {
     parentId: 'classes',
-    ids: ['classes', 'attendance', 'makeup', 'exams', 'stats'],
+    ids: ['classes', 'attendance', 'makeup', 'listening', 'exams', 'stats'],
     tabs: [
       { id: 'classes', label: '반/시간표', icon: BookOpen },
       { id: 'attendance', label: '출결 입력', icon: CalendarCheck },
       { id: 'makeup', label: '보강/보충', icon: CalendarCheck },
+      { id: 'listening', label: '듣기 자료', icon: Headphones },
       { id: 'exams', label: '평가', icon: ClipboardList },
       { id: 'stats', label: '출결 리포트', icon: BarChart3 },
     ],
@@ -205,6 +212,7 @@ export const TAB_TITLES: Record<TabId, string> = {
   dashboard: '오늘 운영',
   students: '학생 관리',
   classes: '수업 관리',
+  listening: '듣기 자료 게시판',
   attendance: '출결 상세',
   makeup: '보강/보충 처리',
   stats: '출결 리포트',
@@ -222,6 +230,7 @@ export const TAB_DESCRIPTIONS: Record<TabId, string> = {
   dashboard: '오늘 수업, 출결, 보강, 미납 안내 후보를 한 화면에서 확인합니다.',
   students: '학생 상세 타임라인, 상담, 리포트, 출결·수납 이력을 관리합니다.',
   classes: '반과 시간표를 기준으로 수업 운영 흐름을 정리합니다.',
+  listening: '듣기 파일을 게시하고 클래스카드 학습자료에 붙여 넣을 공개 링크를 만듭니다.',
   attendance: '날짜와 반별 출결, 숙제, 보강/보충 상태를 자세히 입력합니다.',
   makeup: '결석으로 생긴 보강 필요 항목과 수행한 보강/보충을 처리합니다.',
   stats: '출결 흐름과 위험 신호를 리포트로 확인합니다.',
