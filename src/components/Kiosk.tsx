@@ -59,8 +59,11 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, attendance, kio
   };
 
   const getStatusText = (record: Attendance | undefined): { text: string; tone: 'info' | 'success' | 'warn' | 'danger' } | null => {
-    if (!record) return null;
+    if (!record) return { text: '미체크', tone: 'info' };
     if (record.checkOutTime) {
+      if (record.checkInTime) {
+        return { text: `등원 ${record.checkInTime} / 하원 ${record.checkOutTime}`, tone: 'success' };
+      }
       return { text: `하원 ${record.checkOutTime}`, tone: 'warn' };
     }
     if (record.checkInTime) {
