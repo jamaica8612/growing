@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import type { Student, Class, DayOfWeek } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import type { Student, Class, DayOfWeek, Attendance } from '../types';
 import { Sprout, Home, Lock, CheckCircle, Volume2 } from 'lucide-react';
 import { getStudentIdsForDay } from '../lib/classSchedules';
 import { localToday } from '../lib/dateUtils';
@@ -7,12 +7,13 @@ import { localToday } from '../lib/dateUtils';
 interface KioskProps {
   students: Student[];
   classes: Class[];
+  attendance: Attendance[];
   kioskPin: string;
   onRecordEvent: (studentId: string, classId: string, kind: 'in' | 'out', date: string, time: string) => Promise<boolean>;
   onExitKiosk: () => void;
 }
 
-export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onRecordEvent, onExitKiosk }) => {
+export const Kiosk: React.FC<KioskProps> = ({ students, classes, attendance, kioskPin, onRecordEvent, onExitKiosk }) => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
   const [passcode, setPasscode] = useState('');
@@ -31,6 +32,51 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onRec
   const activeStudents = students
     .filter(s => s.status === 'active')
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+  const todayDateStr = localToday();
+
+  const todayAttendance = useMemo(
+    () => attendance.filter(record => record.date === todayDateStr),
+    [attendance, todayDateStr],
+  );
+
+  const getStudentTodayRecord = (studentId: string, selectedClassId: string): Attendance | undefined => {
+    const candidateRecords = todayAttendance.filter(record => record.studentId === studentId);
+    if (candidateRecords.length === 0) return undefined;
+    if (selectedClassId) {
+      const selectedClassRecord = candidateRecords.find(record => record.classId === selectedClassId);
+      if (selectedClassRecord) return selectedClassRecord;
+    }
+
+    const studentClasses = classes
+      .filter(cls => getStudentIdsForDay(cls, todayDayOfWeek).includes(studentId));
+    for (const cls of studentClasses) {
+      const record = candidateRecords.find(item => item.classId === cls.id);
+      if (record) return record;
+    }
+
+    return candidateRecords[0];
+  };
+
+  const getStatusText = (record: Attendance | undefined): { text: string; tone: 'info' | 'success' | 'warn' | 'danger' } | null => {
+    if (!record) return null;
+    if (record.checkOutTime) {
+      return { text: `하원 ${record.checkOutTime}`, tone: 'warn' };
+    }
+    if (record.checkInTime) {
+      return { text: `등원 ${record.checkInTime}`, tone: 'success' };
+    }
+    if (record.status === 'absent') {
+      return { text: '결석 처리됨', tone: 'danger' };
+    }
+    if (record.status === 'makeup') {
+      return { text: '보강', tone: 'info' };
+    }
+    if (record.status === 'supplement') {
+      return { text: '보충', tone: 'info' };
+    }
+    return { text: '미체크', tone: 'info' };
+  };
 
   const displayStudents = !selectedClassId
     ? activeStudents
@@ -184,6 +230,12 @@ export const Kiosk: React.FC<KioskProps> = ({ students, classes, kioskPin, onRec
               <button key={student.id} className="kk-card" onClick={() => setSelectedStudent(student)}>
                 <span className="kk-card-name">{student.name}</span>
                 <span className="kk-card-sub">{student.school || '교습소'} {student.grade.split(' ')[1] || student.grade}</span>
+                {(() => {
+                  const record = getStudentTodayRecord(student.id, selectedClassId);
+                  const status = getStatusText(record);
+                  if (!status) return null;
+                  return <span className={`kk-status-badge ${status.tone}`}>{status.text}</span>;
+                })()}
               </button>
             ))
           )}

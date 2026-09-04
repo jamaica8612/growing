@@ -415,6 +415,7 @@ function AcademyApp({ session }: { session: Session }) {
           <Kiosk
             students={students}
             classes={classes}
+            attendance={attendance}
             kioskPin={kioskPin}
             onRecordEvent={data.handleRecordKioskEvent}
             onExitKiosk={goDashboard}
