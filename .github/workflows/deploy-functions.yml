@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           secrets_json="$(supabase secrets list --project-ref xrrdokcjhjqdfvwtbenl --output json)"
-          for required_secret in PUSH_INTERNAL_SECRET EXAM_VERIFICATION_SECRET; do
+          for required_secret in PUSH_INTERNAL_SECRET EXAM_VERIFICATION_SECRET GROWING_OPENAI_API_KEY; do
             if ! jq -e --arg name "$required_secret" 'any(.[]; .name == $name)' <<<"$secrets_json" >/dev/null; then
               echo "Missing required Supabase secret: $required_secret" >&2
               exit 1

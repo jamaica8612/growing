@@ -32,7 +32,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-AI 비서 Edge Function은 Supabase 프로젝트 시크릿에 `GEMINI_API_KEY`가 필요합니다.
+AI Edge Function(`assistant`, `exam-generate`, `exam-public`)은 OpenAI Responses API의 `gpt-6-luna`를 쓰며, Supabase 프로젝트 시크릿에 그로잉 전용 키 `GROWING_OPENAI_API_KEY`가 필요합니다. 같은 프로젝트의 다른 앱이 `OPENAI_API_KEY`를 쓰므로 그 이름은 덮어쓰지 않습니다. 모델을 바꿀 때는 선택 시크릿 `GROWING_OPENAI_MODEL`을 설정합니다.
 
 ## 검증
 

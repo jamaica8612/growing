@@ -56,7 +56,7 @@
 - publishable key로 `exam-public` 호출 시 401이 아니라 시험 없음/토큰 없음 오류가 반환되는지 확인
 - `SUPABASE_URL` 설정
 - `SUPABASE_ANON_KEY` 설정
-- `GEMINI_API_KEY` 설정
+- `GROWING_OPENAI_API_KEY` 설정 (AI 출제·서술형 채점, `gpt-6-luna`)
 - `SUPABASE_SERVICE_ROLE_KEY` 설정
 
 ## 2026-06-05 원격 상태 메모
