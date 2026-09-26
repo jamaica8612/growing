@@ -893,6 +893,34 @@ export const api = {
     });
   },
 
+  // ---- Bulk: prepare a backup restore (RLS-scoped) ----
+  // Students/classes that also exist in the backup are kept (and updated in
+  // place by the caller) so rows that reference them but are not part of the
+  // backup — makeup reservations, exam submissions, message logs, Kakao parent
+  // links — are not cascade-deleted.
+  async clearForRestore(keepStudentIds: string[], keepClassIds: string[]): Promise<void> {
+    for (const t of [
+      'growing_kiosk_alerts',
+      'growing_homework_alerts',
+      'growing_counsel_logs',
+      'growing_payments',
+      'growing_attendance',
+    ]) {
+      const { error } = await supabase.from(t).delete().not('id', 'is', null);
+      if (error) throw error;
+    }
+    for (const [t, keep] of [
+      ['growing_classes', keepClassIds],
+      ['growing_students', keepStudentIds],
+    ] as const) {
+      const query = supabase.from(t).delete();
+      const { error } = keep.length
+        ? await query.not('id', 'in', `(${keep.join(',')})`)
+        : await query.not('id', 'is', null);
+      if (error) throw error;
+    }
+  },
+
   // ---- Bulk: delete all of the signed-in owner's academy rows (RLS-scoped) ----
   async clearAll(): Promise<void> {
     // Order respects FKs; students last (cascades the rest), classes before.

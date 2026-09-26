@@ -51,7 +51,29 @@ const IvyIcon = ({ size = 24 }: { size?: number }) => (
 );
 
 
-const KIOSK_RELOAD_RESET_KEY = 'growing:kiosk-reload-reset';
+// 키오스크 모드는 새로고침·앱 재시작 후에도 유지된다. PIN으로 나갈 때만 해제되므로
+// 학생이 새로고침해서 관리자 화면을 여는 일을 막는다.
+const KIOSK_MODE_KEY = 'growing:kiosk-mode';
+const DEFAULT_KIOSK_PIN = '1234';
+
+function readKioskMode(): boolean {
+  try {
+    return localStorage.getItem(KIOSK_MODE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeKioskMode(on: boolean) {
+  try {
+    if (on) localStorage.setItem(KIOSK_MODE_KEY, '1');
+    else localStorage.removeItem(KIOSK_MODE_KEY);
+  } catch {
+    // 저장소를 쓸 수 없는 환경에서는 새로고침 시 유지되지 않는다.
+  }
+}
+
+type MembershipState = 'checking' | 'member' | 'denied' | 'error';
 
 function NavItemButton({
   active,
@@ -134,17 +156,55 @@ function App() {
   if (!session) {
     return <Login />;
   }
-  return <AcademyApp session={session} />;
+  return <MemberGate session={session} />;
+}
+
+// 같은 Supabase 프로젝트를 쓰는 다른 앱 계정은 로그인만으로 그로잉을 쓸 수 없다.
+function MemberGate({ session }: { session: Session }) {
+  const userId = session.user.id;
+  const [state, setState] = useState<{ userId: string; value: MembershipState } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('growing_members')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setState({ userId, value: error ? 'error' : data ? 'member' : 'denied' });
+      });
+    return () => { cancelled = true; };
+  }, [userId, attempt]);
+
+  const membership: MembershipState = state?.userId === userId ? state.value : 'checking';
+  const logout = () => { void supabase.auth.signOut(); };
+
+  if (membership === 'member') return <AcademyApp session={session} />;
+  if (membership === 'checking') {
+    return <FullScreen><IvyIcon size={28} /><div style={{ marginTop: '0.75rem', color: 'var(--color-text-secondary)' }}>불러오는 중...</div></FullScreen>;
+  }
+  return (
+    <FullScreen>
+      <div style={{ fontWeight: 600, marginBottom: '1rem' }}>
+        {membership === 'denied'
+          ? <>그로잉 사용 승인이 필요한 계정입니다.<br />{session.user.email}</>
+          : '계정 확인에 실패했습니다. 잠시 후 다시 시도해 주세요.'}
+      </div>
+      {membership === 'error' && (
+        <button className="btn btn-primary" onClick={() => setAttempt(n => n + 1)}>다시 시도</button>
+      )}
+      <button className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={logout}>로그아웃</button>
+    </FullScreen>
+  );
 }
 
 // The signed-in application: loads data for the owner and renders the UI.
 function AcademyApp({ session }: { session: Session }) {
-  const [activeTab, setActiveTab] = useState<TabId>(() => {
-    if (sessionStorage.getItem(KIOSK_RELOAD_RESET_KEY) === '1') {
-      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-    }
-    return 'dashboard';
-  });
+  const [activeTab, setActiveTab] = useState<TabId>(() => (readKioskMode() ? 'kiosk' : 'dashboard'));
+  const [messagingDraft, setMessagingDraft] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const data = useAcademyData(session.user.id);
@@ -212,37 +272,42 @@ function AcademyApp({ session }: { session: Session }) {
     void supabase.auth.signOut();
   };
 
-  useEffect(() => {
-    const markKioskReload = () => {
-      if (activeTab === 'kiosk') {
-        sessionStorage.setItem(KIOSK_RELOAD_RESET_KEY, '1');
-      }
-    };
-    window.addEventListener('beforeunload', markKioskReload);
-    window.addEventListener('pagehide', markKioskReload);
-    return () => {
-      window.removeEventListener('beforeunload', markKioskReload);
-      window.removeEventListener('pagehide', markKioskReload);
-    };
-  }, [activeTab]);
-
-  const handleAssistantDraftToMessaging = () => {
+  const handleAssistantDraftToMessaging = (draft?: string) => {
+    if (draft?.trim()) setMessagingDraft(draft);
     setActiveTab('messaging');
     setIsMobileMenuOpen(false);
   };
 
   const goDashboard = () => {
-    sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
+    writeKioskMode(false);
     setActiveTab('dashboard');
     setIsMobileMenuOpen(false);
   };
 
-  const startKioskMode = () => {
-    if (window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) {
-      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-      setActiveTab('kiosk');
-      setIsMobileMenuOpen(false);
+  // 기본 PIN(1234)으로는 키오스크를 열지 않는다. 학생이 쉽게 관리자 화면으로 나올 수 있기 때문.
+  const ensureKioskPin = async (): Promise<boolean> => {
+    if (kioskPin !== DEFAULT_KIOSK_PIN) return true;
+    const first = window.prompt('키오스크 PIN이 아직 기본값(1234)입니다.\n관리자 화면으로 돌아올 때 쓸 새 PIN(숫자 4~8자리)을 입력해 주세요.');
+    if (first === null) return false;
+    if (!/^\d{4,8}$/.test(first) || first === DEFAULT_KIOSK_PIN) {
+      window.alert('PIN은 1234가 아닌 숫자 4~8자리로 정해 주세요.');
+      return false;
     }
+    const second = window.prompt('확인을 위해 새 PIN을 한 번 더 입력해 주세요.');
+    if (second === null) return false;
+    if (second !== first) {
+      window.alert('두 PIN이 일치하지 않습니다. 다시 시도해 주세요.');
+      return false;
+    }
+    return data.handleChangeKioskPin(first);
+  };
+
+  const startKioskMode = async () => {
+    if (!window.confirm('자율출결 키오스크 단말기 모드로 전환하시겠습니까? (복귀 시 관리자 PIN이 필요합니다)')) return;
+    if (!(await ensureKioskPin())) return;
+    writeKioskMode(true);
+    setActiveTab('kiosk');
+    setIsMobileMenuOpen(false);
   };
 
   const mobileQuickNavItems: FlowNavItem[] = MOBILE_QUICK_NAV_ITEMS;
@@ -390,6 +455,8 @@ function AcademyApp({ session }: { session: Session }) {
             onClearAlerts={data.handleClearKioskAlerts}
             onDismissHomeworkAlert={data.handleDismissHomeworkAlert}
             onClearHomeworkAlerts={data.handleClearHomeworkAlerts}
+            initialDraft={messagingDraft}
+            onInitialDraftConsumed={() => setMessagingDraft(null)}
           />
         );
       case 'kakao':
@@ -439,13 +506,12 @@ function AcademyApp({ session }: { session: Session }) {
   // 데스크탑 사이드바 + 모바일 드로어 공용 네비게이션
   const renderNavSection = (opts: { closeOnNav: boolean }) => {
     const go = (id: TabId) => {
-      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-      setActiveTab(id);
+            setActiveTab(id);
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
     };
     const launchKiosk = () => {
       if (opts.closeOnNav) setIsMobileMenuOpen(false);
-      startKioskMode();
+      void startKioskMode();
     };
 
     return (
@@ -489,8 +555,7 @@ function AcademyApp({ session }: { session: Session }) {
   const renderTopbarActions = () => {
     const actions = SCREEN_ACTIONS[activeTab] ?? [];
     const go = (id: TabId) => {
-      sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-      setActiveTab(id);
+            setActiveTab(id);
       setIsMobileMenuOpen(false);
     };
     return (
@@ -500,7 +565,7 @@ function AcademyApp({ session }: { session: Session }) {
             key={`${activeTab}-${action.to}-${action.label}`}
             type="button"
             className={`tb-act${action.primary ? ' primary' : ''}`}
-            onClick={action.kind === 'kiosk' ? startKioskMode : () => go(action.to)}
+            onClick={action.kind === 'kiosk' ? () => void startKioskMode() : () => go(action.to)}
           >
             {action.primary ? <Send size={14} /> : null}
             <span>{action.label}</span>
@@ -595,10 +660,9 @@ function AcademyApp({ session }: { session: Session }) {
                         onClick={() => {
                           setIsMobileMenuOpen(false);
                           if (item.kind === 'kiosk') {
-                            startKioskMode();
+                            void startKioskMode();
                           } else {
-                            sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-                            setActiveTab(item.id);
+                                                        setActiveTab(item.id);
                           }
                         }}
                       >
@@ -617,8 +681,7 @@ function AcademyApp({ session }: { session: Session }) {
                 className={`sheet-item${activeTab === 'backup' ? ' on' : ''}`}
                 onClick={() => {
                   setIsMobileMenuOpen(false);
-                  sessionStorage.removeItem(KIOSK_RELOAD_RESET_KEY);
-                  setActiveTab(SETTINGS_NAV_ITEM.id);
+                                    setActiveTab(SETTINGS_NAV_ITEM.id);
                 }}
               >
                 <span className="si-ic"><SETTINGS_NAV_ITEM.icon size={18} /></span>

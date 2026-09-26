@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   Student,
   Class,
@@ -49,9 +49,16 @@ export function useAcademyData(userId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 첫 로딩에만 전체 로딩 화면을 띄운다. 이후 다시 불러오기(실시간 이벤트, 저장 실패 후
+  // 재동기화)는 화면을 유지한 채 뒤에서 처리해, 작성 중인 입력이 사라지지 않게 한다.
+  const hasLoadedRef = useRef(false);
+
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    const isInitialLoad = !hasLoadedRef.current;
+    if (isInitialLoad) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const snap = await api.loadAll();
       setStudents(snap.students);
@@ -68,11 +75,13 @@ export function useAcademyData(userId: string) {
       setKioskPin(snap.kioskPin);
       setMessageTemplates(snap.messageTemplates);
       setHolidaySettings(snap.holidaySettings);
+      hasLoadedRef.current = true;
     } catch (e) {
       console.error('Failed to load academy data:', e);
-      setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.');
+      // 이미 화면에 데이터가 있으면 그대로 두고, 첫 로딩 실패만 오류 화면으로 보낸다.
+      if (isInitialLoad) setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.');
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   }, []);
 
@@ -444,11 +453,12 @@ export function useAcademyData(userId: string) {
     });
 
   // ---- Settings ----
-  const handleChangeKioskPin = (newPin: string) =>
-    guard(async () => {
+  const handleChangeKioskPin = async (newPin: string): Promise<boolean> =>
+    (await guard(async () => {
       await api.setKioskPin(userId, newPin);
       setKioskPin(newPin);
-    });
+      return true;
+    })) ?? false;
 
   const handleSaveMessageTemplates = (templates: MessageTemplates) =>
     guard(async () => {
@@ -482,27 +492,39 @@ export function useAcademyData(userId: string) {
   }): Promise<boolean> => {
     let succeeded = false;
     await guard(async () => {
-      await api.clearAll();
+      // Rows present both here and in the backup keep their ids (updated in
+      // place) so data outside the backup that references them survives.
+      const existingStudentIds = new Set(students.map(st => st.id));
+      const existingClassIds = new Set(classes.map(c => c.id));
+      const keepStudentIds = data.students.map(st => st.id).filter(id => existingStudentIds.has(id));
+      const keepClassIds = data.classes.map(c => c.id).filter(id => existingClassIds.has(id));
+      await api.clearForRestore(keepStudentIds, keepClassIds);
       // Old backups carry client-generated ids; remap them to fresh DB uuids.
       const studentIdMap = new Map<string, string>();
       for (const st of data.students) {
-        const created = await api.addStudent(st);
-        studentIdMap.set(st.id, created.id);
+        const saved = existingStudentIds.has(st.id)
+          ? await api.updateStudent(st)
+          : await api.addStudent(st);
+        studentIdMap.set(st.id, saved.id);
       }
+      const mapStudentIds = (ids: string[]) =>
+        ids.map(id => studentIdMap.get(id)).filter((v): v is string => Boolean(v));
       const classIdMap = new Map<string, string>();
       for (const c of data.classes) {
-        const studentIds = c.studentIds.map(id => studentIdMap.get(id)).filter((v): v is string => Boolean(v));
+        const studentIds = mapStudentIds(c.studentIds);
         const tuitionOverrides = Object.fromEntries(
           Object.entries(c.tuitionOverrides ?? {})
             .map(([oldId, fee]) => [studentIdMap.get(oldId), fee] as const)
             .filter((entry): entry is [string, number] => Boolean(entry[0]) && Number.isFinite(entry[1]))
         );
-        const created = await api.addClass({
-          ...c,
-          tuitionOverrides,
-          studentIds,
-        });
-        classIdMap.set(c.id, created.id);
+        const schedules = (c.schedules ?? []).map(schedule => schedule.studentIds === undefined
+          ? schedule
+          : { ...schedule, studentIds: mapStudentIds(schedule.studentIds) });
+        const restored = { ...c, schedules, tuitionOverrides, studentIds };
+        const saved = existingClassIds.has(c.id)
+          ? await api.updateClass(restored)
+          : await api.addClass(restored);
+        classIdMap.set(c.id, saved.id);
       }
       for (const a of data.attendance) {
         const studentId = studentIdMap.get(a.studentId);

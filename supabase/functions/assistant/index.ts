@@ -10,6 +10,7 @@
 // stream: true 요청은 SSE로 진행 단계(progress)와 답변 조각(delta)을 흘려보낸다.
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
+import { NOT_A_MEMBER_MESSAGE, isGrowingMember } from '../_shared/growing-member.ts';
 import {
   MISSING_KEY_MESSAGE,
   OpenAIError,
@@ -1433,6 +1434,9 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userErr } = await sb.auth.getUser();
     if (userErr || !user) {
       return jsonResponse({ error: '인증이 필요합니다. 다시 로그인해 주세요.' }, 401);
+    }
+    if (!(await isGrowingMember(sb, user.id))) {
+      return jsonResponse({ error: NOT_A_MEMBER_MESSAGE }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
