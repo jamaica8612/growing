@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
+import { NOT_A_MEMBER_MESSAGE, isGrowingMember } from '../_shared/growing-member.ts';
 import { MISSING_KEY_MESSAGE, createResponse, openAIConfig, outputText } from '../_shared/openai.ts';
 
 const corsHeaders = {
@@ -207,6 +208,13 @@ Deno.serve(async req => {
   });
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return jsonResponse({ error: '로그인이 필요합니다.' }, 401);
+  try {
+    if (!(await isGrowingMember(supabase, userData.user.id))) {
+      return jsonResponse({ error: NOT_A_MEMBER_MESSAGE }, 403);
+    }
+  } catch {
+    return jsonResponse({ error: '계정 확인에 실패했습니다. 잠시 후 다시 시도해 주세요.' }, 500);
+  }
 
   const payload = await req.json().catch(() => null) as {
     mode?: 'generate' | 'revise';
