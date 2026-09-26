@@ -17,6 +17,7 @@ import {
   verifyVerificationToken,
   type AnswerValue,
 } from './security.ts';
+import { createResponse, openAIConfig, outputText } from '../_shared/openai.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,7 +26,7 @@ const corsHeaders = {
 };
 
 type Row = Record<string, unknown>;
-const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+const GRADE_MAX_OUTPUT_TOKENS = 2_000;
 const PUBLIC_ACTIONS = ['get_exam', 'verify_student', 'submit', 'get_result'] as const;
 const VERIFY_ATTEMPT_WINDOW_MS = 10 * 60 * 1000;
 const VERIFY_ATTEMPT_LIMIT = 5;
@@ -157,7 +158,7 @@ function fallbackGradeOne(question: Row, answer: AnswerValue): GradeResult {
 }
 
 async function gradeWritingWithAi(question: Row, answer: AnswerValue): Promise<GradeResult | null> {
-  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  const { apiKey, model } = openAIConfig();
   const actual = String(answer).trim();
   if (!apiKey || !actual) return null;
   const points = Number(question.points ?? 0);
@@ -196,40 +197,30 @@ Student answer:
 ${actual}
 `.trim();
 
-  let lastError: unknown = null;
-  for (const model of MODELS) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generationConfig: {
-            temperature: 0.15,
-            responseMimeType: 'application/json',
-          },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message ?? `Gemini ${res.status}`);
-      const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join('\n') ?? '';
-      const parsed = JSON.parse(stripFence(text)) as { gainedPoints?: unknown; isCorrect?: unknown; isPartial?: unknown; feedback?: unknown };
-      const gained = clampPoints(parsed.gainedPoints, points);
-      const isCorrect = Boolean(parsed.isCorrect) || gained >= points;
-      const isPartial = !isCorrect && (Boolean(parsed.isPartial) || gained > 0);
-      return {
-        is_correct: isCorrect,
-        is_partial: isPartial,
-        gained_points: isCorrect ? points : gained,
-        feedback: isCorrect ? null : typeof parsed.feedback === 'string' && parsed.feedback.trim() ? parsed.feedback.trim().slice(0, 240) : '어순, 핵심 어휘, 빠진 표현을 다시 확인해 보세요.',
-        graded_by: 'ai',
-      };
-    } catch (error) {
-      lastError = error;
-    }
+  try {
+    const response = await createResponse(apiKey, {
+      model,
+      input: prompt,
+      store: false,
+      reasoning: { effort: 'low' },
+      text: { format: { type: 'json_object' } },
+      max_output_tokens: GRADE_MAX_OUTPUT_TOKENS,
+    });
+    const parsed = JSON.parse(stripFence(outputText(response))) as { gainedPoints?: unknown; isCorrect?: unknown; isPartial?: unknown; feedback?: unknown };
+    const gained = clampPoints(parsed.gainedPoints, points);
+    const isCorrect = Boolean(parsed.isCorrect) || gained >= points;
+    const isPartial = !isCorrect && (Boolean(parsed.isPartial) || gained > 0);
+    return {
+      is_correct: isCorrect,
+      is_partial: isPartial,
+      gained_points: isCorrect ? points : gained,
+      feedback: isCorrect ? null : typeof parsed.feedback === 'string' && parsed.feedback.trim() ? parsed.feedback.trim().slice(0, 240) : '어순, 핵심 어휘, 빠진 표현을 다시 확인해 보세요.',
+      graded_by: 'ai',
+    };
+  } catch (error) {
+    console.warn('AI writing grade failed; falling back to rule grade', error);
+    return null;
   }
-  console.warn('AI writing grade failed; falling back to rule grade', lastError);
-  return null;
 }
 
 async function gradeOne(question: Row, answer: AnswerValue): Promise<GradeResult> {

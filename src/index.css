@@ -4292,6 +4292,55 @@ textarea.form-control {
 .ivy-typing span:nth-child(2) { animation-delay: 0.15s; }
 .ivy-typing span:nth-child(3) { animation-delay: 0.3s; }
 
+/* 생각 과정 — 진행 중엔 펼침, 답변 뒤엔 접힌 details */
+.ivy-thinking {
+  margin-bottom: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: #f6faf8;
+  border: 1px dashed #cfe6da;
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+}
+.ivy-thinking-title {
+  font-weight: 800;
+  color: #0c7a55;
+  cursor: default;
+}
+details.ivy-thinking > .ivy-thinking-title { cursor: pointer; }
+.ivy-steps {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+.ivy-steps li { display: flex; align-items: flex-start; gap: 0.35rem; line-height: 1.4; }
+.ivy-step-mark {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e3f6ed;
+  color: #0c7a55;
+}
+.ivy-steps li.active { color: var(--color-text-primary); font-weight: 700; }
+.ivy-steps li.active .ivy-step-mark {
+  background: transparent;
+  border: 2px solid var(--color-accent-mint);
+  border-top-color: transparent;
+  animation: ivySpin 0.8s linear infinite;
+}
+@keyframes ivySpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ivy-steps li.active .ivy-step-mark { animation: none; }
+}
+
 .ivy-confirm {
   margin-top: 0.6rem;
   border: 1.5px solid var(--color-primary);

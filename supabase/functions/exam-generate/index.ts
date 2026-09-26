@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.4';
+import { MISSING_KEY_MESSAGE, createResponse, openAIConfig, outputText } from '../_shared/openai.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,7 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+// 16문항 + 해설 JSON이 추론 토큰과 함께 들어갈 만큼 여유를 둔다.
+const MAX_OUTPUT_TOKENS = 16_000;
 const QUESTION_TYPES = ['vocab', 'grammar', 'reading', 'writing'] as const;
 
 type QuestionType = typeof QUESTION_TYPES[number];
@@ -81,32 +83,24 @@ function parseQuestions(text: string): AiResult {
   };
 }
 
-async function callGemini(prompt: string): Promise<AiResult> {
-  const apiKey = requiredEnv('GEMINI_API_KEY');
-  let lastError: unknown = null;
-  for (const model of MODELS) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generationConfig: {
-            temperature: 0.35,
-            responseMimeType: 'application/json',
-          },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message ?? `Gemini ${res.status}`);
-      const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join('\n') ?? '';
-      if (!text.trim()) throw new Error('Gemini 응답이 비어 있습니다.');
-      return parseQuestions(text);
-    } catch (error) {
-      lastError = error;
-    }
+async function generateWithAi(prompt: string): Promise<AiResult> {
+  const { apiKey, model } = openAIConfig();
+  if (!apiKey) throw new Error(MISSING_KEY_MESSAGE);
+  const response = await createResponse(apiKey, {
+    model,
+    input: prompt,
+    store: false,
+    reasoning: { effort: 'low' },
+    text: { format: { type: 'json_object' } },
+    max_output_tokens: MAX_OUTPUT_TOKENS,
+  });
+  const text = outputText(response);
+  if (!text) {
+    throw new Error(response.status === 'incomplete'
+      ? '문항이 길어 AI가 끝맺지 못했어요. 문항 수를 줄여 다시 시도해 주세요.'
+      : 'AI 응답이 비어 있습니다.');
   }
-  throw lastError instanceof Error ? lastError : new Error('AI 출제에 실패했습니다.');
+  return parseQuestions(text);
 }
 
 function buildPrompt(payload: {
@@ -230,7 +224,7 @@ Deno.serve(async req => {
   if (!payload?.materialText?.trim()) return jsonResponse({ error: '자료 텍스트가 필요합니다.' }, 400);
 
   try {
-    const result = await callGemini(buildPrompt({
+    const result = await generateWithAi(buildPrompt({
       mode: payload.mode ?? 'generate',
       materialText: payload.materialText,
       title: payload.title ?? 'Online exam',

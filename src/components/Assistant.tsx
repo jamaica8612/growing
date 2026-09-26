@@ -1,11 +1,12 @@
 import { useRef, useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import { Check, CheckCircle2, Copy, MessageSquare, RefreshCw, Send, X, XCircle, AlertCircle } from 'lucide-react';
-import { sendAssistantMessage, executeAction, type ChatMessage, type PendingAction } from '../lib/assistant';
+import { streamAssistantMessage, executeAction, type ActionStatus, type ChatMessage, type PendingAction } from '../lib/assistant';
 
 // AI 학원 비서 '아이비' — 오른쪽 하단 플로팅 위젯.
-// Phase 2: propose_* tool 응답에 action 객체가 오면 확인 카드를 표시하고,
-// 원장님이 승인 시 execute_action으로 실제 DB를 변경한다.
+// 답을 만드는 동안 진행 단계(생각 과정)와 답변을 실시간으로 보여준다.
+// 읽기는 아이비가 자유롭게 하고, propose_* 도구가 만든 변경 제안은 확인 카드로
+// 표시해 원장님이 승인할 때만 execute_action으로 실제 DB를 변경한다.
 
 interface AssistantProps {
   onSendToMessaging?: (content: string) => void;
@@ -23,6 +24,7 @@ const ACTION_TITLE: Record<PendingAction['type'], string> = {
   update_payment: '수납 처리',
   create_counsel_log: '일지 작성',
   update_student_memo: '메모 수정',
+  create_assistant_note: '아이비 메모 저장',
 };
 
 const LOG_TYPE_KO: Record<string, string> = {
@@ -74,6 +76,13 @@ const SUGGESTION_GROUPS = [
   },
 ];
 
+const MARKDOWN_COMPONENTS: Components = {
+  p: ({ children }) => <p className="ivy-p">{children}</p>,
+  ul: ({ children }) => <ul className="ivy-ul">{children}</ul>,
+  ol: ({ children }) => <ol className="ivy-ul">{children}</ol>,
+  li: ({ children }) => <li>{children}</li>,
+};
+
 function truncate(text: string, max = 80) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
@@ -114,7 +123,7 @@ function IvyAvatar({ size = 36, state = 'idle', ring = false }: {
 // ── 승인 카드 — pending/approved/rejected 세 상태 통합 ──
 interface ConfirmationCardProps {
   action: PendingAction;
-  status: 'pending' | 'approved' | 'rejected';
+  status: ActionStatus;
   onApprove: () => void;
   onReject: () => void;
   disabled?: boolean;
@@ -158,6 +167,10 @@ function ConfirmationCard({ action, status, onApprove, onReject, disabled }: Con
     rows.push({ label: '학생', value: action.student_name });
     rows.push({ label: '현재 메모', value: action.old_memo ? truncate(action.old_memo) : '(없음)' });
     rows.push({ label: '변경 후', value: truncate(action.new_memo) });
+  } else if (action.type === 'create_assistant_note') {
+    rows.push({ label: '대상', value: action.scope === 'student' ? `${action.student_name ?? ''} 학생` : '학원 운영 기준' });
+    rows.push({ label: '분류', value: action.category });
+    rows.push({ label: '내용', value: truncate(action.content, 120) });
   }
 
   return (
@@ -186,6 +199,38 @@ function ConfirmationCard({ action, status, onApprove, onReject, disabled }: Con
   );
 }
 
+// ── 생각 과정 — 진행 중에는 펼쳐 두고, 답변이 끝나면 접어서 보관 ──
+function ThinkingSteps({ steps, live = false }: { steps: string[]; live?: boolean }) {
+  if (steps.length === 0) return null;
+  const list = (
+    <ol className="ivy-steps">
+      {steps.map((step, index) => {
+        const active = live && index === steps.length - 1;
+        return (
+          <li key={`${index}-${step}`} className={active ? 'active' : 'done'}>
+            <span className="ivy-step-mark" aria-hidden="true">{active ? '' : <Check size={10} />}</span>
+            <span>{step}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+  if (live) {
+    return (
+      <div className="ivy-thinking" aria-live="polite">
+        <div className="ivy-thinking-title">생각하는 중…</div>
+        {list}
+      </div>
+    );
+  }
+  return (
+    <details className="ivy-thinking">
+      <summary className="ivy-thinking-title">생각 과정 {steps.length}단계</summary>
+      {list}
+    </details>
+  );
+}
+
 export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counselNotification, onCounselNotificationConsumed }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -196,11 +241,14 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
   const [activeSuggestionGroup, setActiveSuggestionGroup] = useState(SUGGESTION_GROUPS[0].title);
   const [toast, setToast] = useState<string | null>(null);
   const [hasUnread, setHasUnread] = useState(false);
+  // 답을 받는 동안의 진행 단계와 흘러나오는 답변
+  const [liveSteps, setLiveSteps] = useState<string[]>([]);
+  const [liveText, setLiveText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, loading, open]);
+  }, [messages, loading, open, liveSteps, liveText]);
 
   // 새 상담 요청 알림 → 아이비 채팅에 자동 주입
   useEffect(() => {
@@ -222,19 +270,34 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
   const runConversation = async (msgs: ChatMessage[]) => {
     setError(null);
     setLoading(true);
+    setLiveSteps([]);
+    setLiveText('');
     try {
-      const { reply, action } = await sendAssistantMessage(msgs);
+      const { reply, steps, actions } = await streamAssistantMessage(msgs, {
+        onProgress: message => setLiveSteps(prev => [...prev, message]),
+        onDelta: text => setLiveText(prev => prev + text),
+        onReset: () => setLiveText(''),
+      });
       const assistantMsg: ChatMessage = {
         role: 'assistant',
         content: reply,
-        ...(action ? { action, actionStatus: 'pending' } : {}),
+        ...(steps.length ? { steps } : {}),
+        ...(actions.length ? { actions: actions.map(action => ({ action, status: 'pending' as const })) } : {}),
       };
       setMessages([...msgs, assistantMsg]);
     } catch (e) {
       setError(e instanceof Error ? e.message : '아이비가 잠시 답하지 못했어요. 다시 시도해 주세요. 🙏');
     } finally {
       setLoading(false);
+      setLiveSteps([]);
+      setLiveText('');
     }
+  };
+
+  const setActionStatus = (msgIndex: number, actionIndex: number, status: ActionStatus) => {
+    setMessages(prev => prev.map((m, i) => i === msgIndex && m.actions
+      ? { ...m, actions: m.actions.map((a, j) => (j === actionIndex ? { ...a, status } : a)) }
+      : m));
   };
 
   const handleSend = async () => {
@@ -252,12 +315,13 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
     await runConversation(messages);
   };
 
-  const handleApproveAction = async (msgIndex: number, action: PendingAction) => {
+  const handleApproveAction = async (msgIndex: number, actionIndex: number, action: PendingAction) => {
     setLoading(true);
     setError(null);
     try {
-      const { message } = await executeAction(action);
-      setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, actionStatus: 'approved' as const } : m));
+      const { success, message } = await executeAction(action);
+      if (!success) throw new Error(message || '처리에 실패했습니다.');
+      setActionStatus(msgIndex, actionIndex, 'approved');
       setMessages(prev => [...prev, { role: 'assistant', content: message }]);
       flash('변경을 저장했어요');
     } catch (e) {
@@ -267,8 +331,8 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
     }
   };
 
-  const handleRejectAction = (msgIndex: number) => {
-    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, actionStatus: 'rejected' as const } : m));
+  const handleRejectAction = (msgIndex: number, actionIndex: number) => {
+    setActionStatus(msgIndex, actionIndex, 'rejected');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -397,7 +461,7 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
                   ))}
                 </div>
 
-                <p className="ivy-note">출결·수납·일지·메모 변경은 확인 카드에서 승인해야 저장됩니다.</p>
+                <p className="ivy-note">아이비는 학원 자료를 자유롭게 조회하지만, 출결·수납·일지·메모 저장과 변경은 확인 카드에서 승인해야 반영됩니다.</p>
               </div>
             )}
 
@@ -408,6 +472,9 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
                 {m.role !== 'user' && <IvyAvatar size={28} />}
 
                 <div className={`ivy-bubble${m.role === 'user' ? ' user' : ' ivy'}`}>
+                  {/* 생각 과정 (접힘) */}
+                  {m.role === 'assistant' && m.steps && <ThinkingSteps steps={m.steps} />}
+
                   {/* 초안 배지 */}
                   {m.role === 'assistant' && isDraftMessage(m.content) && (
                     <div className="ivy-draft">✦ 초안</div>
@@ -416,31 +483,23 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
                   {/* 본문 */}
                   {m.role === 'assistant' ? (
                     <div className="ivy-rich">
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => <p className="ivy-p">{children}</p>,
-                          ul: ({ children }) => <ul className="ivy-ul">{children}</ul>,
-                          ol: ({ children }) => <ol className="ivy-ul">{children}</ol>,
-                          li: ({ children }) => <li>{children}</li>,
-                        }}
-                      >
-                        {m.content}
-                      </ReactMarkdown>
+                      <ReactMarkdown components={MARKDOWN_COMPONENTS}>{m.content}</ReactMarkdown>
                     </div>
                   ) : (
                     m.content
                   )}
 
-                  {/* 승인 카드 (pending/approved/rejected 통합) */}
-                  {m.role === 'assistant' && m.action && (
+                  {/* 승인 카드 (pending/approved/rejected 통합) — 한 답변에 여러 건 */}
+                  {m.role === 'assistant' && m.actions?.map((proposed, j) => (
                     <ConfirmationCard
-                      action={m.action}
-                      status={m.actionStatus ?? 'pending'}
-                      onApprove={() => void handleApproveAction(i, m.action!)}
-                      onReject={() => handleRejectAction(i)}
+                      key={j}
+                      action={proposed.action}
+                      status={proposed.status}
+                      onApprove={() => void handleApproveAction(i, j, proposed.action)}
+                      onReject={() => handleRejectAction(i, j)}
                       disabled={loading}
                     />
-                  )}
+                  ))}
 
                   {/* 복사 / 알림장으로 */}
                   {m.role === 'assistant' && (
@@ -470,15 +529,26 @@ export const Assistant: React.FC<AssistantProps> = ({ onSendToMessaging, counsel
               </div>
             ))}
 
-            {/* 타이핑 인디케이터 — 점 3개 바운스 */}
+            {/* 진행 중 — 생각 과정 + 흘러나오는 답변, 아직 아무것도 없으면 점 3개 바운스 */}
             {loading && (
               <div className="ivy-msg ivy">
                 <IvyAvatar size={28} state="thinking" />
-                <div className="ivy-bubble ivy ivy-typing">
-                  <span />
-                  <span />
-                  <span />
-                </div>
+                {liveSteps.length === 0 && !liveText ? (
+                  <div className="ivy-bubble ivy ivy-typing">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                ) : (
+                  <div className="ivy-bubble ivy">
+                    <ThinkingSteps steps={liveSteps} live={!liveText} />
+                    {liveText && (
+                      <div className="ivy-rich">
+                        <ReactMarkdown components={MARKDOWN_COMPONENTS}>{liveText}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

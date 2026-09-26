@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 // 백엔드는 이미 구축되어 있다(코덱스 작업):
 //   테이블  growing_exams / _questions / _submissions / _answers /
 //           _materials / _result_links  (owner_id RLS, class_id·student_id 실제 FK)
-//   엣지함수 exam-generate (JWT, AI 출제/수정 — Gemini)
+//   엣지함수 exam-generate (JWT, AI 출제/수정 — OpenAI gpt-6-luna)
 //           exam-public   (무로그인, 서비스롤 — 학생 응시/제출, 학부모 결과)
 //
 // 이 모듈은 그 백엔드에 대응하는 타입과 호출 래퍼를 제공한다.
