@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>내친구 깜냥이</title>
+<style>
+:root{
+  --ink:#202238;
+  --muted:#6b7088;
+  --panel:rgba(255,255,255,.88);
+  --line:rgba(32,34,56,.12);
+  --rose:#ff5c8a;
+  --sun:#ffb84d;
+  --mint:#53c78b;
+  --aqua:#45b8ff;
+  --violet:#8b6cff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;color:var(--ink);user-select:none;touch-action:none;background:#dcefff}
+button{font:inherit}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;background:#dcefff}
+.shell{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto;pointer-events:none}
+.top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;width:100%;max-width:100%;overflow:hidden;padding:12px max(12px,env(safe-area-inset-left)) 8px;z-index:5}
+.profile,.wallet,.panel{background:var(--panel);border:1px solid rgba(255,255,255,.75);box-shadow:0 12px 28px rgba(32,34,56,.14);backdrop-filter:blur(16px)}
+.profile{min-width:0;flex:1 1 auto;border-radius:20px;padding:12px 13px}
+.name-row{display:flex;align-items:center;gap:8px;min-width:0}
+.name{font-weight:900;font-size:20px;letter-spacing:0;color:#1f2033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:12px;font-weight:900;color:white;background:linear-gradient(135deg,var(--rose),var(--sun));border-radius:999px;padding:4px 8px;white-space:nowrap}
+.sub{margin-top:4px;font-size:13px;font-weight:800;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xp{height:10px;background:rgba(32,34,56,.1);border-radius:999px;overflow:hidden;margin-top:9px}
+.xp>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--violet),var(--aqua));border-radius:999px;transition:width .25s}
+.wallet{border-radius:18px;padding:10px 11px;display:grid;gap:5px;flex:0 0 92px;min-width:0;text-align:right}
+.coin{font-weight:950;font-size:18px;color:#1f2033}
+.day{font-size:12px;font-weight:850;color:var(--muted)}
+.bars{position:absolute;top:92px;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));display:grid;grid-template-columns:repeat(5,1fr);gap:7px;z-index:4;pointer-events:none}
+.bar{background:rgba(255,255,255,.68);border:1px solid rgba(255,255,255,.72);border-radius:14px;padding:7px 7px 6px;box-shadow:0 8px 22px rgba(32,34,56,.09);backdrop-filter:blur(12px)}
+.bar span{display:block;font-size:11px;font-weight:900;color:var(--muted);white-space:nowrap;text-align:center}
+.track{height:8px;background:rgba(32,34,56,.1);border-radius:999px;margin-top:5px;overflow:hidden}
+.fill{height:100%;width:50%;border-radius:999px;transition:width .25s}
+.talk{position:absolute;left:50%;top:158px;transform:translateX(-50%) translateY(8px) scale(.96);max-width:min(88vw,520px);background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.85);box-shadow:0 16px 38px rgba(32,34,56,.16);padding:13px 18px;border-radius:20px;font-weight:950;font-size:18px;text-align:center;line-height:1.42;opacity:0;transition:.2s;z-index:7;pointer-events:none}
+.talk.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+.talk:after{content:"";position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);border:10px solid transparent;border-top-color:rgba(255,255,255,.94);border-bottom:0}
+.quick{align-self:end;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:8px max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:linear-gradient(180deg,transparent,rgba(32,34,56,.16));z-index:6;pointer-events:auto}
+.qbtn{height:68px;border:0;border-radius:18px;background:rgba(255,255,255,.86);box-shadow:0 10px 22px rgba(32,34,56,.16);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-weight:950;color:#25263b;position:relative;cursor:pointer}
+.qbtn:active{transform:scale(.95)}
+.qbtn b{font-size:25px;line-height:1}
+.qbtn span{font-size:12px;white-space:nowrap}
+.qbtn.need:after{content:"";position:absolute;right:9px;top:8px;width:10px;height:10px;background:#ff3b59;border-radius:50%;box-shadow:0 0 0 5px rgba(255,59,89,.13)}
+.tabs{position:absolute;right:max(12px,env(safe-area-inset-right));top:158px;display:grid;gap:9px;z-index:8;pointer-events:auto}
+.tab{width:54px;height:54px;border:0;border-radius:18px;background:rgba(255,255,255,.86);box-shadow:0 10px 20px rgba(32,34,56,.13);font-size:24px;cursor:pointer}
+.tab:active{transform:scale(.94)}
+.home{position:absolute;left:max(12px,env(safe-area-inset-left));top:158px;width:54px;height:54px;border-radius:18px;background:rgba(255,255,255,.86);box-shadow:0 10px 20px rgba(32,34,56,.13);display:grid;place-items:center;text-decoration:none;font-size:23px;z-index:8;pointer-events:auto}
+.overlay{position:fixed;inset:0;background:rgba(24,27,48,.48);display:none;align-items:flex-end;justify-content:center;z-index:20;pointer-events:auto}
+.overlay.open{display:flex}
+.sheet{width:min(680px,100%);max-height:82vh;background:#fff;border-radius:26px 26px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -18px 50px rgba(16,18,34,.28);overflow:auto}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.sheet h2{margin:0;font-size:23px;letter-spacing:0;font-weight:950}
+.close{border:0;background:#f1f3f8;border-radius:14px;width:42px;height:42px;font-size:22px;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{border:1px solid var(--line);background:#fafbff;border-radius:18px;padding:13px}
+.item{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;cursor:pointer}
+.item:active{transform:scale(.98)}
+.emoji{width:52px;height:52px;border-radius:17px;background:#fff;display:grid;place-items:center;font-size:31px;box-shadow:inset 0 0 0 1px rgba(32,34,56,.08)}
+.it-name{font-size:16px;font-weight:950}
+.it-desc{font-size:12px;font-weight:800;color:var(--muted);margin-top:3px;line-height:1.35}
+.price{margin-top:6px;font-size:13px;font-weight:950;color:#d47a00}
+.owned{color:var(--mint)}
+.equipped{outline:3px solid rgba(255,92,138,.28);background:#fff6fa}
+.mission{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.mission+.mission{margin-top:10px}
+.mission .prog{height:9px;background:#edf0f6;border-radius:999px;overflow:hidden;margin-top:7px}
+.mission .prog i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--rose),var(--sun))}
+.reward{font-size:13px;font-weight:950;color:#d47a00;white-space:nowrap}
+.album{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.badge-card{text-align:center;border:1px solid var(--line);border-radius:16px;padding:12px 6px;background:#fafbff}
+.badge-card.locked{filter:grayscale(1);opacity:.48}
+.badge-card .big{font-size:34px}
+.badge-card .label{font-size:12px;font-weight:950;margin-top:4px}
+.mini{position:fixed;inset:0;background:linear-gradient(180deg,#17304e,#276d8e);z-index:30;display:none;overflow:hidden;color:#fff;pointer-events:auto}
+.mini.open{display:block}
+.mini-hud{position:absolute;left:14px;right:14px;top:14px;display:flex;align-items:center;justify-content:space-between;z-index:3}
+.mini-hud b{font-size:20px}
+.mini-close{border:0;border-radius:14px;background:rgba(255,255,255,.18);color:#fff;width:46px;height:46px;font-size:22px}
+.target{position:absolute;width:62px;height:62px;border:0;border-radius:50%;background:rgba(255,255,255,.2);box-shadow:0 10px 22px rgba(0,0,0,.22), inset 0 0 0 2px rgba(255,255,255,.28);font-size:34px;display:grid;place-items:center;transition:transform .08s}
+.target:active{transform:scale(.86)}
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(12px);background:#202238;color:#fff;border-radius:999px;padding:12px 18px;font-weight:950;opacity:0;z-index:40;transition:.2s;pointer-events:none;max-width:88vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.flash{position:fixed;inset:0;background:radial-gradient(circle at center,rgba(255,255,255,.8),transparent 60%);opacity:0;z-index:35;pointer-events:none}
+.flash.go{animation:flash .5s ease-out}
+@keyframes flash{0%{opacity:.8}100%{opacity:0}}
+@media (max-width:520px){
+  .bars{grid-template-columns:repeat(3,1fr);top:96px}
+  .bar:nth-child(4),.bar:nth-child(5){display:none}
+  .talk{top:150px;font-size:16px}
+  .tabs,.home{top:146px}
+  .quick{gap:6px}
+  .qbtn{height:62px;border-radius:16px}
+  .qbtn b{font-size:22px}
+  .qbtn span{font-size:11px}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="shell">
+  <div class="top">
+    <section class="profile">
+      <div class="name-row"><div class="name" id="catName">깜냥이</div><div class="tag" id="formTag">새싹냥</div></div>
+      <div class="sub" id="moodText">연아의 방에서 오늘도 자라는 중</div>
+      <div class="xp"><i id="xpFill"></i></div>
+    </section>
+    <section class="wallet">
+      <div class="coin" id="coins">0 코인</div>
+      <div class="day" id="day">1일차</div>
+    </section>
+  </div>
+  <div class="bars">
+    <div class="bar"><span>배고픔</span><div class="track"><i class="fill" id="hungerFill" style="background:linear-gradient(90deg,#ffb84d,#ff7a54)"></i></div></div>
+    <div class="bar"><span>기분</span><div class="track"><i class="fill" id="joyFill" style="background:linear-gradient(90deg,#ff7fb0,#ff4f86)"></i></div></div>
+    <div class="bar"><span>청결</span><div class="track"><i class="fill" id="cleanFill" style="background:linear-gradient(90deg,#4bd6ff,#3a9dff)"></i></div></div>
+    <div class="bar"><span>에너지</span><div class="track"><i class="fill" id="energyFill" style="background:linear-gradient(90deg,#8b6cff,#47b6ff)"></i></div></div>
+    <div class="bar"><span>건강</span><div class="track"><i class="fill" id="healthFill" style="background:linear-gradient(90deg,#64db8a,#35b970)"></i></div></div>
+  </div>
+  <a class="home" href="./play.html" aria-label="놀이방">⌂</a>
+  <div class="tabs">
+    <button class="tab" data-sheet="missions" aria-label="미션">🎯</button>
+    <button class="tab" data-sheet="shop" aria-label="상점">🛍️</button>
+    <button class="tab" data-sheet="album" aria-label="앨범">🏆</button>
+    <button class="tab" id="soundBtn" aria-label="소리">🔊</button>
+  </div>
+  <div class="talk" id="talk"></div>
+  <nav class="quick">
+    <button class="qbtn" data-action="meal"><b>🍱</b><span>밥</span></button>
+    <button class="qbtn" data-action="play"><b>🧶</b><span>놀기</span></button>
+    <button class="qbtn" data-action="clean"><b>🫧</b><span>씻기</span></button>
+    <button class="qbtn" data-action="nap"><b>🌙</b><span>잠</span></button>
+    <button class="qbtn" data-action="mini"><b>🎮</b><span>훈련</span></button>
+  </nav>
+</div>
+
+<div class="overlay" id="shop">
+  <div class="sheet">
+    <div class="sheet-head"><h2>깜냥이 상점</h2><button class="close" data-close>×</button></div>
+    <div class="grid" id="shopGrid"></div>
+  </div>
+</div>
+<div class="overlay" id="missions">
+  <div class="sheet">
+    <div class="sheet-head"><h2>오늘의 퀘스트</h2><button class="close" data-close>×</button></div>
+    <div id="missionList"></div>
+  </div>
+</div>
+<div class="overlay" id="album">
+  <div class="sheet">
+    <div class="sheet-head"><h2>성장 앨범</h2><button class="close" data-close>×</button></div>
+    <div class="album" id="albumGrid"></div>
+  </div>
+</div>
+<div class="mini" id="mini">
+  <div class="mini-hud"><b id="miniScore">훈련 0점</b><span id="miniTime">20초</span><button class="mini-close" id="miniClose">×</button></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="flash" id="flash"></div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+  let W = 0, H = 0, DPR = 1;
+  let audio = null;
+  const saveKey = 'kkamnyangi-premium-v1';
+  const clamp = (v, min = 0, max = 100) => Math.max(min, Math.min(max, v));
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  const stages = [
+    { id: 'seed', name: '새싹냥', level: 1, xp: 0, scale: .72 },
+    { id: 'teen', name: '탐험냥', level: 4, xp: 120, scale: .88 },
+    { id: 'pro', name: '스타냥', level: 8, xp: 360, scale: 1.04 },
+    { id: 'legend', name: '레전드냥', level: 14, xp: 820, scale: 1.17 },
+  ];
+  const forms = {
+    cozy: { name: '힐링 깜냥이', aura: '#72d6a7', rule: '돌봄 균형이 좋아요' },
+    clever: { name: '전략가 깜냥이', aura: '#8b6cff', rule: '훈련을 많이 했어요' },
+    pop: { name: '아이돌 깜냥이', aura: '#ff5c8a', rule: '기분 관리가 뛰어나요' },
+    moon: { name: '문라이트 깜냥이', aura: '#45b8ff', rule: '밤잠 루틴이 좋아요' },
+  };
+  const shopItems = [
+    { id: 'ribbon', icon: '🎀', name: '체리 리본', price: 45, slot: 'hat', desc: '기분 보너스 +2' },
+    { id: 'cap', icon: '🧢', name: '스트릿 캡', price: 70, slot: 'hat', desc: '훈련 보상 +1' },
+    { id: 'crown', icon: '👑', name: '미니 왕관', price: 160, slot: 'hat', desc: '레전드 분위기' },
+    { id: 'scarf', icon: '🧣', name: '포근 머플러', price: 80, slot: 'neck', desc: '건강 보너스 +2' },
+    { id: 'starbed', icon: '🛏️', name: '별빛 침대', price: 120, slot: 'room', desc: '잠 보상 증가' },
+    { id: 'city', icon: '🌃', name: '네온 창가', price: 140, slot: 'backdrop', desc: '밤 배경 해금' },
+    { id: 'garden', icon: '🌿', name: '실내 정원', price: 140, slot: 'backdrop', desc: '낮 배경 해금' },
+    { id: 'robot', icon: '🤖', name: '훈련 로봇', price: 180, slot: 'toy', desc: '미니게임 희귀 타겟' },
+  ];
+  const achievements = [
+    { id: 'firstCare', icon: '💗', name: '첫 돌봄' },
+    { id: 'level4', icon: '🌱', name: '탐험 시작' },
+    { id: 'level8', icon: '⭐', name: '스타 탄생' },
+    { id: 'level14', icon: '👑', name: '레전드' },
+    { id: 'rich', icon: '💰', name: '100코인' },
+    { id: 'collector', icon: '🛍️', name: '수집가' },
+    { id: 'trainer', icon: '🎮', name: '훈련왕' },
+    { id: 'perfectDay', icon: '🌈', name: '완벽한 하루' },
+    { id: 'hospitalMode', icon: '🫶', name: '천천히 해도 돼' },
+  ];
+  const missionPool = [
+    { id: 'meal', icon: '🍱', name: '밥 2번 챙기기', goal: 2, reward: 28 },
+    { id: 'play', icon: '🧶', name: '놀기 2번', goal: 2, reward: 28 },
+    { id: 'clean', icon: '🫧', name: '청결 90 이상 만들기', goal: 1, reward: 35 },
+    { id: 'nap', icon: '🌙', name: '낮잠 재우기', goal: 1, reward: 24 },
+    { id: 'mini', icon: '🎮', name: '훈련 10점 넘기기', goal: 1, reward: 45 },
+    { id: 'pet', icon: '💗', name: '깜냥이 쓰다듬기', goal: 8, reward: 32 },
+  ];
+
+  const defaults = {
+    createdAt: Date.now(),
+    lastSeen: Date.now(),
+    name: '깜냥이',
+    xp: 0,
+    coins: 60,
+    hunger: 78,
+    joy: 76,
+    clean: 84,
+    energy: 82,
+    health: 96,
+    careScore: 40,
+    trainingScore: 0,
+    form: '',
+    sound: true,
+    owned: [],
+    equipped: { hat: '', neck: '', room: '', backdrop: '', toy: '' },
+    missions: [],
+    missionDay: '',
+    missionLog: {},
+    achievements: ['hospitalMode'],
+    totals: { care: 0, mini: 0, pet: 0, perfect: 0 },
+  };
+  let state = loadState();
+  let cat = { x: 0, y: 0, targetX: 0, face: 1, blink: 1, blinkAt: 0, bob: 0, mood: 'idle', sleep: false };
+  let particles = [];
+  let speechTimer = 0;
+  let lastFrame = 0;
+  let mini = { running: false, score: 0, endAt: 0, spawnAt: 0 };
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(saveKey) || 'null');
+      if (!saved) return structuredClone(defaults);
+      const merged = { ...structuredClone(defaults), ...saved };
+      merged.equipped = { ...defaults.equipped, ...(saved.equipped || {}) };
+      merged.totals = { ...defaults.totals, ...(saved.totals || {}) };
+      merged.missionLog = saved.missionLog || {};
+      applyOfflineProgress(merged);
+      return merged;
+    } catch {
+      return structuredClone(defaults);
+    }
+  }
+  function saveState() {
+    state.lastSeen = Date.now();
+    localStorage.setItem(saveKey, JSON.stringify(state));
+  }
+  function dayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+  }
+  function ageDays() {
+    return Math.max(1, Math.floor((Date.now() - state.createdAt) / 86400000) + 1);
+  }
+  function applyOfflineProgress(s) {
+    const elapsedMin = Math.min(360, Math.max(0, (Date.now() - (s.lastSeen || Date.now())) / 60000));
+    if (elapsedMin < 4) return;
+    const gentle = elapsedMin / 60;
+    s.hunger = clamp(s.hunger - gentle * 4, 35, 100);
+    s.joy = clamp(s.joy - gentle * 3, 35, 100);
+    s.clean = clamp(s.clean - gentle * 3.5, 30, 100);
+    s.energy = clamp(s.energy + gentle * 10, 30, 100);
+    s.health = clamp(s.health - (s.hunger < 45 || s.clean < 45 ? gentle * 2 : 0), 45, 100);
+  }
+  function ensureMissions() {
+    if (state.missionDay === dayKey() && state.missions.length) return;
+    const shuffled = missionPool.slice().sort(() => Math.random() - .5);
+    state.missions = shuffled.slice(0, 3).map((m) => ({ ...m, progress: 0, done: false }));
+    state.missionDay = dayKey();
+    state.missionLog = {};
+    saveState();
+  }
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    cat.x = cat.x || W / 2;
+    cat.targetX = cat.targetX || W / 2;
+    cat.y = H * .62;
+  }
+  window.addEventListener('resize', resize);
+
+  function stage() {
+    let current = stages[0];
+    for (const s of stages) if (state.xp >= s.xp) current = s;
+    return current;
+  }
+  function nextStage() {
+    return stages.find((s) => s.xp > state.xp) || null;
+  }
+  function chooseForm() {
+    if (state.form || stage().id !== 'legend') return;
+    if (state.trainingScore >= 12) state.form = 'clever';
+    else if (state.energy > 88) state.form = 'moon';
+    else if (state.joy > 88) state.form = 'pop';
+    else state.form = 'cozy';
+    toast(`${forms[state.form].name}로 성장했어요`);
+    celebrate();
+  }
+  function addXp(v) {
+    const before = stage().id;
+    state.xp += v;
+    const after = stage().id;
+    if (before !== after) {
+      unlock(after === 'teen' ? 'level4' : after === 'pro' ? 'level8' : 'level14');
+      toast(`${stage().name} 단계로 성장!`);
+      celebrate();
+    }
+    chooseForm();
+  }
+  function addCoins(v) {
+    state.coins += v;
+    if (state.coins >= 100) unlock('rich');
+  }
+  function unlock(id) {
+    if (!state.achievements.includes(id)) state.achievements.push(id);
+  }
+  function track(id, amount = 1) {
+    state.missionLog[id] = (state.missionLog[id] || 0) + amount;
+    state.missions.forEach((m) => {
+      if (m.done || m.id !== id) return;
+      m.progress = clamp(m.progress + amount, 0, m.goal);
+      if (m.progress >= m.goal) {
+        m.done = true;
+        addCoins(m.reward);
+        addXp(18);
+        toast(`퀘스트 완료: ${m.name} +${m.reward}코인`);
+        celebrate(false);
+      }
+    });
+    if (state.missions.length && state.missions.every((m) => m.done)) unlock('perfectDay');
+  }
+  function care(action) {
+    wakeAudio();
+    cat.sleep = false;
+    const lines = {
+      meal: ['따뜻한 도시락 최고.', '든든해졌어. 다음엔 디저트도?', '깜냥이가 만족스럽게 꼬리를 흔들어요.'],
+      play: ['연아랑 놀면 컨디션이 올라가.', '방금 콤보 좋았다.', '깜냥이가 장난감을 물고 왔어요.'],
+      clean: ['반짝반짝. 오늘 비주얼 합격.', '깨끗해지니까 기분도 좋아졌어.', '거품 냄새가 포근해요.'],
+      nap: ['잠깐 충전하고 올게.', '별빛 침대에서 쉬는 중.', '에너지를 회복했어요.'],
+    };
+    if (action === 'meal') { state.hunger = clamp(state.hunger + 22); state.energy = clamp(state.energy + 4); setMood('eat'); burst(cat.x, cat.y - 90, '🍱', 12); }
+    if (action === 'play') { state.joy = clamp(state.joy + 20); state.energy = clamp(state.energy - 9); setMood('happy'); burst(cat.x, cat.y - 90, '💗', 14); }
+    if (action === 'clean') { state.clean = 100; state.health = clamp(state.health + 3); setMood('happy'); burst(cat.x, cat.y - 80, '🫧', 18); }
+    if (action === 'nap') { state.energy = clamp(state.energy + 26); state.health = clamp(state.health + 4); cat.sleep = true; setMood('sleep'); burst(cat.x, cat.y - 110, '✨', 10); }
+    state.careScore = clamp(state.careScore + 2);
+    state.totals.care += 1;
+    unlock('firstCare');
+    addXp(action === 'nap' ? 10 : 12);
+    addCoins(action === 'play' ? 7 : 5);
+    track(action);
+    say(pick(lines[action]));
+    playSound(action === 'nap' ? [520, 440, 390] : [780, 980]);
+    evaluatePerfect();
+    refresh();
+    saveState();
+  }
+  function pet(x, y) {
+    wakeAudio();
+    setMood('happy');
+    state.joy = clamp(state.joy + 1.2);
+    state.totals.pet += 1;
+    if (state.totals.pet % 4 === 0) { addXp(2); addCoins(1); }
+    burst(x, y, '💗', 3);
+    track('pet');
+    if (state.totals.pet % 10 === 0) say(pick(['쓰다듬 콤보 좋다.', '깜냥이가 골골송을 불러요.', '오늘 손길은 프로급.']));
+    refresh();
+    saveState();
+  }
+  function evaluatePerfect() {
+    if ([state.hunger, state.joy, state.clean, state.energy, state.health].every((v) => v >= 82)) {
+      state.totals.perfect += 1;
+      if (state.totals.perfect === 1) unlock('perfectDay');
+    }
+  }
+  function setMood(mood) {
+    cat.mood = mood;
+    clearTimeout(cat.moodTimer);
+    cat.moodTimer = setTimeout(() => { if (!cat.sleep) cat.mood = state.health < 55 ? 'sick' : 'idle'; }, 2200);
+  }
+  function decay() {
+    if (mini.running) return;
+    if (cat.sleep) {
+      state.energy = clamp(state.energy + 3);
+      state.health = clamp(state.health + 1);
+      if (state.energy > 96) cat.sleep = false;
+    } else {
+      state.hunger = clamp(state.hunger - 1.2, 25);
+      state.joy = clamp(state.joy - .9, 25);
+      state.clean = clamp(state.clean - 1, 20);
+      state.energy = clamp(state.energy - .65, 20);
+      if (state.hunger < 36 || state.clean < 32 || state.energy < 28) state.health = clamp(state.health - 1.5, 35);
+      else state.health = clamp(state.health + .6);
+    }
+    cat.mood = state.health < 55 ? 'sick' : cat.mood;
+    refresh();
+    saveState();
+  }
+
+  function draw(time) {
+    ctx.clearRect(0, 0, W, H);
+    drawRoom(time);
+    updateCat(time);
+    drawCat(time);
+    updateParticles();
+    requestAnimationFrame(draw);
+  }
+  function drawRoom(time) {
+    const night = state.equipped.backdrop === 'city' || cat.sleep;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    if (night) { g.addColorStop(0, '#172243'); g.addColorStop(.52, '#263f6d'); g.addColorStop(1, '#635b9b'); }
+    else if (state.equipped.backdrop === 'garden') { g.addColorStop(0, '#c7f0ff'); g.addColorStop(.55, '#f1fff2'); g.addColorStop(1, '#9ad99a'); }
+    else { g.addColorStop(0, '#cfeeff'); g.addColorStop(.55, '#fff2dc'); g.addColorStop(1, '#ffd9e8'); }
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.globalAlpha = night ? .58 : .78;
+    for (let i = 0; i < 28; i++) {
+      const x = (i * 97 + time * .012) % (W + 120) - 60;
+      const y = 70 + (i * 53) % Math.max(180, H * .42);
+      ctx.fillStyle = night ? '#fff6cf' : '#fff';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.2 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    drawWindow(night, time);
+    ctx.fillStyle = night ? 'rgba(31,34,70,.36)' : 'rgba(255,255,255,.34)';
+    roundRect(24, H * .72, W - 48, H * .22, 36);
+    ctx.fill();
+    if (state.equipped.room === 'starbed') drawFurniture('🛏️', W * .18, H * .67, 76);
+    else drawFurniture('🧺', W * .18, H * .69, 62);
+    if (state.equipped.toy === 'robot') drawFurniture('🤖', W * .82, H * .68, 58);
+    else drawFurniture('🧶', W * .82, H * .70, 50);
+  }
+  function drawWindow(night, time) {
+    const x = W * .67, y = H * .19, w = Math.min(180, W * .28), h = 112;
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    roundRect(x, y, w, h, 24); ctx.fill();
+    ctx.fillStyle = night ? '#24345e' : '#95d9ff';
+    roundRect(x + 10, y + 10, w - 20, h - 20, 17); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x + w / 2, y + 14); ctx.lineTo(x + w / 2, y + h - 14); ctx.moveTo(x + 14, y + h / 2); ctx.lineTo(x + w - 14, y + h / 2); ctx.stroke();
+    ctx.font = '30px serif'; ctx.textAlign = 'center';
+    ctx.fillText(night ? '🌙' : '☀️', x + w * .77, y + h * .35 + Math.sin(time * .001) * 2);
+  }
+  function drawFurniture(icon, x, y, size) {
+    ctx.save();
+    ctx.font = `${size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(icon, x, y);
+    ctx.restore();
+  }
+  function updateCat(time) {
+    if (Math.abs(cat.x - cat.targetX) < 4 && Math.random() < .006 && !cat.sleep) {
+      cat.targetX = 86 + Math.random() * (W - 172);
+      cat.face = cat.targetX > cat.x ? 1 : -1;
+    }
+    cat.x += (cat.targetX - cat.x) * .018;
+    cat.bob = Math.sin(time * .004) * (cat.sleep ? 1.2 : 4);
+    if (time > cat.blinkAt) { cat.blink = 0; cat.blinkAt = time + 2600 + Math.random() * 2200; setTimeout(() => cat.blink = 1, 130); }
+  }
+  function drawCat(time) {
+    const s = stage().scale;
+    const mood = cat.sleep ? 'sleep' : cat.mood;
+    const x = cat.x, y = cat.y + cat.bob;
+    const aura = state.form ? forms[state.form].aura : '#ffffff';
+    ctx.save();
+    ctx.translate(x, y);
+    if (state.form) {
+      const pulse = .24 + Math.sin(time * .004) * .08;
+      const rg = ctx.createRadialGradient(0, -20, 20, 0, -10, 150 * s);
+      rg.addColorStop(0, hexToRgba(aura, pulse));
+      rg.addColorStop(1, hexToRgba(aura, 0));
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -12, 150 * s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.scale(cat.face * s, s);
+    ctx.fillStyle = 'rgba(20,22,40,.16)';
+    ctx.beginPath(); ctx.ellipse(0, 116, 86, 17, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(58, 24);
+    ctx.rotate(.32 + Math.sin(time * .003) * .12);
+    ctx.fillStyle = '#242638';
+    ctx.lineWidth = 18; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 30); ctx.bezierCurveTo(76, 18, 82, -66, 22, -72); ctx.strokeStyle = '#242638'; ctx.stroke();
+    ctx.restore();
+    const body = ctx.createLinearGradient(-50, -70, 52, 102);
+    body.addColorStop(0, '#45485f'); body.addColorStop(1, '#171826');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(0, 52, 74, 86, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#252738';
+    ctx.beginPath(); ctx.ellipse(-32, 122, 25, 14, 0, 0, Math.PI * 2); ctx.ellipse(32, 122, 25, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(0, -34);
+    ctx.fillStyle = '#252738';
+    ctx.beginPath(); ctx.moveTo(-50, -28); ctx.lineTo(-74, -88); ctx.lineTo(-18, -58); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(50, -28); ctx.lineTo(74, -88); ctx.lineTo(18, -58); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#f3a4b9';
+    ctx.beginPath(); ctx.moveTo(-48, -40); ctx.lineTo(-62, -72); ctx.lineTo(-28, -56); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(48, -40); ctx.lineTo(62, -72); ctx.lineTo(28, -56); ctx.closePath(); ctx.fill();
+    const head = ctx.createRadialGradient(-18, -18, 8, 0, 0, 74);
+    head.addColorStop(0, '#4e5268'); head.addColorStop(1, '#1c1d2c');
+    ctx.fillStyle = head; ctx.beginPath(); ctx.arc(0, 0, 68, 0, Math.PI * 2); ctx.fill();
+    drawAccessory();
+    ctx.fillStyle = 'rgba(255,105,150,.28)';
+    ctx.beginPath(); ctx.arc(-42, 22, 16, 0, Math.PI * 2); ctx.arc(42, 22, 16, 0, Math.PI * 2); ctx.fill();
+    drawEyes(mood);
+    ctx.fillStyle = '#ff86a7';
+    ctx.beginPath(); ctx.moveTo(-7, 16); ctx.lineTo(7, 16); ctx.lineTo(0, 24); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#d6d0e6'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+    if (mood === 'sick') { ctx.beginPath(); ctx.moveTo(-12, 38); ctx.quadraticCurveTo(0, 28, 12, 38); ctx.stroke(); }
+    else if (mood === 'eat') { ctx.fillStyle = '#d83b68'; ctx.beginPath(); ctx.ellipse(0, 38, 15, 10, 0, 0, Math.PI * 2); ctx.fill(); }
+    else { ctx.beginPath(); ctx.moveTo(-16, 32); ctx.quadraticCurveTo(-6, 43, 0, 32); ctx.quadraticCurveTo(6, 43, 16, 32); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(220,220,235,.64)'; ctx.lineWidth = 2;
+    [[-22,18,-68,10],[-22,26,-70,30],[22,18,68,10],[22,26,70,30]].forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+    ctx.restore();
+    ctx.restore();
+  }
+  function drawEyes(mood) {
+    [[-24, -10], [24, -10]].forEach(([ex, ey]) => {
+      if (mood === 'sleep') {
+        ctx.strokeStyle = '#d6d0e6'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(ex - 15, ey); ctx.quadraticCurveTo(ex, ey + 12, ex + 15, ey); ctx.stroke(); return;
+      }
+      if (mood === 'happy') {
+        ctx.strokeStyle = '#d6d0e6'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(ex - 15, ey + 6); ctx.quadraticCurveTo(ex, ey - 12, ex + 15, ey + 6); ctx.stroke(); return;
+      }
+      const h = 20 * cat.blink;
+      ctx.fillStyle = '#f2f0ea'; ctx.beginPath(); ctx.ellipse(ex, ey, 15, Math.max(1, h), 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = mood === 'sick' ? '#9aa0b6' : '#72d074'; ctx.beginPath(); ctx.ellipse(ex, ey + 1, 10, Math.max(1, h * .76), 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#11131d'; ctx.beginPath(); ctx.ellipse(ex, ey + 1, 5, Math.max(1, h * .5), 0, 0, Math.PI * 2); ctx.fill();
+      if (cat.blink > .6) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex - 4, ey - 5, 3.5, 0, Math.PI * 2); ctx.fill(); }
+    });
+  }
+  function drawAccessory() {
+    const hat = shopItems.find((i) => i.id === state.equipped.hat);
+    const neck = shopItems.find((i) => i.id === state.equipped.neck);
+    if (hat) { ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.fillText(hat.icon, 0, -66); }
+    if (neck) { ctx.font = '36px serif'; ctx.textAlign = 'center'; ctx.fillText(neck.icon, 0, 62); }
+  }
+  function burst(x, y, icon, count) {
+    for (let i = 0; i < count; i++) particles.push({ x, y, icon, vx:(Math.random()-.5)*5, vy:-2-Math.random()*5, life:1, size:18+Math.random()*12, rot:Math.random()*6 });
+  }
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += .12; p.life -= .018; p.rot += .06;
+      if (p.life <= 0) { particles.splice(i,1); continue; }
+      ctx.save(); ctx.globalAlpha = p.life; ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.font = `${p.size}px serif`; ctx.textAlign = 'center'; ctx.fillText(p.icon,0,0); ctx.restore();
+    }
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  function hexToRgba(hex, alpha) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`;
+  }
+
+  function refresh() {
+    ensureMissions();
+    const st = stage();
+    const nxt = nextStage();
+    $('catName').textContent = state.name;
+    $('formTag').textContent = state.form ? forms[state.form].name : st.name;
+    $('moodText').textContent = moodLabel();
+    $('coins').textContent = `${Math.floor(state.coins)} 코인`;
+    $('day').textContent = `${ageDays()}일차`;
+    $('xpFill').style.width = nxt ? `${clamp(((state.xp - st.xp) / (nxt.xp - st.xp)) * 100)}%` : '100%';
+    $('hungerFill').style.width = `${state.hunger}%`;
+    $('joyFill').style.width = `${state.joy}%`;
+    $('cleanFill').style.width = `${state.clean}%`;
+    $('energyFill').style.width = `${state.energy}%`;
+    $('healthFill').style.width = `${state.health}%`;
+    document.querySelector('[data-action="meal"]').classList.toggle('need', state.hunger < 45);
+    document.querySelector('[data-action="play"]').classList.toggle('need', state.joy < 45);
+    document.querySelector('[data-action="clean"]').classList.toggle('need', state.clean < 45);
+    document.querySelector('[data-action="nap"]').classList.toggle('need', state.energy < 35);
+    $('soundBtn').textContent = state.sound ? '🔊' : '🔇';
+    renderOpenSheet();
+  }
+  function moodLabel() {
+    if (state.health < 55) return '컨디션이 낮아요. 밥, 휴식, 씻기가 필요해요.';
+    if (cat.sleep) return '별빛 아래에서 에너지 충전 중';
+    if (state.form) return `${forms[state.form].rule}.`;
+    const low = [['배고픔',state.hunger],['기분',state.joy],['청결',state.clean],['에너지',state.energy]].sort((a,b)=>a[1]-b[1])[0];
+    return low[1] < 50 ? `${low[0]} 관리가 필요해요.` : '오늘 컨디션 좋아요. 훈련하면 보상이 커져요.';
+  }
+  function renderOpenSheet() {
+    if ($('shop').classList.contains('open')) renderShop();
+    if ($('missions').classList.contains('open')) renderMissions();
+    if ($('album').classList.contains('open')) renderAlbum();
+  }
+  function renderShop() {
+    $('shopGrid').innerHTML = shopItems.map((it) => {
+      const owned = state.owned.includes(it.id);
+      const equipped = state.equipped[it.slot] === it.id;
+      return `<div class="card item ${equipped ? 'equipped' : ''}" data-buy="${it.id}">
+        <div class="emoji">${it.icon}</div>
+        <div><div class="it-name">${it.name}</div><div class="it-desc">${it.desc}</div>
+        <div class="price ${owned ? 'owned' : ''}">${equipped ? '착용 중' : owned ? '보유 중' : `${it.price} 코인`}</div></div>
+      </div>`;
+    }).join('');
+  }
+  function renderMissions() {
+    $('missionList').innerHTML = state.missions.map((m) => {
+      const p = clamp((m.progress / m.goal) * 100);
+      return `<div class="card mission">
+        <div class="emoji">${m.done ? '✅' : m.icon}</div>
+        <div><div class="it-name">${m.name}</div><div class="it-desc">${m.progress}/${m.goal}</div><div class="prog"><i style="width:${p}%"></i></div></div>
+        <div class="reward">+${m.reward}</div>
+      </div>`;
+    }).join('');
+  }
+  function renderAlbum() {
+    $('albumGrid').innerHTML = achievements.map((a) => {
+      const got = state.achievements.includes(a.id);
+      return `<div class="badge-card ${got ? '' : 'locked'}"><div class="big">${a.icon}</div><div class="label">${a.name}</div></div>`;
+    }).join('');
+  }
+
+  function startMini() {
+    wakeAudio();
+    mini.running = true; mini.score = 0; mini.endAt = Date.now() + 20000; mini.spawnAt = 0;
+    $('mini').classList.add('open');
+    $('miniScore').textContent = '훈련 0점';
+    miniLoop();
+  }
+  function miniLoop() {
+    if (!mini.running) return;
+    const left = Math.max(0, Math.ceil((mini.endAt - Date.now()) / 1000));
+    $('miniTime').textContent = `${left}초`;
+    if (Date.now() > mini.spawnAt) spawnTarget();
+    if (left <= 0) return endMini();
+    requestAnimationFrame(miniLoop);
+  }
+  function spawnTarget() {
+    mini.spawnAt = Date.now() + Math.max(430, 1050 - mini.score * 18);
+    const b = document.createElement('button');
+    b.className = 'target';
+    b.textContent = state.equipped.toy === 'robot' && Math.random() < .22 ? '🤖' : pick(['🐟','🦋','⭐','🍓','💎']);
+    b.style.left = `${30 + Math.random() * (W - 92)}px`;
+    b.style.top = `${90 + Math.random() * (H - 190)}px`;
+    b.onclick = () => {
+      const bonus = b.textContent === '🤖' ? 3 : b.textContent === '💎' ? 2 : 1;
+      mini.score += bonus;
+      $('miniScore').textContent = `훈련 ${mini.score}점`;
+      burst(parseFloat(b.style.left)+31, parseFloat(b.style.top)+31, '✨', 6);
+      playSound([780, 1040 + bonus * 80]);
+      b.remove();
+    };
+    $('mini').appendChild(b);
+    setTimeout(() => b.remove(), 900);
+  }
+  function endMini() {
+    mini.running = false;
+    document.querySelectorAll('.target').forEach((el) => el.remove());
+    $('mini').classList.remove('open');
+    const reward = 12 + mini.score * 3;
+    state.trainingScore += 1;
+    state.totals.mini += 1;
+    if (state.totals.mini >= 5) unlock('trainer');
+    state.joy = clamp(state.joy + 12);
+    state.energy = clamp(state.energy - 10);
+    addCoins(reward);
+    addXp(18 + Math.min(24, mini.score));
+    if (mini.score >= 10) track('mini');
+    say(`훈련 완료. ${mini.score}점, ${reward}코인 획득.`);
+    celebrate(false);
+    refresh();
+    saveState();
+  }
+
+  function say(text) {
+    $('talk').textContent = text;
+    $('talk').classList.add('show');
+    clearTimeout(speechTimer);
+    speechTimer = setTimeout(() => $('talk').classList.remove('show'), 2600);
+  }
+  function toast(text) {
+    $('toast').textContent = text;
+    $('toast').classList.add('show');
+    setTimeout(() => $('toast').classList.remove('show'), 2200);
+  }
+  function celebrate(big = true) {
+    $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+    burst(cat.x, cat.y - 120, big ? '🎉' : '✨', big ? 24 : 12);
+    playSound(big ? [520,650,780,1040] : [980,1240]);
+  }
+  function wakeAudio() {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  }
+  function playSound(notes) {
+    if (!state.sound || !audio) return;
+    notes.forEach((freq, i) => {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(audio.destination);
+      const t = audio.currentTime + i * .08;
+      gain.gain.setValueAtTime(.001, t);
+      gain.gain.exponentialRampToValueAtTime(.16, t + .025);
+      gain.gain.exponentialRampToValueAtTime(.001, t + .23);
+      osc.start(t); osc.stop(t + .25);
+    });
+  }
+
+  document.querySelectorAll('[data-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      if (action === 'mini') startMini();
+      else care(action);
+    });
+  });
+  document.querySelectorAll('[data-sheet]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.sheet;
+      $(id).classList.add('open');
+      if (id === 'shop') renderShop();
+      if (id === 'missions') renderMissions();
+      if (id === 'album') renderAlbum();
+    });
+  });
+  document.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => btn.closest('.overlay').classList.remove('open')));
+  $('shopGrid').addEventListener('click', (e) => {
+    const card = e.target.closest('[data-buy]');
+    if (!card) return;
+    const item = shopItems.find((it) => it.id === card.dataset.buy);
+    const owned = state.owned.includes(item.id);
+    if (!owned && state.coins < item.price) return toast('코인이 부족해요. 훈련으로 벌 수 있어요.');
+    if (!owned) { state.coins -= item.price; state.owned.push(item.id); unlock(state.owned.length >= 3 ? 'collector' : 'firstCare'); toast(`${item.name} 구매 완료`); }
+    state.equipped[item.slot] = state.equipped[item.slot] === item.id ? '' : item.id;
+    playSound([820, 1100]);
+    refresh(); saveState(); renderShop();
+  });
+  $('soundBtn').addEventListener('click', () => { state.sound = !state.sound; refresh(); saveState(); });
+  $('miniClose').addEventListener('click', endMini);
+  canvas.addEventListener('pointerdown', (e) => {
+    const dx = e.clientX - cat.x, dy = e.clientY - (cat.y - 25);
+    if (Math.hypot(dx, dy) < 130) pet(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.buttons !== 1) return;
+    const dx = e.clientX - cat.x, dy = e.clientY - (cat.y - 25);
+    if (Math.hypot(dx, dy) < 120) pet(e.clientX, e.clientY);
+  });
+
+  resize();
+  ensureMissions();
+  refresh();
+  say('연아의 깜냥이 방에 오신 걸 환영합니다.');
+  setInterval(decay, 16000);
+  setInterval(() => { if (!cat.sleep && Math.random() < .45) say(pick(['오늘 퀘스트 하면 상점 코인이 모여요.', '연아가 오면 깜냥이가 바로 알아봐요.', '훈련 10점 넘기면 보상이 커져요.', '깜냥이는 천천히 키워도 괜찮아요.'])); }, 24000);
+  requestAnimationFrame((t) => { lastFrame = t; draw(t); });
+})();
+</script>
+</body>
+</html>
