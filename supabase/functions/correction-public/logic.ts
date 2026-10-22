@@ -151,6 +151,9 @@ export function buildGradePrompt(mode: CorrectionMode, sentences: string[], answ
   const correctedRule = mode === 'translate'
     ? '"corrected": a natural, accurate Korean translation that keeps the student\'s wording where it is already right.'
     : '"corrected": a grammatical, natural English sentence that keeps the student\'s wording where it is already right.';
+  const modeRule = mode === 'translate'
+    ? '- Korean often omits subjects. Read the student\'s Korean the way a Korean reader naturally would; only mark meaning that is actually lost or changed. A literal but correct rendering is not an error.'
+    : '- Accept any grammatical English that conveys the source meaning, even if it uses a different structure than you would (e.g. so ... that instead of too ... to).';
   const lines = sentences.map((sentence, index) => [
     `[${index + 1}]`,
     `source: ${sentence}`,
@@ -167,11 +170,18 @@ Return ONLY valid JSON:
 Rules:
 - Return exactly ${sentences.length} items, in the same order as the sentences.
 - ${correctedRule}
-- "explanation": one or two short Korean sentences telling the student what was wrong and why (grammar, word choice, missing meaning). If the answer is already correct, give a short Korean compliment.
-- "completeness" (0-100): how much of the source meaning the student's answer covers. Blank = 0.
-- "accuracy" (0-100): how correct the written part is (grammar, vocabulary, meaning). Blank = 0.
-- Random letters or unrelated text get 0 for both.
-- Be fair but conservative.
+- If the student's answer is already correct and conveys the source meaning, copy it unchanged into "corrected". A more natural alternative may be mentioned in "explanation" as optional (e.g. "~라고 해도 좋아요"), but it is not an error.
+- If "explanation" points out any error or missing meaning, "corrected" must fix it. Keep it consistent: "corrected" unchanged means accuracy 100, and accuracy below 100 means "corrected" shows the fix.
+${modeRule}
+- "explanation": one or two short Korean sentences. Name the exact error, state the rule in simple words, and show how it applies to this sentence (e.g. why a word is required, not just that it sounds better). If the answer is already correct, give a short Korean compliment. If blank, give a one-line hint on how to start.
+- Score the student's original answer, not your corrected version.
+- "completeness" (0-100): how much of the source meaning the student's answer conveys, ignoring grammar. Parts whose meaning is reversed or wrong count as not conveyed.
+- "accuracy" (0-100): how correct the answer is in meaning and grammar. Use these bands consistently across all items:
+  - 100: correct. Stylistic preferences never lower the score.
+  - 80-95: small slips that leave the meaning clear (missing article, missing -s, missing be verb, spelling).
+  - 55-79: a real grammar or structure error (wrong tense or mood, wrong preposition, misread construction) while the main meaning still comes through.
+  - 20-50: the main meaning is reversed or wrong (opposite action, flipped negation, misread key construction).
+- Blank, random letters, or unrelated text get 0 for both.
 
 ${lines.join('\n\n')}
 `.trim();
