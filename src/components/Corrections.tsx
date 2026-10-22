@@ -27,6 +27,7 @@ import {
   MAX_SENTENCES,
   MODE_LABELS,
   averageScores,
+  buildCorrectionPrintHtml,
   correctionBoardUrl,
   correctionsApi,
   formatCorrectionForCopy,
@@ -84,14 +85,20 @@ const copyText = async (text: string) => {
 const qrImageUrl = (value: string) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=16&data=${encodeURIComponent(value)}`;
 
-// 교실에 붙일 A4 안내지를 새 창에 그리고, QR 이미지가 다 불러와지면 인쇄 창을 연다.
-function printBoardQr(boardUrl: string) {
+// 인쇄용 문서를 새 창에 쓴다. 문서 안의 스크립트가 다 그려진 뒤 인쇄 창을 연다.
+function printDocument(html: string) {
   const win = window.open('', '_blank');
   if (!win) {
     window.alert('팝업이 막혀 있어요. 브라우저에서 팝업을 허용해 주세요.');
     return;
   }
-  win.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>해석·영작 게시판 QR</title>
+  win.document.write(html);
+  win.document.close();
+}
+
+// 교실에 붙일 A4 안내지. QR 이미지가 다 불러와지면 인쇄 창을 연다.
+function printBoardQr(boardUrl: string) {
+  printDocument(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>해석·영작 게시판 QR</title>
 <style>
   body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; color: #0f3023; text-align: center; }
   .page { padding: 18mm 12mm; }
@@ -108,7 +115,6 @@ function printBoardQr(boardUrl: string) {
   <p class="sub">과제 제목 선택 → 이름 + 비번 4자리 → 답 적고 제출</p>
   <p class="sub">첨삭은 선생님이 확인한 뒤 ‘내 제출 보기’에서 볼 수 있어요</p>
 </div></body></html>`);
-  win.document.close();
 }
 
 const MODE_GUIDE: Record<CorrectionMode, { paste: string; placeholder: string; student: string; answerPlaceholder: string }> = {
@@ -517,9 +523,19 @@ function SetDetail({
         <section className="lm-card">
           <div className="cr-list-toolbar">
             <h3>제출 {submissions.length}건</h3>
-            <button className="btn btn-secondary" type="button" onClick={() => { setLoading(true); setReloadKey(key => key + 1); }} disabled={loading}>
-              <RefreshCw size={15} /> 새로고침
-            </button>
+            <div className="cr-list-tools">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => printDocument(buildCorrectionPrintHtml(set, [...submissions].sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko'))))}
+                disabled={loading || submissions.length === 0}
+              >
+                <Printer size={15} /> 전체 인쇄
+              </button>
+              <button className="btn btn-secondary" type="button" onClick={() => { setLoading(true); setReloadKey(key => key + 1); }} disabled={loading}>
+                <RefreshCw size={15} /> 새로고침
+              </button>
+            </div>
           </div>
           {loading ? (
             <div className="lm-empty" role="status"><b>불러오는 중...</b></div>
@@ -691,6 +707,7 @@ function SubmissionReview({
           <button className="btn btn-accent" type="button" onClick={() => void save(true)} disabled={busy}><Eye size={16} /> 저장하고 학생에게 공개</button>
         )}
         <button className="btn btn-secondary" type="button" onClick={() => void copyResult()}><Copy size={16} /> 첨삭 복사</button>
+        <button className="btn btn-secondary" type="button" onClick={() => printDocument(buildCorrectionPrintHtml(set, [{ ...submission, items }]))}><Printer size={16} /> 인쇄</button>
         <button className="btn btn-secondary" type="button" onClick={() => void regrade()} disabled={busy}><RefreshCw size={16} /> AI 다시 첨삭</button>
         <button className="btn btn-danger lm-delete" type="button" onClick={() => void remove()} disabled={busy}><Trash2 size={16} /> 제출 삭제</button>
       </div>

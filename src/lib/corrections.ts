@@ -148,6 +148,62 @@ export function formatCorrectionForCopy(
   return [...header, '', blocks.join('\n\n')].join('\n');
 }
 
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
+
+const printDate = (value?: string) => {
+  const date = new Date(value ?? '');
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric' }).format(date);
+};
+
+// 첨삭 결과 인쇄용 A4 문서. 학생 한 명이 한 블록이고, 블록이 이어져 한 장에 여러 명이 들어간다.
+export function buildCorrectionPrintHtml(
+  set: { title: string; mode: CorrectionMode; sentences: string[] },
+  submissions: { studentName: string; items: CorrectionItem[]; submittedAt?: string; published?: boolean }[],
+): string {
+  const label = MODE_LABELS[set.mode];
+  const blocks = submissions.map(submission => {
+    const scores = averageScores(submission.items);
+    const rows = set.sentences.map((sentence, index) => {
+      const item = submission.items[index];
+      const answer = item?.answer ?? '';
+      const corrected = item?.corrected ?? '';
+      const same = corrected !== '' && corrected.trim() === answer.trim();
+      const fix = same ? '<span class="ok">✓ 정답</span>' : corrected ? `<b>${escapeHtml(corrected)}</b>` : '';
+      const note = item?.explanation ? `<div class="note">${escapeHtml(item.explanation)}</div>` : '';
+      return `<tr><td class="n">${index + 1}</td><td>${escapeHtml(sentence)}</td>`
+        + `<td>${answer ? escapeHtml(answer) : '<span class="blank">(빈칸)</span>'}</td>`
+        + `<td>${fix}${note}</td><td class="s">${item?.completeness ?? 0}<br>${item?.accuracy ?? 0}</td></tr>`;
+    }).join('');
+    const meta = [printDate(submission.submittedAt), submission.published === false ? '검토 전' : ''].filter(Boolean).join(' · ');
+    return `<section><header><b>${escapeHtml(submission.studentName)}</b><span>${escapeHtml(set.title)} (${label})${meta ? ` · ${escapeHtml(meta)}` : ''}</span>`
+      + `<span class="score">완성도 ${scores.completeness}% · 정확도 ${scores.accuracy}%</span></header>`
+      + `<table><colgroup><col style="width:4%"><col style="width:27%"><col style="width:27%"><col style="width:36%"><col style="width:6%"></colgroup>`
+      + `<thead><tr><th>#</th><th>원문</th><th>학생 답</th><th>첨삭 · 설명</th><th>완성<br>정확</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }).join('');
+
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(`${label} 첨삭 - ${set.title}`)}</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 8.5pt; line-height: 1.35; color: #111827; }
+  section { margin: 0 0 5mm; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 3mm; padding: 0 0 1mm; border-bottom: 1.5px solid #0f3023; break-after: avoid; }
+  header b { font-size: 11pt; color: #0f3023; }
+  header span { color: #4b5563; }
+  header .score { margin-left: auto; color: #0f3023; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { padding: 0.8mm 1.2mm; background: #eef5f1; color: #374151; font-size: 7.5pt; font-weight: 700; text-align: left; }
+  td { padding: 1mm 1.2mm; border-bottom: 0.5px solid #d1d5db; vertical-align: top; word-break: keep-all; overflow-wrap: anywhere; }
+  tr { break-inside: avoid; }
+  .n, .s { color: #6b7280; text-align: center; }
+  .s { font-size: 7.5pt; }
+  .note { margin-top: 0.5mm; color: #4b5563; font-size: 7.5pt; }
+  .ok { color: #15803d; font-weight: 700; }
+  .blank { color: #9ca3af; }
+</style></head><body>${blocks}<script>window.onload = function () { window.print(); };</script></body></html>`;
+}
+
 export function correctionBoardUrl(ownerId: string): string {
   return `${window.location.origin}${window.location.pathname}#/board/${ownerId}`;
 }

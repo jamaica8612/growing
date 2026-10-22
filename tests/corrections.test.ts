@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/supabase', () => ({ supabase: {} }));
 
-import { averageScores, formatCorrectionForCopy, hashPin as appHashPin, splitSentences } from '../src/lib/corrections';
+import { averageScores, buildCorrectionPrintHtml, formatCorrectionForCopy, hashPin as appHashPin, splitSentences } from '../src/lib/corrections';
 import {
   SESSION_TTL_SECONDS,
   buildGradePrompt,
@@ -58,6 +58,32 @@ describe('scores and copy text', () => {
     expect(text).toContain('[해석 첨삭] 3과 - 민지');
     expect(text).toContain('완성도 50% · 정확도 50%');
     expect(text).toContain('2. You are kind.\n- 내 답: (빈칸)\n- 첨삭: 너는 친절하다.\n- 설명: 빈칸이에요.');
+  });
+
+  it('builds one escaped print block per submission', () => {
+    const html = buildCorrectionPrintHtml(
+      { title: '3과 <본문>', mode: 'compose', sentences: ['나는 학생이다.', '그는 친절하다.'] },
+      [
+        {
+          studentName: '민지',
+          published: false,
+          items: [
+            { answer: 'I am a student.', corrected: 'I am a student.', explanation: '잘했어요.', completeness: 100, accuracy: 100 },
+            { answer: 'He <b>kind</b>.', corrected: 'He is kind.', explanation: 'be동사가 필요해요.', completeness: 100, accuracy: 85 },
+          ],
+        },
+        { studentName: '지훈', items: [] },
+      ],
+    );
+    expect(html.match(/<section>/g)).toHaveLength(2);
+    expect(html).toContain('3과 &lt;본문&gt; (영작)');
+    expect(html).toContain('He &lt;b&gt;kind&lt;/b&gt;.');
+    expect(html).not.toContain('<b>kind</b>');
+    expect(html).toContain('✓ 정답');
+    expect(html).toContain('<b>He is kind.</b>');
+    expect(html).toContain('검토 전');
+    expect(html).toContain('완성도 100% · 정확도 93%');
+    expect(html).toContain('(빈칸)');
   });
 });
 
