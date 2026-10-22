@@ -63,6 +63,17 @@ const addDays = (date: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+// date 컬럼은 like로 거를 수 없어서 [해당 월 1일, 다음 달 1일) 범위로 조회한다.
+function monthBounds(month: string): { start: string; end: string } {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) throw new Error('조회 월은 YYYY-MM 형식이어야 합니다.');
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
+  if (monthNumber < 1 || monthNumber > 12) throw new Error('조회 월이 올바르지 않습니다.');
+  const end = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
+  return { start: `${month}-01`, end };
+}
+
 function jsonResponse(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj), {
     status,
@@ -509,10 +520,11 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
       const month = (args.month as string) || kstMonth();
       const studentName = (args.studentName as string) ?? '';
       const className = (args.className as string) ?? '';
+      const { start: monthStart, end: monthEnd } = monthBounds(month);
       const [students, classesRes, attRes] = await Promise.all([
         fetchStudents(sb),
         sb.from('growing_classes').select('*'),
-        sb.from('growing_attendance').select('*').like('date', `${month}%`),
+        sb.from('growing_attendance').select('*').gte('date', monthStart).lt('date', monthEnd),
       ]);
       if (classesRes.error) throw classesRes.error;
       if (attRes.error) throw attRes.error;
@@ -692,9 +704,13 @@ async function execTool(sb: SupabaseClient, name: string, args: Json): Promise<J
 
       if (kind === 'attendance_followup') {
         if (!student) return { found: false, message: '출결 후속 안내문은 학생 이름이 필요합니다.' };
+        const { start: monthStart, end: monthEnd } = monthBounds(month);
         const { data, error } = await sb
           .from('growing_attendance').select('*')
-          .eq('student_id', student.id).like('date', `${month}%`).order('date', { ascending: false });
+          .eq('student_id', student.id)
+          .gte('date', monthStart)
+          .lt('date', monthEnd)
+          .order('date', { ascending: false });
         if (error) throw error;
         const absences = (data ?? []).filter((r: Json) => r.status === 'absent');
         return {
