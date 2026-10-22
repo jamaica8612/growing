@@ -60,7 +60,7 @@ describe('scores and copy text', () => {
     expect(text).toContain('2. You are kind.\n- 내 답: (빈칸)\n- 첨삭: 너는 친절하다.\n- 설명: 빈칸이에요.');
   });
 
-  it('builds one escaped print block per submission', () => {
+  it('builds one escaped print page per submission', () => {
     const html = buildCorrectionPrintHtml(
       { title: '3과 <본문>', mode: 'compose', sentences: ['나는 학생이다.', '그는 친절하다.'] },
       [
@@ -76,6 +76,7 @@ describe('scores and copy text', () => {
       ],
     );
     expect(html.match(/<section>/g)).toHaveLength(2);
+    expect(html).toContain('section + section { break-before: page; }');
     expect(html).toContain('3과 &lt;본문&gt; (영작)');
     expect(html).toContain('He &lt;b&gt;kind&lt;/b&gt;.');
     expect(html).not.toContain('<b>kind</b>');

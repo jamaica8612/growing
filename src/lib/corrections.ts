@@ -156,7 +156,7 @@ const printDate = (value?: string) => {
   return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric' }).format(date);
 };
 
-// 첨삭 결과 인쇄용 A4 문서. 학생 한 명이 한 블록이고, 블록이 이어져 한 장에 여러 명이 들어간다.
+// 첨삭 결과 인쇄용 A4 문서. 학생 한 명이 한 페이지에서 시작한다 (문장이 많으면 다음 장으로 이어짐).
 export function buildCorrectionPrintHtml(
   set: { title: string; mode: CorrectionMode; sentences: string[] },
   submissions: { studentName: string; items: CorrectionItem[]; submittedAt?: string; published?: boolean }[],
@@ -187,7 +187,7 @@ export function buildCorrectionPrintHtml(
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 8.5pt; line-height: 1.35; color: #111827; }
-  section { margin: 0 0 5mm; }
+  section + section { break-before: page; }
   header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 3mm; padding: 0 0 1mm; border-bottom: 1.5px solid #0f3023; break-after: avoid; }
   header b { font-size: 11pt; color: #0f3023; }
   header span { color: #4b5563; }
