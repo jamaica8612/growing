@@ -153,55 +153,109 @@ const escapeHtml = (value: string) =>
 
 const printDate = (value?: string) => {
   const date = new Date(value ?? '');
-  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric' }).format(date);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(date);
 };
 
-// 첨삭 결과 인쇄용 A4 문서. 학생 한 명이 한 페이지에서 시작한다 (문장이 많으면 다음 장으로 이어짐).
+const scoreLevel = (value: number) => (value >= 90 ? 'high' : value >= 60 ? 'mid' : 'low');
+
+const PRINT_LABELS: Record<CorrectionMode, { source: string; answer: string }> = {
+  translate: { source: '원문', answer: '내 해석' },
+  compose: { source: '우리말', answer: '내 영작' },
+};
+
+// 첨삭 결과지 (A4). 학생 한 명이 한 페이지에서 시작한다 (문장이 많으면 다음 장으로 이어짐).
+// 인쇄는 printDocument가 창을 다 그린 뒤 부른다 — 앱 CSP가 인라인 스크립트를 막기 때문.
 export function buildCorrectionPrintHtml(
   set: { title: string; mode: CorrectionMode; sentences: string[] },
   submissions: { studentName: string; items: CorrectionItem[]; submittedAt?: string; published?: boolean }[],
 ): string {
   const label = MODE_LABELS[set.mode];
-  const blocks = submissions.map(submission => {
+  const labels = PRINT_LABELS[set.mode];
+  const sheets = submissions.map(submission => {
     const scores = averageScores(submission.items);
+    let correctCount = 0;
     const rows = set.sentences.map((sentence, index) => {
       const item = submission.items[index];
       const answer = item?.answer ?? '';
       const corrected = item?.corrected ?? '';
-      const same = corrected !== '' && corrected.trim() === answer.trim();
-      const fix = same ? '<span class="ok">✓ 정답</span>' : corrected ? `<b>${escapeHtml(corrected)}</b>` : '';
-      const note = item?.explanation ? `<div class="note">${escapeHtml(item.explanation)}</div>` : '';
-      return `<tr><td class="n">${index + 1}</td><td>${escapeHtml(sentence)}</td>`
-        + `<td>${answer ? escapeHtml(answer) : '<span class="blank">(빈칸)</span>'}</td>`
-        + `<td>${fix}${note}</td><td class="s">${item?.completeness ?? 0}<br>${item?.accuracy ?? 0}</td></tr>`;
+      const accuracy = answer ? item?.accuracy ?? 0 : 0;
+      const ok = answer !== '' && corrected.trim() === answer.trim();
+      if (ok) correctCount += 1;
+      const fix = ok
+        ? '<span class="chip">✓ 정답</span>'
+        : corrected ? `<div class="fix">${escapeHtml(corrected)}</div>` : '';
+      const why = item?.explanation ? `<p class="why">${escapeHtml(item.explanation)}</p>` : '';
+      return `<li class="item${ok ? ' ok' : ''}">`
+        + `<span class="no">${index + 1}</span>`
+        + '<div class="body"><div class="pair">'
+        + `<p class="src">${escapeHtml(sentence)}</p>`
+        + `<p class="ans">${answer ? escapeHtml(answer) : '<span class="blank">(빈칸)</span>'}</p>`
+        + `</div>${ok ? `<div class="okline">${fix}${why}</div>` : `${fix}${why}`}</div>`
+        + `<div class="pts"><b class="${scoreLevel(accuracy)}">${accuracy}</b><small>완성 ${answer ? item?.completeness ?? 0 : 0}</small></div>`
+        + '</li>';
     }).join('');
-    const meta = [printDate(submission.submittedAt), submission.published === false ? '검토 전' : ''].filter(Boolean).join(' · ');
-    return `<section><header><b>${escapeHtml(submission.studentName)}</b><span>${escapeHtml(set.title)} (${label})${meta ? ` · ${escapeHtml(meta)}` : ''}</span>`
-      + `<span class="score">완성도 ${scores.completeness}% · 정확도 ${scores.accuracy}%</span></header>`
-      + `<table><colgroup><col style="width:4%"><col style="width:27%"><col style="width:27%"><col style="width:36%"><col style="width:6%"></colgroup>`
-      + `<thead><tr><th>#</th><th>원문</th><th>학생 답</th><th>첨삭 · 설명</th><th>완성<br>정확</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+    const date = printDate(submission.submittedAt);
+    const sub = [escapeHtml(set.title), date ? `${date} 제출` : ''].filter(Boolean).join(' · ');
+    const stat = (name: string, value: number) =>
+      `<div class="stat"><span>${name}</span><b>${value}<small>%</small></b><i class="bar"><i class="${scoreLevel(value)}" style="width:${value}%"></i></i></div>`;
+    return '<section class="sheet">'
+      + `<header class="top"><span class="brand">GROWING ENGLISH</span><span class="kind">${label} 첨삭 결과지</span></header>`
+      + '<div class="hero"><div class="who">'
+      + `<h1>${escapeHtml(submission.studentName)}${submission.published === false ? '<span class="draft">검토 전</span>' : ''}</h1>`
+      + `<p>${sub}</p></div><div class="stats">`
+      + stat('완성도', scores.completeness) + stat('정확도', scores.accuracy)
+      + `<div class="stat"><span>정답</span><b>${correctCount}<small>/${set.sentences.length}</small></b></div>`
+      + `</div></div>`
+      + `<div class="cols"><span></span><div class="pair"><span>${labels.source}</span><span>${labels.answer}</span></div><span>정확도</span></div>`
+      + `<ol class="items">${rows}</ol>`
+      + '<footer>오른쪽 큰 숫자는 정확도, 작은 숫자는 완성도 · 그로잉영어</footer>'
+      + '</section>';
   }).join('');
 
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(`${label} 첨삭 - ${set.title}`)}</title>
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(`${label} 첨삭 결과지 - ${set.title}`)}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@500;700;800&display=swap">
 <style>
-  @page { size: A4; margin: 10mm; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 8.5pt; line-height: 1.35; color: #111827; }
-  section + section { break-before: page; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 3mm; padding: 0 0 1mm; border-bottom: 1.5px solid #0f3023; break-after: avoid; }
-  header b { font-size: 11pt; color: #0f3023; }
-  header span { color: #4b5563; }
-  header .score { margin-left: auto; color: #0f3023; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  th { padding: 0.8mm 1.2mm; background: #eef5f1; color: #374151; font-size: 7.5pt; font-weight: 700; text-align: left; }
-  td { padding: 1mm 1.2mm; border-bottom: 0.5px solid #d1d5db; vertical-align: top; word-break: keep-all; overflow-wrap: anywhere; }
-  tr { break-inside: avoid; }
-  .n, .s { color: #6b7280; text-align: center; }
-  .s { font-size: 7.5pt; }
-  .note { margin-top: 0.5mm; color: #4b5563; font-size: 7.5pt; }
-  .ok { color: #15803d; font-weight: 700; }
+  @page { size: A4; margin: 10mm 11mm 9mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 9.6pt; line-height: 1.42; color: #1f2937; word-break: keep-all; overflow-wrap: anywhere; }
+  p { margin: 0; }
+  .sheet + .sheet { break-before: page; }
+  .top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 2.5mm; border-bottom: 0.4mm solid #0f3023; }
+  .brand { font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: 0.18em; font-size: 8pt; color: #2c6f52; }
+  .kind { font-size: 8pt; font-weight: 700; color: #0f3023; }
+  .hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; margin: 4mm 0 3.5mm; }
+  .who h1 { display: flex; align-items: center; gap: 2.5mm; margin: 0; font-size: 20pt; font-weight: 900; color: #0f3023; letter-spacing: -0.02em; }
+  .who p { margin-top: 1mm; color: #4b5563; font-size: 9.6pt; }
+  .draft { padding: 0.6mm 2mm; border-radius: 99px; background: #fef3c7; color: #92400e; font-size: 8pt; font-weight: 700; letter-spacing: 0; }
+  .stats { display: flex; gap: 2.5mm; }
+  .stat { min-width: 25mm; padding: 2.2mm 3mm; border-radius: 2.5mm; background: #f2f8f5; }
+  .stat span { display: block; color: #4b5563; font-size: 7.5pt; font-weight: 700; }
+  .stat b { font-family: 'Outfit', sans-serif; font-size: 18pt; font-weight: 800; color: #0f3023; line-height: 1.15; }
+  .stat b small { font-size: 9pt; color: #6b7280; font-weight: 600; margin-left: 0.4mm; }
+  .bar { display: block; height: 1.2mm; margin-top: 1mm; border-radius: 99px; background: #dbe7e0; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 99px; }
+  .bar .high { background: #10b981; } .bar .mid { background: #f59e0b; } .bar .low { background: #ef4444; }
+  .cols { display: grid; grid-template-columns: 7mm 1fr 13mm; gap: 3mm; padding: 1mm 0; border-bottom: 0.25mm solid #d1d5db; color: #6b7280; font-size: 7.6pt; font-weight: 700; }
+  .cols > span:last-child { text-align: right; }
+  .items { margin: 0; padding: 0; list-style: none; }
+  .item { display: grid; grid-template-columns: 7mm 1fr 13mm; gap: 3mm; padding: 1.9mm 0; border-bottom: 0.25mm solid #e5e7eb; break-inside: avoid; }
+  .no { display: grid; place-items: center; width: 6.4mm; height: 6.4mm; border-radius: 99px; background: #0f3023; color: #fff; font-family: 'Outfit', sans-serif; font-size: 8.6pt; font-weight: 700; }
+  .item.ok .no { background: #10b981; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .src { color: #4b5563; }
+  .ans { color: #111827; font-weight: 500; }
   .blank { color: #9ca3af; }
-</style></head><body>${blocks}<script>window.onload = function () { window.print(); };</script></body></html>`;
+  .fix { margin-top: 1.1mm; padding: 0.8mm 2.4mm; border-left: 0.8mm solid #10b981; border-radius: 0 1.5mm 1.5mm 0; background: #ecfdf5; color: #065f46; font-weight: 700; }
+  .why { margin-top: 0.8mm; color: #374151; font-size: 8.8pt; }
+  .okline { display: flex; align-items: baseline; gap: 2mm; margin-top: 0.9mm; }
+  .okline .why { margin: 0; }
+  .chip { flex: none; padding: 0.3mm 2mm; border-radius: 99px; background: #d1fae5; color: #047857; font-size: 8.2pt; font-weight: 700; }
+  .pts { text-align: right; }
+  .pts b { display: block; font-family: 'Outfit', sans-serif; font-size: 14pt; font-weight: 800; line-height: 1.1; }
+  .pts .high { color: #059669; } .pts .mid { color: #d97706; } .pts .low { color: #dc2626; }
+  .pts small { color: #6b7280; font-size: 7.2pt; }
+  footer { margin-top: 2.5mm; color: #6b7280; font-size: 7.6pt; text-align: right; }
+</style></head><body>${sheets}</body></html>`;
 }
 
 export function correctionBoardUrl(ownerId: string): string {

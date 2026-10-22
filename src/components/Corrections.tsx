@@ -85,7 +85,8 @@ const copyText = async (text: string) => {
 const qrImageUrl = (value: string) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=16&data=${encodeURIComponent(value)}`;
 
-// 인쇄용 문서를 새 창에 쓴다. 문서 안의 스크립트가 다 그려진 뒤 인쇄 창을 연다.
+// 인쇄용 문서를 새 창에 쓰고, 이미지·글꼴이 다 불러와지면 인쇄 창을 연다.
+// 새 창은 앱 CSP(script-src 'self')를 물려받아 문서 안 인라인 스크립트가 막히므로 여기서 print를 부른다.
 function printDocument(html: string) {
   const win = window.open('', '_blank');
   if (!win) {
@@ -94,6 +95,19 @@ function printDocument(html: string) {
   }
   win.document.write(html);
   win.document.close();
+  let printed = false;
+  const print = () => {
+    if (printed || win.closed) return;
+    printed = true;
+    win.focus();
+    win.print();
+  };
+  const whenReady = () => {
+    void Promise.resolve(win.document.fonts?.ready).finally(() => window.setTimeout(print, 150));
+  };
+  if (win.document.readyState === 'complete') whenReady();
+  else win.addEventListener('load', whenReady, { once: true });
+  window.setTimeout(print, 4000);
 }
 
 // 교실에 붙일 A4 안내지. QR 이미지가 다 불러와지면 인쇄 창을 연다.
@@ -110,7 +124,7 @@ function printBoardQr(boardUrl: string) {
 </style></head><body><div class="page">
   <p class="brand">그로잉영어</p>
   <h1>해석 · 영작 게시판</h1>
-  <img src="${qrImageUrl(boardUrl)}" alt="게시판 QR" onload="setTimeout(function(){window.print()},200)">
+  <img src="${qrImageUrl(boardUrl)}" alt="게시판 QR">
   <p class="main">카메라로 QR을 찍어 들어가세요</p>
   <p class="sub">과제 제목 선택 → 이름 + 비번 4자리 → 답 적고 제출</p>
   <p class="sub">첨삭은 선생님이 확인한 뒤 ‘내 제출 보기’에서 볼 수 있어요</p>

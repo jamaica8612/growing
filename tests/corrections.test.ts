@@ -75,16 +75,19 @@ describe('scores and copy text', () => {
         { studentName: '지훈', items: [] },
       ],
     );
-    expect(html.match(/<section>/g)).toHaveLength(2);
-    expect(html).toContain('section + section { break-before: page; }');
-    expect(html).toContain('3과 &lt;본문&gt; (영작)');
+    expect(html.match(/<section class="sheet">/g)).toHaveLength(2);
+    expect(html).toContain('.sheet + .sheet { break-before: page; }');
+    expect(html).toContain('영작 첨삭 결과지');
+    expect(html).toContain('3과 &lt;본문&gt;');
     expect(html).toContain('He &lt;b&gt;kind&lt;/b&gt;.');
     expect(html).not.toContain('<b>kind</b>');
-    expect(html).toContain('✓ 정답');
-    expect(html).toContain('<b>He is kind.</b>');
-    expect(html).toContain('검토 전');
-    expect(html).toContain('완성도 100% · 정확도 93%');
+    expect(html).toContain('<span class="chip">✓ 정답</span>');
+    expect(html).toContain('<div class="fix">He is kind.</div>');
+    expect(html).toContain('<span class="draft">검토 전</span>');
+    expect(html).toContain('<span>정확도</span><b>93<small>%</small></b>');
+    expect(html).toContain('<b>1<small>/2</small></b>');
     expect(html).toContain('(빈칸)');
+    expect(html).not.toContain('<script');
   });
 });
 
