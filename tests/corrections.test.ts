@@ -120,7 +120,7 @@ describe('correction-public logic', () => {
 
 describe('correction migration', () => {
   const sql = readFileSync(
-    new URL('../supabase/migrations/20261022090000_growing_correction_sets.sql', import.meta.url),
+    new URL('../supabase/migrations/20261022094643_growing_correction_sets.sql', import.meta.url),
     'utf8',
   ).toLowerCase();
 
