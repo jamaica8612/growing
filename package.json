@@ -13,6 +13,7 @@
     "check:edge": "deno check --no-lock supabase/functions/assistant/index.ts supabase/functions/exam-generate/index.ts supabase/functions/exam-public/index.ts supabase/functions/correction-public/index.ts supabase/functions/kakao-channel-event/index.ts supabase/functions/kakao-skill/index.ts supabase/functions/send-alimtalk/index.ts supabase/functions/send-push/index.ts",
     "verify:quiet": "node scripts/verify-quiet.mjs",
     "deploy:exam-functions": "npx supabase functions deploy exam-public --no-verify-jwt && npx supabase functions deploy exam-generate",
+    "eval:correction": "node --experimental-strip-types scripts/correction-eval.mjs",
     "smoke:exam-public": "node scripts/smoke-exam-public.mjs",
     "smoke:exam-e2e": "node scripts/smoke-exam-e2e.mjs",
     "check:migration-drift": "node scripts/check-migration-drift.mjs",
