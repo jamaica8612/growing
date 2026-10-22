@@ -181,16 +181,17 @@ export function buildCorrectionPrintHtml(
       const accuracy = answer ? item?.accuracy ?? 0 : 0;
       const ok = answer !== '' && corrected.trim() === answer.trim();
       if (ok) correctCount += 1;
+      // 정답 문항도 같은 자리에 띠를 둬서 모든 문항이 같은 모양(문장 → 띠 → 설명)이 되게 한다.
       const fix = ok
-        ? '<span class="chip">✓ 정답</span>'
-        : corrected ? `<div class="fix">${escapeHtml(corrected)}</div>` : '';
+        ? '<div class="fix ok">✓ 정답</div>'
+        : `<div class="fix">${corrected ? escapeHtml(corrected) : '&nbsp;'}</div>`;
       const why = item?.explanation ? `<p class="why">${escapeHtml(item.explanation)}</p>` : '';
       return `<li class="item${ok ? ' ok' : ''}">`
         + `<span class="no">${index + 1}</span>`
         + '<div class="body"><div class="pair">'
         + `<p class="src">${escapeHtml(sentence)}</p>`
         + `<p class="ans">${answer ? escapeHtml(answer) : '<span class="blank">(빈칸)</span>'}</p>`
-        + `</div>${ok ? `<div class="okline">${fix}${why}</div>` : `${fix}${why}`}</div>`
+        + `</div>${fix}${why}</div>`
         + `<div class="pts"><b class="${scoreLevel(accuracy)}">${accuracy}</b><small>완성 ${answer ? item?.completeness ?? 0 : 0}</small></div>`
         + '</li>';
     }).join('');
@@ -215,7 +216,7 @@ export function buildCorrectionPrintHtml(
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(`${label} 첨삭 결과지 - ${set.title}`)}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@500;700;800&display=swap">
 <style>
-  @page { size: A4; margin: 10mm 11mm 9mm; }
+  @page { size: A4; margin: 9mm 11mm 8mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { margin: 0; font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 9.6pt; line-height: 1.42; color: #1f2937; word-break: keep-all; overflow-wrap: anywhere; }
   p { margin: 0; }
@@ -223,7 +224,7 @@ export function buildCorrectionPrintHtml(
   .top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 2.5mm; border-bottom: 0.4mm solid #0f3023; }
   .brand { font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: 0.18em; font-size: 8pt; color: #2c6f52; }
   .kind { font-size: 8pt; font-weight: 700; color: #0f3023; }
-  .hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; margin: 4mm 0 3.5mm; }
+  .hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; margin: 3.5mm 0 3mm; }
   .who h1 { display: flex; align-items: center; gap: 2.5mm; margin: 0; font-size: 20pt; font-weight: 900; color: #0f3023; letter-spacing: -0.02em; }
   .who p { margin-top: 1mm; color: #4b5563; font-size: 9.6pt; }
   .draft { padding: 0.6mm 2mm; border-radius: 99px; background: #fef3c7; color: #92400e; font-size: 8pt; font-weight: 700; letter-spacing: 0; }
@@ -238,7 +239,8 @@ export function buildCorrectionPrintHtml(
   .cols { display: grid; grid-template-columns: 7mm 1fr 13mm; gap: 3mm; padding: 1mm 0; border-bottom: 0.25mm solid #d1d5db; color: #6b7280; font-size: 7.6pt; font-weight: 700; }
   .cols > span:last-child { text-align: right; }
   .items { margin: 0; padding: 0; list-style: none; }
-  .item { display: grid; grid-template-columns: 7mm 1fr 13mm; gap: 3mm; padding: 1.9mm 0; border-bottom: 0.25mm solid #e5e7eb; break-inside: avoid; }
+  /* 문장·띠·설명이 한 줄씩인 문항 높이를 기본으로 맞춰, 대부분의 칸 높이가 같게 보인다 */
+  .item { display: grid; grid-template-columns: 7mm 1fr 13mm; align-items: start; gap: 3mm; min-height: 19.5mm; padding: 1.6mm 0; border-bottom: 0.25mm solid #e5e7eb; break-inside: avoid; }
   .no { display: grid; place-items: center; width: 6.4mm; height: 6.4mm; border-radius: 99px; background: #0f3023; color: #fff; font-family: 'Outfit', sans-serif; font-size: 8.6pt; font-weight: 700; }
   .item.ok .no { background: #10b981; }
   .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4mm; }
@@ -250,11 +252,9 @@ export function buildCorrectionPrintHtml(
   .src { color: #4b5563; }
   .ans { color: #111827; font-weight: 500; }
   .blank { color: #9ca3af; }
-  .fix { margin-top: 1.1mm; padding: 0.8mm 2.4mm; border-left: 0.8mm solid #10b981; border-radius: 0 1.5mm 1.5mm 0; background: #ecfdf5; color: #065f46; font-weight: 700; }
-  .why { margin-top: 0.8mm; color: #374151; font-size: 8.8pt; }
-  .okline { display: flex; align-items: baseline; gap: 2mm; margin-top: 0.9mm; }
-  .okline .why { margin: 0; }
-  .chip { flex: none; padding: 0.3mm 2mm; border-radius: 99px; background: #d1fae5; color: #047857; font-size: 8.2pt; font-weight: 700; }
+  .fix { margin-top: 1mm; padding: 0.6mm 2.4mm; border-left: 0.8mm solid #10b981; border-radius: 0 1.5mm 1.5mm 0; background: #ecfdf5; color: #065f46; font-weight: 700; }
+  .why { margin-top: 0.7mm; color: #374151; font-size: 8.8pt; line-height: 1.35; }
+  .fix.ok { border-left-color: #6ee7b7; background: #f0fdf4; color: #047857; }
   .pts { text-align: right; }
   .pts b { display: block; font-family: 'Outfit', sans-serif; font-size: 14pt; font-weight: 800; line-height: 1.1; }
   .pts .high { color: #059669; } .pts .mid { color: #d97706; } .pts .low { color: #dc2626; }

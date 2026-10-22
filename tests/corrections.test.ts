@@ -81,7 +81,7 @@ describe('scores and copy text', () => {
     expect(html).toContain('3과 &lt;본문&gt;');
     expect(html).toContain('He &lt;b&gt;kind&lt;/b&gt;.');
     expect(html).not.toContain('<b>kind</b>');
-    expect(html).toContain('<span class="chip">✓ 정답</span>');
+    expect(html).toContain('<div class="fix ok">✓ 정답</div>');
     expect(html).toContain('<div class="fix">He is kind.</div>');
     expect(html).toContain('<span class="draft">검토 전</span>');
     expect(html).toContain('<span>정확도</span><b>93<small>%</small></b>');
