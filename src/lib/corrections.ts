@@ -241,7 +241,12 @@ export function buildCorrectionPrintHtml(
   .item { display: grid; grid-template-columns: 7mm 1fr 13mm; gap: 3mm; padding: 1.9mm 0; border-bottom: 0.25mm solid #e5e7eb; break-inside: avoid; }
   .no { display: grid; place-items: center; width: 6.4mm; height: 6.4mm; border-radius: 99px; background: #0f3023; color: #fff; font-family: 'Outfit', sans-serif; font-size: 8.6pt; font-weight: 700; }
   .item.ok .no { background: #10b981; }
-  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4mm; }
+  /* 같은 뜻이면 영어가 한국어보다 길어서 영어 칸을 넓게 준다 */
+  .translate .pair { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .compose .pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  .src, .ans, .fix { text-wrap: balance; }
+  .why { text-wrap: pretty; }
   .src { color: #4b5563; }
   .ans { color: #111827; font-weight: 500; }
   .blank { color: #9ca3af; }
@@ -255,7 +260,7 @@ export function buildCorrectionPrintHtml(
   .pts .high { color: #059669; } .pts .mid { color: #d97706; } .pts .low { color: #dc2626; }
   .pts small { color: #6b7280; font-size: 7.2pt; }
   footer { margin-top: 2.5mm; color: #6b7280; font-size: 7.6pt; text-align: right; }
-</style></head><body>${sheets}</body></html>`;
+</style></head><body class="${set.mode}">${sheets}</body></html>`;
 }
 
 export function correctionBoardUrl(ownerId: string): string {
