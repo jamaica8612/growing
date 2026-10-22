@@ -163,6 +163,18 @@
 }
 .cr-board-actions { display: flex; gap: 0.4rem; }
 .cr-board-actions .btn { min-height: 40px; text-decoration: none; white-space: nowrap; }
+.cr-qr {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem;
+  border-radius: var(--radius-md);
+  background: #f2faf6;
+}
+.cr-qr img { width: 220px; height: 220px; border-radius: var(--radius-sm); background: #fff; }
+.cr-qr p { margin: 0 0 0.6rem; color: var(--color-text-secondary); font-size: 0.82rem; }
 .cr-student-search { margin-bottom: 0.75rem; }
 .cr-student-row {
   display: flex;
@@ -222,6 +234,8 @@
   .cr-mode-tabs { align-self: stretch; }
   .cr-mode-tab { flex: 1; justify-content: center; }
   .cr-board-link { grid-template-columns: 1fr; }
+  .cr-board-actions { flex-wrap: wrap; }
+  .cr-qr { justify-content: center; text-align: center; }
   .cr-board-head { flex-direction: column; align-items: stretch; }
   .cr-board-head nav .btn { flex: 1 1 auto; }
 }
