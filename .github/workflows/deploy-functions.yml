@@ -79,6 +79,14 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # Students submit with only a name and a 6-character set code; results
+      # stay hidden until the teacher publishes them. regrade checks the JWT
+      # inside the function.
+      - name: Deploy correction-public
+        run: supabase functions deploy correction-public --project-ref xrrdokcjhjqdfvwtbenl --use-api --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deploy exam-generate
         run: supabase functions deploy exam-generate --project-ref xrrdokcjhjqdfvwtbenl --use-api
         env:
