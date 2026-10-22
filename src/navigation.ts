@@ -5,6 +5,7 @@ import {
   ClipboardList,
   CreditCard,
   Headphones,
+  Languages,
   LayoutDashboard,
   MessageCircle,
   MessageSquare,
@@ -32,7 +33,8 @@ export type TabId =
   | 'messaging'
   | 'kiosk'
   | 'backup'
-  | 'exams';
+  | 'exams'
+  | 'corrections';
 
 export type NavItem = {
   id: TabId;
@@ -68,6 +70,7 @@ export const PRIMARY_NAV_GROUPS: NavGroup[] = [
       { id: 'classes', label: '반 / 시간표', icon: BookOpen },
       { id: 'listening', label: '듣기 자료', icon: Headphones },
       { id: 'exams', label: '평가 관리', icon: ClipboardList },
+      { id: 'corrections', label: '해석·영작 첨삭', icon: Languages },
       { id: 'payments', label: '수납 관리', icon: CreditCard },
     ],
   },
@@ -112,6 +115,7 @@ export const SCREEN_ACTIONS: Record<TabId, ScreenAction[]> = {
   ],
   listening: [{ to: 'exams', label: '평가 만들기', primary: true }],
   exams: [{ to: 'messaging', label: '시험 결과 안내', primary: true }],
+  corrections: [{ to: 'exams', label: '평가 관리' }],
   payments: [
     { to: 'messaging', label: '미납 안내 보내기', primary: true },
     { to: 'students', label: '학생별 이력' },
@@ -183,13 +187,14 @@ export const FLOW_TAB_GROUPS: FlowTabGroup[] = [
   },
   {
     parentId: 'classes',
-    ids: ['classes', 'attendance', 'makeup', 'listening', 'exams', 'stats'],
+    ids: ['classes', 'attendance', 'makeup', 'listening', 'exams', 'corrections', 'stats'],
     tabs: [
       { id: 'classes', label: '반/시간표', icon: BookOpen },
       { id: 'attendance', label: '출결 입력', icon: CalendarCheck },
       { id: 'makeup', label: '보강/보충', icon: CalendarCheck },
       { id: 'listening', label: '듣기 자료', icon: Headphones },
       { id: 'exams', label: '평가', icon: ClipboardList },
+      { id: 'corrections', label: '첨삭', icon: Languages },
       { id: 'stats', label: '출결 리포트', icon: BarChart3 },
     ],
   },
@@ -224,6 +229,7 @@ export const TAB_TITLES: Record<TabId, string> = {
   kiosk: '자율 등하원 키오스크',
   backup: '설정',
   exams: '평가 관리',
+  corrections: '해석·영작 첨삭',
 };
 
 export const TAB_DESCRIPTIONS: Record<TabId, string> = {
@@ -242,6 +248,7 @@ export const TAB_DESCRIPTIONS: Record<TabId, string> = {
   kiosk: '학생이 직접 등하원을 기록하는 단말 모드입니다.',
   backup: '연동, 백업, 키오스크 PIN, AI 설정, 데이터 관리 도구를 모았습니다.',
   exams: '시험 제작, 배포, 제출 현황, 결과 안내를 관리합니다.',
+  corrections: '학생이 문장마다 해석·영작을 적으면 AI가 첨삭하고, 선생님이 검토해 공개합니다.',
 };
 
 // 모바일 하단 빠른 이동 — 4개 핵심 탭. 5번째 "더보기"는 App에서 전체 메뉴 시트로 처리.

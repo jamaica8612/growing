@@ -1,0 +1,259 @@
+/* 해석/영작 첨삭 — 선생님 화면은 lm-* (듣기 자료) 카드 스타일을 재사용한다. */
+
+.cr-mode-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface);
+  align-self: flex-start;
+}
+.cr-mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.45rem 1.1rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cr-mode-tab.on { background: var(--color-primary); color: #fff; }
+
+.cr-passage { min-height: 130px; resize: vertical; }
+.cr-sentences { min-height: 170px; resize: vertical; line-height: 1.6; }
+.cr-split { margin-top: 0.5rem; }
+.cr-over { color: var(--color-danger); font-weight: 700; }
+
+.cr-set-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
+.cr-set-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fbfcfb;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cr-set-row:hover { border-color: var(--color-accent-mint); background: #f2faf6; }
+.cr-set-title { font-size: 0.9rem; font-weight: 750; color: var(--color-primary-dark); }
+.cr-set-meta { flex: 1 1 auto; color: var(--color-text-secondary); font-size: 0.74rem; }
+.cr-set-meta b { color: var(--color-primary); letter-spacing: 0.05em; }
+
+.cr-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.cr-badge.open { background: var(--color-accent-mint-light); color: #047857; }
+.cr-badge.closed { background: #eef1ef; color: var(--color-text-secondary); }
+.cr-badge.pending { background: var(--color-warning-light); color: #92400e; }
+.cr-badge.failed { background: var(--color-danger-light); color: #b42318; }
+
+.cr-scores { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; }
+.cr-score {
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: var(--color-info-light);
+  color: #1e40af;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.cr-score.accuracy { background: var(--color-accent-mint-light); color: #047857; }
+
+.cr-detail { display: flex; flex-direction: column; gap: 1rem; }
+.cr-detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.8rem; margin-bottom: 0.9rem; }
+.cr-detail-title { flex: 1 1 200px; min-width: 0; }
+.cr-detail-title h3 { margin: 0; color: var(--color-primary-dark); font-size: 1rem; overflow-wrap: anywhere; }
+.cr-detail-title p { margin: 0.2rem 0 0; color: var(--color-text-secondary); font-size: 0.76rem; }
+
+.cr-list-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.cr-list-toolbar h3 { margin: 0; color: var(--color-primary-dark); font-size: 0.98rem; }
+
+.cr-review-list,
+.cr-public-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.8rem; }
+.cr-review-item,
+.cr-public-item {
+  padding: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fbfcfb;
+}
+.cr-source {
+  display: flex;
+  gap: 0.55rem;
+  margin: 0 0 0.6rem;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.55;
+}
+.cr-source span {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.72rem;
+}
+.cr-answer,
+.cr-corrected,
+.cr-explanation {
+  margin: 0.4rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cr-answer { background: #fff; border: 1px solid var(--color-border); }
+.cr-corrected { background: var(--color-accent-mint-light); color: #065f46; }
+.cr-explanation { background: var(--color-warning-light); color: #78350f; }
+.cr-answer b,
+.cr-corrected b,
+.cr-explanation b { display: block; margin-bottom: 0.15rem; font-size: 0.7rem; opacity: 0.75; }
+.cr-answer em { color: var(--color-text-muted); }
+
+.cr-field { display: block; margin-top: 0.55rem; }
+.cr-field b { display: block; margin-bottom: 0.2rem; color: var(--color-text-secondary); font-size: 0.72rem; }
+.cr-field textarea { min-height: 54px; resize: vertical; }
+.cr-percent-row { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.55rem; }
+.cr-percent-row label { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--color-text-secondary); font-size: 0.78rem; font-weight: 700; }
+.cr-percent-row input { width: 76px; min-height: 36px; padding: 0.3rem 0.45rem; }
+.cr-review-actions { margin-top: 1rem; }
+
+/* 선생님: 게시판 링크 · 학생 비번 */
+.cr-board-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+.cr-board-link h3 { margin: 0; color: var(--color-primary-dark); font-size: 0.95rem; }
+.cr-board-link p { margin: 0.2rem 0 0; color: var(--color-text-secondary); font-size: 0.74rem; line-height: 1.45; }
+.cr-board-link input {
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #f7faf8;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 0.74rem;
+}
+.cr-board-actions { display: flex; gap: 0.4rem; }
+.cr-board-actions .btn { min-height: 40px; text-decoration: none; white-space: nowrap; }
+.cr-student-search { margin-bottom: 0.75rem; }
+.cr-student-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fbfcfb;
+}
+.cr-student-row .btn { min-height: 36px; padding: 0.35rem 0.6rem; font-size: 0.74rem; }
+
+/* 학생 공개 화면 (태블릿) */
+.cr-public {
+  min-height: 100vh;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  background: var(--color-bg-base);
+}
+.cr-public-head { margin-bottom: 1rem; }
+.cr-public-head h1 { margin: 0.5rem 0 0.25rem; color: var(--color-primary-dark); font-size: 1.4rem; }
+.cr-public-head p { margin: 0 0 0.5rem; color: var(--color-text-secondary); font-size: 0.92rem; }
+.cr-public-item { background: var(--color-bg-surface); }
+.cr-public-item textarea { min-height: 70px; font-size: 1rem; resize: vertical; }
+.cr-public-submit {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.cr-public-submit p { margin: 0; color: var(--color-text-secondary); font-size: 0.82rem; }
+.cr-public-submit label { font-weight: 700; color: var(--color-primary-dark); }
+.cr-public-submit input { min-height: 46px; font-size: 1rem; }
+.cr-public-submit .btn { min-height: 50px; font-size: 1rem; justify-content: center; }
+.cr-error { color: var(--color-danger) !important; font-weight: 700; }
+.cr-public-card {
+  max-width: 480px;
+  margin: 3rem auto;
+  padding: 1.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-secondary);
+}
+.cr-public-card h2 { margin: 0 0 0.5rem; color: var(--color-primary-dark); font-size: 1.15rem; }
+.cr-done { text-align: center; }
+.cr-done > svg { color: var(--color-accent-mint); }
+.cr-done-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
+.cr-done-actions .btn { min-height: 46px; text-decoration: none; }
+
+@media (max-width: 600px) {
+  .cr-mode-tabs { align-self: stretch; }
+  .cr-mode-tab { flex: 1; justify-content: center; }
+  .cr-board-link { grid-template-columns: 1fr; }
+  .cr-board-head { flex-direction: column; align-items: stretch; }
+  .cr-board-head nav .btn { flex: 1 1 auto; }
+}
+
+/* 학생 게시판 */
+.cr-board-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+.cr-board-head h1 { margin: 0; color: var(--color-primary-dark); font-size: 1.35rem; }
+.cr-board-head p { margin: 0.2rem 0 0; color: var(--color-text-secondary); font-size: 0.86rem; }
+.cr-board-head nav { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cr-board-head nav .btn { min-height: 44px; }
+.cr-notice { margin: 0 0 0.75rem; }
+.cr-board-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6rem; }
+.cr-board-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  width: 100%;
+  min-height: 64px;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cr-board-item:hover { border-color: var(--color-accent-mint); }
+.cr-board-title { flex: 1 1 200px; color: var(--color-primary-dark); font-size: 1rem; font-weight: 750; }
+.cr-mine-body { margin-top: 0.6rem; }
+.cr-login { display: grid; gap: 0.45rem; }
+.cr-login label { margin-top: 0.35rem; color: var(--color-primary-dark); font-weight: 700; font-size: 0.86rem; }
+.cr-login input { min-height: 46px; font-size: 1rem; }
+.cr-resubmit-note { padding: 0.5rem 0.7rem; border-radius: var(--radius-sm); background: var(--color-info-light); color: #1e40af !important; font-size: 0.84rem !important; }

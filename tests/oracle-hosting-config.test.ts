@@ -53,7 +53,7 @@ describe('Oracle root-domain hosting configuration', () => {
     expect(deployWorkflow).toContain('--delete-delay --delay-updates');
     expect(deployWorkflow).toContain("${ORACLE_HOST#$'\\xEF\\xBB\\xBF'}");
     expect(deployWorkflow).not.toContain('actions/deploy-pages');
-    expect(edgeDeployWorkflow.match(/--use-api/g)).toHaveLength(7);
+    expect(edgeDeployWorkflow.match(/--use-api/g)).toHaveLength(8);
   });
 
   it('keeps a GitHub Pages fallback at the legacy PWA scope', () => {
