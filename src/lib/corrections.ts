@@ -151,26 +151,33 @@ export function formatCorrectionForCopy(
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
 
-const printDate = (value?: string) => {
-  const date = new Date(value ?? '');
-  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(date);
+const printDate = (value: string | Date | undefined, withYear = false) => {
+  const date = value instanceof Date ? value : new Date(value ?? '');
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('ko-KR', { year: withYear ? 'numeric' : undefined, month: 'long', day: 'numeric' }).format(date);
 };
 
 const scoreLevel = (value: number) => (value >= 90 ? 'high' : value >= 60 ? 'mid' : 'low');
 
-const PRINT_LABELS: Record<CorrectionMode, { source: string; answer: string }> = {
-  translate: { source: '원문', answer: '내 해석' },
-  compose: { source: '우리말', answer: '내 영작' },
+const PRINT_LABELS: Record<CorrectionMode, { left: string; right: string }> = {
+  translate: { left: '원문과 내 해석', right: '고친 해석' },
+  compose: { left: '문제와 내 영작', right: '고친 문장' },
 };
 
-// 첨삭 결과지 (A4). 학생 한 명이 한 페이지에서 시작한다 (문장이 많으면 다음 장으로 이어짐).
-// 인쇄는 printDocument가 창을 다 그린 뒤 부른다 — 앱 CSP가 인라인 스크립트를 막기 때문.
+// 앱 사이드바·월간 리포트와 같은 새싹 아이콘
+const SPROUT_ICON = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10M10 20c5.5-2.5.8-6.4 5-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6c-.6 1.4-.5 2.6-.4 4 1.7-.4 3-1 4-2.2 1-1.3 1.3-3 1.4-4.8-2.4.6-3.9 1.5-4.7 3z"/></svg>';
+
+// 첨삭 결과지 (A4). 학생 한 명이 한 장에서 시작하고, 문항 칸은 내용만큼만 차지한다
+// (남는 곳은 공백, 넘치면 다음 장으로). 인쇄는 printDocument가 창을 다 그린 뒤 부른다 —
+// 앱 CSP가 인라인 스크립트를 막기 때문.
 export function buildCorrectionPrintHtml(
   set: { title: string; mode: CorrectionMode; sentences: string[] },
   submissions: { studentName: string; items: CorrectionItem[]; submittedAt?: string; published?: boolean }[],
+  issuedAt: Date = new Date(),
 ): string {
   const label = MODE_LABELS[set.mode];
   const labels = PRINT_LABELS[set.mode];
+  const issued = printDate(issuedAt, true);
   const sheets = submissions.map(submission => {
     const scores = averageScores(submission.items);
     let correctCount = 0;
@@ -181,85 +188,96 @@ export function buildCorrectionPrintHtml(
       const accuracy = answer ? item?.accuracy ?? 0 : 0;
       const ok = answer !== '' && corrected.trim() === answer.trim();
       if (ok) correctCount += 1;
-      // 정답 문항도 같은 자리에 띠를 둬서 모든 문항이 같은 모양(문장 → 띠 → 설명)이 되게 한다.
       const fix = ok
-        ? '<div class="fix ok">✓ 정답</div>'
-        : `<div class="fix">${corrected ? escapeHtml(corrected) : '&nbsp;'}</div>`;
-      const why = item?.explanation ? `<p class="why">${escapeHtml(item.explanation)}</p>` : '';
-      return `<li class="item${ok ? ' ok' : ''}">`
-        + `<span class="no">${index + 1}</span>`
-        + '<div class="body"><div class="pair">'
-        + `<p class="src">${escapeHtml(sentence)}</p>`
-        + `<p class="ans">${answer ? escapeHtml(answer) : '<span class="blank">(빈칸)</span>'}</p>`
-        + `</div>${fix}${why}</div>`
-        + `<div class="pts"><b class="${scoreLevel(accuracy)}">${accuracy}</b><small>완성 ${answer ? item?.completeness ?? 0 : 0}</small></div>`
+        ? '<span class="pass">✓ 정답</span>'
+        : corrected ? `<p class="fix">${escapeHtml(corrected)}</p>` : '<p class="fix none">-</p>';
+      return `<li class="row${ok ? ' ok' : ''}">`
+        + `<span class="no">${String(index + 1).padStart(2, '0')}</span>`
+        + `<div class="mine"><p class="src">${escapeHtml(sentence)}</p>`
+        + `<p class="ans">${answer ? escapeHtml(answer) : '<span class="blank">(빈칸)</span>'}</p></div>`
+        + `<div class="right">${fix}</div>`
+        + `<span class="pts ${scoreLevel(accuracy)}">${accuracy}</span>`
+        + (item?.explanation ? `<p class="why">${escapeHtml(item.explanation)}</p>` : '')
         + '</li>';
     }).join('');
-    const date = printDate(submission.submittedAt);
-    const sub = [escapeHtml(set.title), date ? `${date} 제출` : ''].filter(Boolean).join(' · ');
+    const submitted = printDate(submission.submittedAt);
+    const meta = [escapeHtml(set.title), submitted ? `${submitted} 제출` : ''].filter(Boolean).join(' · ');
     const stat = (name: string, value: number) =>
-      `<div class="stat"><span>${name}</span><b>${value}<small>%</small></b><i class="bar"><i class="${scoreLevel(value)}" style="width:${value}%"></i></i></div>`;
+      `<div class="stat"><span>${name}</span><b>${value}</b><i class="meter"><i class="${scoreLevel(value)}" style="width:${value}%"></i></i></div>`;
     return '<section class="sheet">'
-      + `<header class="top"><span class="brand">GROWING ENGLISH</span><span class="kind">${label} 첨삭 결과지</span></header>`
-      + '<div class="hero"><div class="who">'
+      + '<header class="brand">'
+      + `<div class="logo"><span class="mark">${SPROUT_ICON}</span><div><b>그로잉영어 교습소</b><span>GROWING ENGLISH</span></div></div>`
+      + `<div class="doc"><b>${label} 첨삭 결과지</b><span>발행일 ${issued}</span></div>`
+      + '</header>'
+      + '<div class="band"><div class="who">'
       + `<h1>${escapeHtml(submission.studentName)}${submission.published === false ? '<span class="draft">검토 전</span>' : ''}</h1>`
-      + `<p>${sub}</p></div><div class="stats">`
+      + `<p>${meta}</p></div><div class="stats">`
       + stat('완성도', scores.completeness) + stat('정확도', scores.accuracy)
       + `<div class="stat"><span>정답</span><b>${correctCount}<small>/${set.sentences.length}</small></b></div>`
-      + `</div></div>`
-      + `<div class="cols"><span></span><div class="pair"><span>${labels.source}</span><span>${labels.answer}</span></div><span>정확도</span></div>`
-      + `<ol class="items">${rows}</ol>`
-      + '<footer>오른쪽 큰 숫자는 정확도, 작은 숫자는 완성도 · 그로잉영어</footer>'
+      + '</div></div>'
+      + `<div class="cols"><span></span><span>${labels.left}</span><span>${labels.right}</span><span>정확도</span></div>`
+      + `<ol class="rows">${rows}</ol>`
+      + '<footer>'
+      + '<span><b>그로잉영어 교습소</b> · 담당 선생님 확인 <i class="sign"></i></span>'
+      + '<span>정확도: 뜻과 문법이 맞는 정도 · 완성도: 원문의 뜻을 옮긴 정도 · <em class="high">90+</em> <em class="mid">60+</em> <em class="low">60 미만</em></span>'
+      + '</footer>'
       + '</section>';
   }).join('');
 
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(`${label} 첨삭 결과지 - ${set.title}`)}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Outfit:wght@600;700;800&display=swap">
 <style>
-  @page { size: A4; margin: 9mm 11mm 8mm; }
+  @page { size: A4; margin: 9mm 10mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { margin: 0; font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 9.6pt; line-height: 1.42; color: #1f2937; word-break: keep-all; overflow-wrap: anywhere; }
-  p { margin: 0; }
+  html, body { margin: 0; background: #fff; }
+  body { font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 9pt; line-height: 1.42; color: #1f2937; word-break: keep-all; overflow-wrap: anywhere; }
+  p, h1, ol { margin: 0; }
+  .sheet { display: flex; flex-direction: column; gap: 2.6mm; min-height: 278mm; }
   .sheet + .sheet { break-before: page; }
-  .top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 2.5mm; border-bottom: 0.4mm solid #0f3023; }
-  .brand { font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: 0.18em; font-size: 8pt; color: #2c6f52; }
-  .kind { font-size: 8pt; font-weight: 700; color: #0f3023; }
-  .hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; margin: 3.5mm 0 3mm; }
-  .who h1 { display: flex; align-items: center; gap: 2.5mm; margin: 0; font-size: 20pt; font-weight: 900; color: #0f3023; letter-spacing: -0.02em; }
-  .who p { margin-top: 1mm; color: #4b5563; font-size: 9.6pt; }
-  .draft { padding: 0.6mm 2mm; border-radius: 99px; background: #fef3c7; color: #92400e; font-size: 8pt; font-weight: 700; letter-spacing: 0; }
-  .stats { display: flex; gap: 2.5mm; }
-  .stat { min-width: 25mm; padding: 2.2mm 3mm; border-radius: 2.5mm; background: #f2f8f5; }
-  .stat span { display: block; color: #4b5563; font-size: 7.5pt; font-weight: 700; }
-  .stat b { font-family: 'Outfit', sans-serif; font-size: 18pt; font-weight: 800; color: #0f3023; line-height: 1.15; }
-  .stat b small { font-size: 9pt; color: #6b7280; font-weight: 600; margin-left: 0.4mm; }
-  .bar { display: block; height: 1.2mm; margin-top: 1mm; border-radius: 99px; background: #dbe7e0; overflow: hidden; }
-  .bar i { display: block; height: 100%; border-radius: 99px; }
-  .bar .high { background: #10b981; } .bar .mid { background: #f59e0b; } .bar .low { background: #ef4444; }
-  .cols { display: grid; grid-template-columns: 7mm 1fr 13mm; gap: 3mm; padding: 1mm 0; border-bottom: 0.25mm solid #d1d5db; color: #6b7280; font-size: 7.6pt; font-weight: 700; }
-  .cols > span:last-child { text-align: right; }
-  .items { margin: 0; padding: 0; list-style: none; }
-  /* 문장·띠·설명이 한 줄씩인 문항 높이를 기본으로 맞춰, 대부분의 칸 높이가 같게 보인다 */
-  .item { display: grid; grid-template-columns: 7mm 1fr 13mm; align-items: start; gap: 3mm; min-height: 19.5mm; padding: 1.6mm 0; border-bottom: 0.25mm solid #e5e7eb; break-inside: avoid; }
-  .no { display: grid; place-items: center; width: 6.4mm; height: 6.4mm; border-radius: 99px; background: #0f3023; color: #fff; font-family: 'Outfit', sans-serif; font-size: 8.6pt; font-weight: 700; }
-  .item.ok .no { background: #10b981; }
-  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4mm; }
-  /* 같은 뜻이면 영어가 한국어보다 길어서 영어 칸을 넓게 준다 */
-  .translate .pair { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
-  .compose .pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  .brand { display: flex; justify-content: space-between; align-items: center; padding-bottom: 2.4mm; border-bottom: 0.6mm solid #1b4b36; }
+  .logo { display: flex; align-items: center; gap: 2.6mm; }
+  .mark { display: grid; place-items: center; width: 9mm; height: 9mm; border-radius: 2.6mm; background: linear-gradient(135deg, #1b4b36, #10b981); color: #fff; }
+  .logo b, .doc b { display: block; font-size: 11pt; font-weight: 800; color: #0f3023; }
+  .logo span { display: block; font-family: 'Outfit', sans-serif; font-size: 7pt; font-weight: 700; letter-spacing: 0.14em; color: #10b981; }
+  .doc { text-align: right; }
+  .doc span { font-size: 8pt; color: #6b7280; }
+  .band { display: flex; justify-content: space-between; align-items: center; gap: 5mm; padding: 3.2mm 4.5mm; border-radius: 3mm; background: #0f3023; color: #fff; }
+  .who h1 { display: flex; align-items: center; gap: 2.4mm; font-size: 18pt; font-weight: 900; letter-spacing: -0.02em; line-height: 1.15; }
+  .who p { margin-top: 0.6mm; font-size: 8.5pt; color: #c9e4d6; }
+  .draft { padding: 0.4mm 2mm; border-radius: 99px; background: #fde68a; color: #78350f; font-size: 7.5pt; font-weight: 700; letter-spacing: 0; }
+  .stats { display: flex; gap: 5mm; }
+  .stat { display: flex; flex-direction: column; align-items: flex-end; min-width: 13mm; }
+  .stat span { font-size: 7.5pt; color: #c9e4d6; }
+  .stat b { font-family: 'Outfit', sans-serif; font-size: 17pt; font-weight: 800; line-height: 1.05; }
+  .stat small { margin-left: 0.4mm; font-size: 9pt; font-weight: 600; color: #c9e4d6; }
+  .meter { display: block; width: 100%; height: 1mm; margin-top: 0.8mm; border-radius: 99px; background: rgba(255,255,255,0.18); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 99px; }
+  .meter .high { background: #34d399; } .meter .mid { background: #fbbf24; } .meter .low { background: #f87171; }
+  .cols, .row { display: grid; grid-template-columns: 6.5mm minmax(0, 1fr) minmax(0, 1fr) 9mm; column-gap: 3.2mm; }
+  .cols { padding: 0 2.6mm 1mm; border-bottom: 0.5mm solid #0f3023; font-size: 7.5pt; font-weight: 700; color: #4b5563; }
+  .cols span:last-child { text-align: right; }
+  .rows { padding: 0; list-style: none; }
+  .row { row-gap: 1mm; padding: 2.1mm 2.6mm; border-bottom: 0.25mm solid #e3e8e5; break-inside: avoid; }
+  .row:nth-child(even) { background: #f6faf8; }
+  .no { font-family: 'Outfit', sans-serif; font-size: 11pt; font-weight: 800; color: #9ca3af; line-height: 1.3; }
+  .row.ok .no { color: #10b981; }
+  .mine { display: flex; flex-direction: column; gap: 0.5mm; min-width: 0; }
+  .src { font-size: 8.5pt; color: #4b5563; }
+  .ans { font-size: 10pt; font-weight: 500; color: #111827; }
+  .blank { color: #9ca3af; font-weight: 400; }
+  .right { min-width: 0; padding-left: 2.8mm; border-left: 0.6mm solid #10b981; }
+  .row.ok .right { border-left-color: #a7f3d0; }
+  .fix { font-size: 10pt; font-weight: 700; color: #065f46; }
+  .fix.none { color: #9ca3af; font-weight: 400; }
+  .pass { display: inline-block; padding: 0.3mm 2.2mm; border-radius: 99px; background: #d1fae5; color: #047857; font-size: 9pt; font-weight: 700; }
   .src, .ans, .fix { text-wrap: balance; }
-  .why { text-wrap: pretty; }
-  .src { color: #4b5563; }
-  .ans { color: #111827; font-weight: 500; }
-  .blank { color: #9ca3af; }
-  .fix { margin-top: 1mm; padding: 0.6mm 2.4mm; border-left: 0.8mm solid #10b981; border-radius: 0 1.5mm 1.5mm 0; background: #ecfdf5; color: #065f46; font-weight: 700; }
-  .why { margin-top: 0.7mm; color: #374151; font-size: 8.8pt; line-height: 1.35; }
-  .fix.ok { border-left-color: #6ee7b7; background: #f0fdf4; color: #047857; }
-  .pts { text-align: right; }
-  .pts b { display: block; font-family: 'Outfit', sans-serif; font-size: 14pt; font-weight: 800; line-height: 1.1; }
-  .pts .high { color: #059669; } .pts .mid { color: #d97706; } .pts .low { color: #dc2626; }
-  .pts small { color: #6b7280; font-size: 7.2pt; }
-  footer { margin-top: 2.5mm; color: #6b7280; font-size: 7.6pt; text-align: right; }
+  .pts { font-family: 'Outfit', sans-serif; font-size: 13pt; font-weight: 800; line-height: 1.2; text-align: right; }
+  .pts.high, footer .high { color: #047857; } .pts.mid, footer .mid { color: #b45309; } .pts.low, footer .low { color: #b91c1c; }
+  .why { grid-column: 2 / 4; font-size: 8.5pt; line-height: 1.45; color: #374151; text-wrap: pretty; }
+  footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 4mm; margin-top: auto; padding-top: 2mm; border-top: 0.25mm solid #d6dfda; font-size: 7.5pt; color: #6b7280; }
+  footer b { color: #1b4b36; }
+  footer em { font-style: normal; font-weight: 700; }
+  .sign { display: inline-block; width: 22mm; margin-left: 1mm; border-bottom: 0.25mm solid #9ca3af; }
 </style></head><body class="${set.mode}">${sheets}</body></html>`;
 }
 
