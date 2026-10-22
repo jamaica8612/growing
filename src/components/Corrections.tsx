@@ -11,7 +11,9 @@ import {
   Languages,
   Lock,
   PenLine,
+  Printer,
   Plus,
+  QrCode,
   RefreshCw,
   Save,
   Scissors,
@@ -78,6 +80,37 @@ const copyText = async (text: string) => {
   }
 };
 
+// 평가 관리(Exams)의 시험 QR과 같은 생성 서비스를 쓴다.
+const qrImageUrl = (value: string) =>
+  `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=16&data=${encodeURIComponent(value)}`;
+
+// 교실에 붙일 A4 안내지를 새 창에 그리고, QR 이미지가 다 불러와지면 인쇄 창을 연다.
+function printBoardQr(boardUrl: string) {
+  const win = window.open('', '_blank');
+  if (!win) {
+    window.alert('팝업이 막혀 있어요. 브라우저에서 팝업을 허용해 주세요.');
+    return;
+  }
+  win.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>해석·영작 게시판 QR</title>
+<style>
+  body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; color: #0f3023; text-align: center; }
+  .page { padding: 18mm 12mm; }
+  .brand { color: #2c6f52; font-size: 22pt; margin: 0; }
+  h1 { font-size: 36pt; margin: 4mm 0 10mm; }
+  img { width: 130mm; height: 130mm; }
+  .main { font-size: 20pt; margin: 10mm 0 4mm; color: #1f2937; }
+  .sub { font-size: 14pt; margin: 2mm 0; color: #4b5563; }
+</style></head><body><div class="page">
+  <p class="brand">그로잉영어</p>
+  <h1>해석 · 영작 게시판</h1>
+  <img src="${qrImageUrl(boardUrl)}" alt="게시판 QR" onload="setTimeout(function(){window.print()},200)">
+  <p class="main">카메라로 QR을 찍어 들어가세요</p>
+  <p class="sub">과제 제목 선택 → 이름 + 비번 4자리 → 답 적고 제출</p>
+  <p class="sub">첨삭은 선생님이 확인한 뒤 ‘내 제출 보기’에서 볼 수 있어요</p>
+</div></body></html>`);
+  win.document.close();
+}
+
 const MODE_GUIDE: Record<CorrectionMode, { paste: string; placeholder: string; student: string; answerPlaceholder: string }> = {
   translate: {
     paste: '영어 지문을 붙여 넣으세요.',
@@ -142,6 +175,7 @@ export function Corrections({ ownerId }: { ownerId: string }) {
   const selectedSet = modeSets.find(set => set.id === selectedSetId) ?? null;
 
   const boardUrl = correctionBoardUrl(ownerId);
+  const [showQr, setShowQr] = useState(false);
 
   const changeTab = (next: TeacherTab) => {
     setTab(next);
@@ -170,7 +204,21 @@ export function Corrections({ ownerId }: { ownerId: string }) {
             <Copy size={16} /> 링크 복사
           </button>
           <a className="btn btn-secondary" href={boardUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> 열기</a>
+          <button className="btn btn-secondary" type="button" onClick={() => setShowQr(current => !current)} aria-expanded={showQr}>
+            <QrCode size={16} /> {showQr ? 'QR 닫기' : 'QR 보기'}
+          </button>
         </div>
+        {showQr && (
+          <div className="cr-qr">
+            <img src={qrImageUrl(boardUrl)} alt="학생용 게시판 QR 코드" width={220} height={220} />
+            <div>
+              <p>학생이 태블릿·휴대폰 카메라로 찍으면 게시판이 열려요.</p>
+              <button className="btn btn-primary" type="button" onClick={() => printBoardQr(boardUrl)}>
+                <Printer size={16} /> 안내지 인쇄
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <div className="cr-mode-tabs" role="tablist" aria-label="첨삭 종류">
