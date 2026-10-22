@@ -186,11 +186,10 @@ export function Corrections({ ownerId }: { ownerId: string }) {
   return (
     <div className="lm-root cr-root">
       <section className="lm-card cr-board-link">
-        <div>
+        <div className="cr-board-text">
           <h3>학생용 게시판 링크</h3>
-          <p>링크 하나로 ‘제출 받는 중’인 과제가 모두 보여요. 태블릿 홈 화면에 추가해 두면 편해요.</p>
+          <p>‘제출 받는 중’인 과제가 모두 보여요. 태블릿 홈 화면에 추가해 두면 편해요.</p>
         </div>
-        <input value={boardUrl} readOnly aria-label="학생용 게시판 링크" onFocus={event => event.currentTarget.select()} />
         <div className="cr-board-actions">
           <button
             className="btn btn-primary"
