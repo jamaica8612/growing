@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Check,
@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  KeyRound,
   Languages,
   Lock,
   PenLine,
@@ -20,19 +21,22 @@ import {
   X,
 } from 'lucide-react';
 import {
+  LoginRequiredError,
   MAX_SENTENCES,
   MODE_LABELS,
   averageScores,
-  correctionJoinUrl,
-  correctionResultUrl,
+  correctionBoardUrl,
   correctionsApi,
   formatCorrectionForCopy,
+  isValidPin,
   splitSentences,
+  type BoardSet,
   type CorrectionItem,
   type CorrectionMode,
   type CorrectionSet,
+  type CorrectionStudent,
   type CorrectionSubmission,
-  type PublicCorrectionResult,
+  type MySubmission,
   type PublicCorrectionSet,
 } from '../lib/corrections';
 import './Corrections.css';
@@ -102,8 +106,11 @@ function ScorePills({ completeness, accuracy }: { completeness: number; accuracy
 // 선생님 화면
 // ---------------------------------------------------------------------------
 
-export function Corrections() {
-  const [mode, setMode] = useState<CorrectionMode>('translate');
+type TeacherTab = CorrectionMode | 'students';
+
+export function Corrections({ ownerId }: { ownerId: string }) {
+  const [tab, setTab] = useState<TeacherTab>('translate');
+  const mode: CorrectionMode = tab === 'compose' ? 'compose' : 'translate';
   const [sets, setSets] = useState<CorrectionSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -134,26 +141,50 @@ export function Corrections() {
   const modeSets = useMemo(() => sets.filter(set => set.mode === mode), [sets, mode]);
   const selectedSet = modeSets.find(set => set.id === selectedSetId) ?? null;
 
-  const changeMode = (next: CorrectionMode) => {
-    setMode(next);
+  const boardUrl = correctionBoardUrl(ownerId);
+
+  const changeTab = (next: TeacherTab) => {
+    setTab(next);
     setSelectedSetId('');
     setFeedback(null);
   };
 
   return (
     <div className="lm-root cr-root">
+      <section className="lm-card cr-board-link">
+        <div>
+          <h3>학생용 게시판 링크</h3>
+          <p>링크 하나로 ‘제출 받는 중’인 과제가 모두 보여요. 태블릿 홈 화면에 추가해 두면 편해요.</p>
+        </div>
+        <input value={boardUrl} readOnly aria-label="학생용 게시판 링크" onFocus={event => event.currentTarget.select()} />
+        <div className="cr-board-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => {
+              copyText(boardUrl)
+                .then(() => setFeedback({ tone: 'success', message: '게시판 링크를 복사했습니다.' }))
+                .catch(error => setFeedback({ tone: 'error', message: errorMessage(error) }));
+            }}
+          >
+            <Copy size={16} /> 링크 복사
+          </button>
+          <a className="btn btn-secondary" href={boardUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> 열기</a>
+        </div>
+      </section>
+
       <div className="cr-mode-tabs" role="tablist" aria-label="첨삭 종류">
-        {(['translate', 'compose'] as CorrectionMode[]).map(item => (
+        {(['translate', 'compose', 'students'] as TeacherTab[]).map(item => (
           <button
             key={item}
             type="button"
             role="tab"
-            aria-selected={mode === item}
-            className={`cr-mode-tab${mode === item ? ' on' : ''}`}
-            onClick={() => changeMode(item)}
+            aria-selected={tab === item}
+            className={`cr-mode-tab${tab === item ? ' on' : ''}`}
+            onClick={() => changeTab(item)}
           >
-            {item === 'translate' ? <Languages size={17} /> : <PenLine size={17} />}
-            {MODE_LABELS[item]} 첨삭
+            {item === 'translate' ? <Languages size={17} /> : item === 'compose' ? <PenLine size={17} /> : <KeyRound size={17} />}
+            {item === 'students' ? '학생 비번' : `${MODE_LABELS[item]} 첨삭`}
           </button>
         ))}
       </div>
@@ -167,7 +198,9 @@ export function Corrections() {
         )}
       </div>
 
-      {selectedSet ? (
+      {tab === 'students' ? (
+        <StudentsPanel onFeedback={setFeedback} />
+      ) : selectedSet ? (
         <SetDetail
           key={selectedSet.id}
           set={selectedSet}
@@ -187,7 +220,7 @@ export function Corrections() {
             onCreated={set => {
               setSets(current => [set, ...current]);
               setSelectedSetId(set.id);
-              setFeedback({ tone: 'success', message: `‘${set.title}’ 과제를 만들었습니다. 코드 ${set.shortCode}를 학생에게 알려 주세요.` });
+              setFeedback({ tone: 'success', message: `‘${set.title}’ 과제를 게시판에 올렸습니다.` });
             }}
             onFeedback={setFeedback}
           />
@@ -219,10 +252,10 @@ export function Corrections() {
                     <button type="button" className="cr-set-row" onClick={() => setSelectedSetId(set.id)}>
                       <span className="cr-set-title">{set.title}</span>
                       <span className="cr-set-meta">
-                        코드 <b>{set.shortCode}</b> · {set.sentences.length}문장 · {formatDateTime(set.createdAt)}
+                        {set.sentences.length}문장 · {formatDateTime(set.createdAt)}
                       </span>
                       <span className={`cr-badge ${set.status === 'open' ? 'open' : 'closed'}`}>
-                        {set.status === 'open' ? '제출 받는 중' : '마감'}
+                        {set.status === 'open' ? '제출 받는 중' : '마감 (게시판에서 숨김)'}
                       </span>
                     </button>
                   </li>
@@ -326,7 +359,7 @@ function NewSetForm({
         onClick={() => void handleCreate()}
         disabled={saving || !title.trim() || sentences.length === 0 || tooMany}
       >
-        <Plus size={17} /> {saving ? '만드는 중...' : '과제 만들고 코드 받기'}
+        <Plus size={17} /> {saving ? '올리는 중...' : '게시판에 올리기'}
       </button>
     </section>
   );
@@ -350,7 +383,6 @@ function SetDetail({
   const [loadError, setLoadError] = useState('');
   const [openId, setOpenId] = useState('');
   const [busy, setBusy] = useState(false);
-  const joinUrl = correctionJoinUrl(set.shortCode);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -379,7 +411,7 @@ function SetDetail({
     try {
       await correctionsApi.updateSet(set.id, { status });
       onSetChange({ ...set, status });
-      onFeedback({ tone: 'success', message: status === 'open' ? '다시 제출을 받습니다.' : '제출을 마감했습니다.' });
+      onFeedback({ tone: 'success', message: status === 'open' ? '게시판에 다시 올렸습니다.' : '제출을 마감하고 게시판에서 숨겼습니다. 학생은 ‘내 제출’에서 계속 볼 수 있어요.' });
     } catch (error) {
       onFeedback({ tone: 'error', message: errorMessage(error) });
     } finally {
@@ -400,15 +432,6 @@ function SetDetail({
     }
   };
 
-  const copyLink = async () => {
-    try {
-      await copyText(joinUrl);
-      onFeedback({ tone: 'success', message: '학생용 링크를 복사했습니다.' });
-    } catch (error) {
-      onFeedback({ tone: 'error', message: errorMessage(error) });
-    }
-  };
-
   const openSubmission = submissions.find(item => item.id === openId) ?? null;
 
   return (
@@ -420,18 +443,9 @@ function SetDetail({
             <h3>{set.title}</h3>
             <p>{MODE_LABELS[set.mode]} · {set.sentences.length}문장</p>
           </div>
-          <span className={`cr-badge ${set.status === 'open' ? 'open' : 'closed'}`}>{set.status === 'open' ? '제출 받는 중' : '마감'}</span>
-        </div>
-        <div className="cr-code-box">
-          <div>
-            <span>학생 입장 코드</span>
-            <b>{set.shortCode}</b>
-          </div>
-          <input value={joinUrl} readOnly aria-label="학생용 링크" onFocus={event => event.currentTarget.select()} />
+          <span className={`cr-badge ${set.status === 'open' ? 'open' : 'closed'}`}>{set.status === 'open' ? '제출 받는 중' : '마감 (게시판에서 숨김)'}</span>
         </div>
         <div className="lm-item-actions">
-          <button className="btn btn-primary" type="button" onClick={() => void copyLink()}><Copy size={16} /> 학생 링크 복사</button>
-          <a className="btn btn-secondary" href={joinUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> 학생 화면 열기</a>
           <button className="btn btn-secondary" type="button" onClick={() => void toggleStatus()} disabled={busy}>
             {set.status === 'open' ? <><Lock size={16} /> 제출 마감</> : <><Unlock size={16} /> 다시 열기</>}
           </button>
@@ -522,7 +536,7 @@ function SubmissionReview({
       setDirty(false);
       onFeedback({
         tone: 'success',
-        message: published && !submission.published ? '저장하고 학생에게 공개했습니다.' : !published && submission.published ? '공개를 취소했습니다.' : '저장했습니다.',
+        message: published && !submission.published ? '저장하고 공개했습니다. 학생이 ‘내 제출’에서 볼 수 있어요.' : !published && submission.published ? '공개를 취소했습니다.' : '저장했습니다.',
       });
     } catch (error) {
       onFeedback({ tone: 'error', message: `저장하지 못했습니다: ${errorMessage(error)}` });
@@ -551,18 +565,6 @@ function SubmissionReview({
     try {
       await copyText(formatCorrectionForCopy(set, { studentName: submission.studentName, items }));
       onFeedback({ tone: 'success', message: '첨삭 결과를 복사했습니다. 카톡 등에 붙여 넣으세요.' });
-    } catch (error) {
-      onFeedback({ tone: 'error', message: errorMessage(error) });
-    }
-  };
-
-  const copyResultLink = async () => {
-    try {
-      await copyText(correctionResultUrl(submission.resultToken));
-      onFeedback({
-        tone: 'success',
-        message: submission.published ? '결과 링크를 복사했습니다.' : '결과 링크를 복사했습니다. 공개하기 전에는 학생에게 ‘확인 중’으로 보입니다.',
-      });
     } catch (error) {
       onFeedback({ tone: 'error', message: errorMessage(error) });
     }
@@ -642,7 +644,6 @@ function SubmissionReview({
           <button className="btn btn-accent" type="button" onClick={() => void save(true)} disabled={busy}><Eye size={16} /> 저장하고 학생에게 공개</button>
         )}
         <button className="btn btn-secondary" type="button" onClick={() => void copyResult()}><Copy size={16} /> 첨삭 복사</button>
-        <button className="btn btn-secondary" type="button" onClick={() => void copyResultLink()}><ExternalLink size={16} /> 결과 링크 복사</button>
         <button className="btn btn-secondary" type="button" onClick={() => void regrade()} disabled={busy}><RefreshCw size={16} /> AI 다시 첨삭</button>
         <button className="btn btn-danger lm-delete" type="button" onClick={() => void remove()} disabled={busy}><Trash2 size={16} /> 제출 삭제</button>
       </div>
@@ -650,67 +651,382 @@ function SubmissionReview({
   );
 }
 
+function StudentsPanel({ onFeedback }: { onFeedback: (feedback: Feedback) => void }) {
+  const [students, setStudents] = useState<CorrectionStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [query, setQuery] = useState('');
+  const [busyId, setBusyId] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    correctionsApi.listStudents()
+      .then(rows => {
+        if (!active) return;
+        setStudents(rows);
+        setLoadError('');
+      })
+      .catch(error => {
+        if (active) setLoadError(`학생 목록을 불러오지 못했습니다: ${errorMessage(error)}`);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = students.filter(student => student.name.includes(query.trim()));
+
+  const resetPin = async (student: CorrectionStudent) => {
+    const pin = window.prompt(`${student.name} 학생의 새 비번(숫자 4자리)을 적어 주세요.`)?.trim();
+    if (pin === undefined) return;
+    if (!isValidPin(pin)) {
+      onFeedback({ tone: 'error', message: '비번은 숫자 4자리예요.' });
+      return;
+    }
+    setBusyId(student.id);
+    try {
+      await correctionsApi.resetStudentPin(student.id, pin);
+      setStudents(current => current.map(item => item.id === student.id ? { ...item, locked: false } : item));
+      onFeedback({ tone: 'success', message: `${student.name} 학생 비번을 ${pin}(으)로 바꿨습니다. 학생에게 알려 주세요.` });
+    } catch (error) {
+      onFeedback({ tone: 'error', message: errorMessage(error) });
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const remove = async (student: CorrectionStudent) => {
+    if (!window.confirm(`${student.name} 학생 계정과 제출한 답안을 모두 삭제할까요? 복구할 수 없습니다.`)) return;
+    setBusyId(student.id);
+    try {
+      await correctionsApi.deleteStudent(student.id);
+      setStudents(current => current.filter(item => item.id !== student.id));
+      onFeedback({ tone: 'success', message: `${student.name} 학생을 삭제했습니다.` });
+    } catch (error) {
+      onFeedback({ tone: 'error', message: errorMessage(error) });
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  return (
+    <section className="lm-card">
+      <div className="lm-card-heading">
+        <span className="lm-card-icon"><KeyRound size={19} /></span>
+        <div>
+          <h3>게시판 학생 비번</h3>
+          <p>학생이 처음 제출할 때 이름과 4자리 비번을 직접 정해요. 비번을 잊으면 여기서 새 비번으로 바꿔 주세요.</p>
+        </div>
+      </div>
+      <input className="form-control cr-student-search" value={query} placeholder="이름 검색" onChange={event => setQuery(event.target.value)} />
+      {loading ? (
+        <div className="lm-empty" role="status"><b>불러오는 중...</b></div>
+      ) : loadError ? (
+        <div className="lm-empty lm-load-error" role="alert"><span>{loadError}</span></div>
+      ) : filtered.length === 0 ? (
+        <div className="lm-empty"><b>{students.length === 0 ? '아직 등록한 학생이 없어요.' : '검색 결과가 없어요.'}</b></div>
+      ) : (
+        <ul className="cr-set-list">
+          {filtered.map(student => {
+            return (
+              <li key={student.id} className="cr-student-row">
+                <span className="cr-set-title">{student.name}</span>
+                <span className="cr-set-meta">{formatDateTime(student.createdAt)} 등록</span>
+                {student.locked && <span className="cr-badge failed">비번 오류로 잠김</span>}
+                <button className="btn btn-secondary" type="button" onClick={() => void resetPin(student)} disabled={Boolean(busyId)}>
+                  <KeyRound size={15} /> 비번 바꾸기
+                </button>
+                <button className="btn btn-danger" type="button" onClick={() => void remove(student)} disabled={Boolean(busyId)}>
+                  <Trash2 size={15} /> 삭제
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// 학생 화면 (로그인 없음) — #/c/CODE
+// 학생 게시판 (로그인 없음) — #/board/<선생님 id>
+// 공용 태블릿이라 로그인은 화면 메모리에만 두고, 새로고침·‘다음 학생’이면 사라진다.
 // ---------------------------------------------------------------------------
+
+type BoardView = { kind: 'list' } | { kind: 'set'; setId: string } | { kind: 'mine' };
+type StudentSession = { token: string; name: string };
 
 function PublicShell({ children }: { children: React.ReactNode }) {
   return <div className="cr-public">{children}</div>;
 }
 
-export function PublicCorrectionRoute({ code }: { code: string }) {
-  const upperCode = code.trim().toUpperCase();
-  const [set, setSet] = useState<PublicCorrectionSet | null>(null);
-  const [error, setError] = useState('');
+export function PublicCorrectionBoardRoute({ ownerId }: { ownerId: string }) {
+  const [view, setView] = useState<BoardView>({ kind: 'list' });
+  const [session, setSession] = useState<StudentSession | null>(null);
+  // 로그인이 필요할 때 로그인 후 이동할 화면
+  const [loginFor, setLoginFor] = useState<BoardView | null>(null);
+  const [notice, setNotice] = useState('');
+
+  const go = (next: BoardView) => {
+    setNotice('');
+    window.scrollTo(0, 0);
+    if (next.kind !== 'list' && !session) {
+      setLoginFor(next);
+      return;
+    }
+    setLoginFor(null);
+    setView(next);
+  };
+
+  const logout = () => {
+    setSession(null);
+    setLoginFor(null);
+    setView({ kind: 'list' });
+    setNotice('');
+    window.scrollTo(0, 0);
+  };
+
+  // 자식 화면의 불러오기 effect가 매 렌더마다 다시 돌지 않도록 고정한다.
+  const sessionExpired = useCallback((message: string) => {
+    setSession(null);
+    setNotice(message);
+    setLoginFor(view);
+  }, [view]);
+
+  return (
+    <PublicShell>
+      <header className="cr-board-head">
+        <div>
+          <h1>해석·영작 게시판</h1>
+          {session && <p><b>{session.name}</b> 로그인 중</p>}
+        </div>
+        <nav>
+          <button className={`btn ${view.kind === 'list' && !loginFor ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => go({ kind: 'list' })}>과제 목록</button>
+          <button className={`btn ${view.kind === 'mine' || loginFor?.kind === 'mine' ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => go({ kind: 'mine' })}>내 제출 보기</button>
+          {session && <button className="btn btn-secondary" type="button" onClick={logout}>다음 학생 (로그아웃)</button>}
+        </nav>
+      </header>
+
+      {notice && <p className="cr-error cr-notice" role="alert">{notice}</p>}
+
+      {loginFor ? (
+        <LoginPanel
+          ownerId={ownerId}
+          purpose={loginFor.kind === 'mine' ? '내 제출을 보려면' : '답을 적으려면'}
+          onCancel={() => setLoginFor(null)}
+          onLogin={next => {
+            setSession(next);
+            setNotice('');
+            setView(loginFor);
+            setLoginFor(null);
+          }}
+        />
+      ) : view.kind === 'set' && session ? (
+        <SetAnswerView
+          key={view.setId}
+          ownerId={ownerId}
+          setId={view.setId}
+          session={session}
+          onExpired={sessionExpired}
+          onGo={go}
+          onLogout={logout}
+        />
+      ) : view.kind === 'mine' && session ? (
+        <MySubmissionsView session={session} onExpired={sessionExpired} />
+      ) : (
+        <BoardList ownerId={ownerId} onOpen={setId => go({ kind: 'set', setId })} />
+      )}
+    </PublicShell>
+  );
+}
+
+function BoardList({ ownerId, onOpen }: { ownerId: string; onOpen: (setId: string) => void }) {
+  const [sets, setSets] = useState<BoardSet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [resultToken, setResultToken] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const loaded = await correctionsApi.publicGetSet(upperCode);
-        setSet(loaded);
-        setAnswers(loaded.sentences.map(() => ''));
-      } catch (e) {
-        setError(errorMessage(e));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [upperCode]);
+    let active = true;
+    correctionsApi.publicBoard(ownerId)
+      .then(rows => {
+        if (active) setSets(rows);
+      })
+      .catch(e => {
+        if (active) setError(errorMessage(e));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ownerId]);
 
-  if (loading) return <PublicShell><div className="cr-public-card">과제를 불러오는 중...</div></PublicShell>;
-  if (error || !set) {
+  if (loading) return <div className="cr-public-card">불러오는 중...</div>;
+  if (error) return <div className="cr-public-card"><h2>게시판을 열 수 없어요</h2><p>{error}</p></div>;
+  if (sets.length === 0) return <div className="cr-public-card"><h2>올라온 과제가 없어요</h2><p>선생님이 과제를 올리면 여기에 보여요.</p></div>;
+
+  return (
+    <ul className="cr-board-list">
+      {sets.map(set => (
+        <li key={set.id}>
+          <button type="button" className="cr-board-item" onClick={() => onOpen(set.id)}>
+            <span className={`cr-badge ${set.mode === 'translate' ? 'open' : 'pending'}`}>{MODE_LABELS[set.mode]}</span>
+            <span className="cr-board-title">{set.title}</span>
+            <span className="cr-set-meta">{set.sentenceCount}문장 · {formatDateTime(set.createdAt)}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LoginPanel({
+  ownerId,
+  purpose,
+  onCancel,
+  onLogin,
+}: {
+  ownerId: string;
+  purpose: string;
+  onCancel: () => void;
+  onLogin: (session: StudentSession) => void;
+}) {
+  const [name, setName] = useState('');
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return setError('이름을 적어 주세요.');
+    if (!isValidPin(pin)) return setError('비번은 숫자 4자리예요.');
+    setBusy(true);
+    setError('');
+    try {
+      let result = await correctionsApi.publicLogin(ownerId, trimmed, pin);
+      if (result.needsRegister) {
+        const ok = window.confirm(`‘${trimmed}’ 이름은 처음이에요.\n이 이름과 비번 ${pin}(으)로 등록할까요?\n\n비번은 다음에도 써야 하니 꼭 기억해 주세요.`);
+        if (!ok) return;
+        result = await correctionsApi.publicLogin(ownerId, trimmed, pin, true);
+      }
+      if (!result.needsRegister) onLogin({ token: result.token, name: result.name });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="cr-public-card cr-login" onSubmit={event => void submit(event)}>
+      <h2>{purpose} 이름과 비번을 넣어 주세요</h2>
+      <p>처음이면 비번 4자리를 새로 정하면 돼요.</p>
+      <label htmlFor="cr-login-name">이름</label>
+      <input id="cr-login-name" className="form-control" value={name} maxLength={20} autoComplete="off" onChange={event => setName(event.target.value)} autoFocus />
+      <label htmlFor="cr-login-pin">비번 (숫자 4자리)</label>
+      <input
+        id="cr-login-pin"
+        className="form-control"
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={4}
+        value={pin}
+        onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+      />
+      {error && <p className="cr-error" role="alert">{error}</p>}
+      <div className="cr-done-actions">
+        <button className="btn btn-secondary" type="button" onClick={onCancel}>취소</button>
+        <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? '확인 중...' : '들어가기'}</button>
+      </div>
+    </form>
+  );
+}
+
+function SetAnswerView({
+  ownerId,
+  setId,
+  session,
+  onExpired,
+  onGo,
+  onLogout,
+}: {
+  ownerId: string;
+  setId: string;
+  session: StudentSession;
+  onExpired: (message: string) => void;
+  onGo: (view: BoardView) => void;
+  onLogout: () => void;
+}) {
+  const [set, setSet] = useState<PublicCorrectionSet | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [previous, setPrevious] = useState<{ published: boolean } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [done, setDone] = useState<{ resubmitted: boolean } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([correctionsApi.publicGetSet(ownerId, setId), correctionsApi.publicMySubmission(session.token, setId)])
+      .then(([loaded, mine]) => {
+        if (!active) return;
+        setSet(loaded);
+        setPrevious(mine ? { published: mine.published } : null);
+        setAnswers(loaded.sentences.map((_, index) => mine?.answers[index] ?? ''));
+      })
+      .catch(e => {
+        if (!active) return;
+        if (e instanceof LoginRequiredError) onExpired(e.message);
+        else setError(errorMessage(e));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ownerId, setId, session.token, onExpired]);
+
+  if (loading) return <div className="cr-public-card">과제를 불러오는 중...</div>;
+  if (error || !set) return <div className="cr-public-card"><h2>열 수 없어요</h2><p>{error || '과제를 찾을 수 없습니다.'}</p></div>;
+
+  if (previous?.published) {
     return (
-      <PublicShell>
-        <div className="cr-public-card">
-          <h2>들어갈 수 없어요</h2>
-          <p>{error || '과제를 찾을 수 없습니다.'}</p>
+      <div className="cr-public-card cr-done">
+        <h2>이미 첨삭이 공개된 과제예요</h2>
+        <p>선생님이 첨삭을 공개해서 다시 낼 수 없어요.</p>
+        <div className="cr-done-actions">
+          <button className="btn btn-primary" type="button" onClick={() => onGo({ kind: 'mine' })}>내 제출 보기</button>
         </div>
-      </PublicShell>
+      </div>
+    );
+  }
+
+  if (done) {
+    return (
+      <div className="cr-public-card cr-done">
+        <Check size={40} />
+        <h2>{session.name} {done.resubmitted ? '다시 제출 완료!' : '제출 완료!'}</h2>
+        <p>선생님이 첨삭을 확인하면 ‘내 제출 보기’에서 볼 수 있어요. 그 전까지는 다시 고쳐서 낼 수 있어요.</p>
+        <div className="cr-done-actions">
+          <button className="btn btn-secondary" type="button" onClick={() => onGo({ kind: 'list' })}>다른 과제 하기</button>
+          <button className="btn btn-primary" type="button" onClick={onLogout}>다음 학생 (로그아웃)</button>
+        </div>
+      </div>
     );
   }
 
   const guide = MODE_GUIDE[set.mode];
   const filled = answers.filter(answer => answer.trim()).length;
 
-  const reset = () => {
-    setAnswers(set.sentences.map(() => ''));
-    setName('');
-    setResultToken('');
-    setSubmitError('');
-    window.scrollTo(0, 0);
-  };
-
   const submit = async () => {
-    if (!name.trim()) {
-      setSubmitError('이름을 적어 주세요.');
-      return;
-    }
     if (filled === 0) {
       setSubmitError('한 문장 이상 적어 주세요.');
       return;
@@ -719,38 +1035,23 @@ export function PublicCorrectionRoute({ code }: { code: string }) {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const result = await correctionsApi.publicSubmit(upperCode, name.trim(), answers);
-      setResultToken(result.resultToken);
+      setDone(await correctionsApi.publicSubmit(session.token, set.id, answers));
       window.scrollTo(0, 0);
     } catch (e) {
-      setSubmitError(errorMessage(e));
+      if (e instanceof LoginRequiredError) onExpired(e.message);
+      else setSubmitError(errorMessage(e));
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (resultToken) {
-    return (
-      <PublicShell>
-        <div className="cr-public-card cr-done">
-          <Check size={40} />
-          <h2>{name.trim()} 제출 완료!</h2>
-          <p>선생님이 첨삭을 확인한 뒤에 결과를 볼 수 있어요.</p>
-          <div className="cr-done-actions">
-            <a className="btn btn-secondary" href={correctionResultUrl(resultToken)}>내 결과 페이지</a>
-            <button className="btn btn-primary" type="button" onClick={reset}>다음 학생 작성하기</button>
-          </div>
-        </div>
-      </PublicShell>
-    );
-  }
-
   return (
-    <PublicShell>
+    <>
       <header className="cr-public-head">
-        <span className="cr-badge open">{MODE_LABELS[set.mode]}</span>
+        <span className={`cr-badge ${set.mode === 'translate' ? 'open' : 'pending'}`}>{MODE_LABELS[set.mode]}</span>
         <h1>{set.title}</h1>
         <p>{guide.student}</p>
+        {previous && <p className="cr-resubmit-note">전에 낸 답이 들어 있어요. 고쳐서 다시 내면 새 답으로 바뀌어요.</p>}
       </header>
 
       <ol className="cr-public-list">
@@ -773,46 +1074,32 @@ export function PublicCorrectionRoute({ code }: { code: string }) {
       </ol>
 
       <footer className="cr-public-submit">
-        <p>{filled}/{set.sentences.length}문장 작성</p>
-        <label htmlFor="cr-student-name">이름</label>
-        <input
-          id="cr-student-name"
-          className="form-control"
-          value={name}
-          maxLength={20}
-          placeholder="이름을 적어 주세요"
-          onChange={event => setName(event.target.value)}
-        />
+        <p>{session.name} · {filled}/{set.sentences.length}문장 작성</p>
         {submitError && <p className="cr-error" role="alert">{submitError}</p>}
         <button className="btn btn-primary" type="button" onClick={() => void submit()} disabled={submitting}>
-          <Send size={17} /> {submitting ? 'AI가 첨삭하는 중... (최대 1분)' : '제출하기'}
+          <Send size={17} /> {submitting ? 'AI가 첨삭하는 중... (최대 1분)' : previous ? '다시 제출하기' : '제출하기'}
         </button>
       </footer>
-    </PublicShell>
+    </>
   );
 }
 
-// ---------------------------------------------------------------------------
-// 학생 결과 화면 — #/c-result/TOKEN (선생님이 공개한 뒤에만 첨삭 표시)
-// ---------------------------------------------------------------------------
-
-export function PublicCorrectionResultRoute({ token }: { token: string }) {
-  const [result, setResult] = useState<PublicCorrectionResult | null>(null);
-  const [error, setError] = useState('');
+function MySubmissionsView({ session, onExpired }: { session: StudentSession; onExpired: (message: string) => void }) {
+  const [items, setItems] = useState<MySubmission[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [reloadKey, setReloadKey] = useState(0);
+  const [error, setError] = useState('');
+  const [openId, setOpenId] = useState('');
 
   useEffect(() => {
     let active = true;
-    correctionsApi.publicGetResult(token.trim())
-      .then(loaded => {
-        if (!active) return;
-        setResult(loaded);
-        setError('');
+    correctionsApi.publicMyList(session.token)
+      .then(rows => {
+        if (active) setItems(rows);
       })
       .catch(e => {
-        if (active) setError(errorMessage(e));
+        if (!active) return;
+        if (e instanceof LoginRequiredError) onExpired(e.message);
+        else setError(errorMessage(e));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -820,46 +1107,45 @@ export function PublicCorrectionResultRoute({ token }: { token: string }) {
     return () => {
       active = false;
     };
-  }, [token, reloadKey]);
+  }, [session.token, onExpired]);
 
-  if (loading) return <PublicShell><div className="cr-public-card">결과를 불러오는 중...</div></PublicShell>;
-  if (error || !result) {
-    return <PublicShell><div className="cr-public-card"><h2>결과를 볼 수 없어요</h2><p>{error}</p></div></PublicShell>;
-  }
-
-  if (!result.published || !result.items) {
-    return (
-      <PublicShell>
-        <div className="cr-public-card cr-done">
-          <h2>{result.studentName}의 {result.set.title}</h2>
-          <p>선생님이 첨삭을 확인하고 있어요. 나중에 다시 열어 주세요.</p>
-          <button className="btn btn-secondary" type="button" onClick={() => { setLoading(true); setReloadKey(key => key + 1); }}><RefreshCw size={16} /> 다시 확인</button>
-        </div>
-      </PublicShell>
-    );
-  }
+  if (loading) return <div className="cr-public-card">불러오는 중...</div>;
+  if (error) return <div className="cr-public-card"><h2>불러올 수 없어요</h2><p>{error}</p></div>;
+  if (items.length === 0) return <div className="cr-public-card"><h2>아직 제출한 과제가 없어요</h2><p>‘과제 목록’에서 과제를 골라 답을 적어 보세요.</p></div>;
 
   return (
-    <PublicShell>
-      <header className="cr-public-head">
-        <span className="cr-badge open">{MODE_LABELS[result.set.mode]} 첨삭 결과</span>
-        <h1>{result.set.title}</h1>
-        <p>{result.studentName}</p>
-        <ScorePills completeness={result.completeness ?? 0} accuracy={result.accuracy ?? 0} />
-      </header>
-      <ol className="cr-public-list">
-        {result.set.sentences.map((sentence, index) => {
-          const item = result.items?.[index];
-          return (
-            <li key={index} className="cr-public-item">
-              <p className="cr-source"><span>{index + 1}</span>{sentence}</p>
-              <p className="cr-answer"><b>내 답</b>{item?.answer || <em>(빈칸)</em>}</p>
-              {item?.corrected && <p className="cr-corrected"><b>첨삭</b>{item.corrected}</p>}
-              {item?.explanation && <p className="cr-explanation"><b>설명</b>{item.explanation}</p>}
-            </li>
-          );
-        })}
-      </ol>
-    </PublicShell>
+    <ul className="cr-board-list">
+      {items.map(item => {
+        const open = openId === item.setId;
+        return (
+          <li key={item.setId} className="cr-mine">
+            <button type="button" className="cr-board-item" onClick={() => setOpenId(open ? '' : item.setId)} aria-expanded={open}>
+              <span className={`cr-badge ${item.mode === 'translate' ? 'open' : 'pending'}`}>{MODE_LABELS[item.mode]}</span>
+              <span className="cr-board-title">{item.title}</span>
+              <span className="cr-set-meta">{formatDateTime(item.submittedAt)} 제출</span>
+              {item.published
+                ? <ScorePills completeness={item.completeness ?? 0} accuracy={item.accuracy ?? 0} />
+                : <span className="cr-badge closed">선생님 확인 중</span>}
+            </button>
+            {open && (
+              <ol className="cr-public-list cr-mine-body">
+                {item.sentences.map((sentence, index) => {
+                  const correction = item.items?.[index];
+                  const answer = item.answers[index];
+                  return (
+                    <li key={index} className="cr-public-item">
+                      <p className="cr-source"><span>{index + 1}</span>{sentence}</p>
+                      <p className="cr-answer"><b>내 답</b>{answer || <em>(빈칸)</em>}</p>
+                      {correction?.corrected && <p className="cr-corrected"><b>첨삭</b>{correction.corrected}</p>}
+                      {correction?.explanation && <p className="cr-explanation"><b>설명</b>{correction.explanation}</p>}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

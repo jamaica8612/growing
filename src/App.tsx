@@ -23,7 +23,7 @@ import { MakeupManager } from './components/MakeupManager';
 import { KakaoManager } from './components/KakaoManager';
 import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
 import { ListeningMaterials } from './components/ListeningMaterials';
-import { Corrections, PublicCorrectionResultRoute, PublicCorrectionRoute } from './components/Corrections';
+import { Corrections, PublicCorrectionBoardRoute } from './components/Corrections';
 import {
   MOBILE_QUICK_NAV_ITEMS,
   PRIMARY_NAV_GROUPS,
@@ -125,12 +125,8 @@ function App() {
     return <PublicResultRoute token={decodeURIComponent(hashRoute.replace('#/exam-result/', ''))} />;
   }
 
-  if (hashRoute.startsWith('#/c-result/')) {
-    return <PublicCorrectionResultRoute token={decodeURIComponent(hashRoute.replace('#/c-result/', ''))} />;
-  }
-
-  if (hashRoute.startsWith('#/c/')) {
-    return <PublicCorrectionRoute code={decodeURIComponent(hashRoute.replace('#/c/', ''))} />;
+  if (hashRoute.startsWith('#/board/')) {
+    return <PublicCorrectionBoardRoute ownerId={decodeURIComponent(hashRoute.replace('#/board/', ''))} />;
   }
 
   if (hashRoute.startsWith('#/exam/')) {
@@ -304,7 +300,7 @@ function AcademyApp({ session }: { session: Session }) {
       case 'exams':
         return <Exams ownerId={session.user.id} classes={classes} students={students} onSendGuideToMessaging={handleAssistantDraftToMessaging} />;
       case 'corrections':
-        return <Corrections key={session.user.id} />;
+        return <Corrections key={session.user.id} ownerId={session.user.id} />;
       case 'attendance':
         return (
           <AttendanceManager

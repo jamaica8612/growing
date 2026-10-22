@@ -13,28 +13,92 @@ export interface CorrectionItem {
 export const MAX_SENTENCES = 40;
 export const MAX_ANSWER_LENGTH = 1_000;
 export const MAX_NAME_LENGTH = 20;
+export const SESSION_TTL_SECONDS = 2 * 60 * 60;
+export const MAX_FAILED_LOGINS = 5;
+export const LOGIN_LOCK_MS = 10 * 60 * 1000;
 
-const CODE_PATTERN = /^[A-Z0-9]{6}$/;
-const RESULT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PIN_PATTERN = /^\d{4}$/;
+const textEncoder = new TextEncoder();
 
 export function isCorrectionMode(value: unknown): value is CorrectionMode {
   return value === 'translate' || value === 'compose';
 }
 
-export function isValidCode(value: string): boolean {
-  return CODE_PATTERN.test(value);
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_PATTERN.test(value);
 }
 
-export function isValidResultToken(value: string): boolean {
-  return RESULT_TOKEN_PATTERN.test(value);
+export function isValidPin(value: unknown): value is string {
+  return typeof value === 'string' && PIN_PATTERN.test(value);
 }
 
-export function makeResultToken(): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  let token = '';
-  for (const byte of bytes) token += alphabet[byte % alphabet.length];
-  return token;
+function toHex(bytes: ArrayBuffer | Uint8Array): string {
+  return Array.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function makePinSalt(): string {
+  return toHex(crypto.getRandomValues(new Uint8Array(16)));
+}
+
+// 앱(선생님 비번 초기화)과 같은 방식: SHA-256(salt + ':' + pin)
+export async function hashPin(salt: string, pin: string): Promise<string> {
+  return toHex(await crypto.subtle.digest('SHA-256', textEncoder.encode(`${salt}:${pin}`)));
+}
+
+export function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// ---- 학생 로그인 토큰 (HMAC 서명, 2시간) ----
+
+export interface SessionClaims {
+  v: 1;
+  ownerId: string;
+  studentId: string;
+  name: string;
+  exp: number;
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecode(value: string): Uint8Array {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+async function hmac(secret: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return base64UrlEncode(new Uint8Array(await crypto.subtle.sign('HMAC', key, textEncoder.encode(payload))));
+}
+
+export async function signSession(secret: string, claims: Omit<SessionClaims, 'v' | 'exp'>, now = Date.now()): Promise<string> {
+  const body: SessionClaims = { v: 1, ...claims, exp: Math.floor(now / 1000) + SESSION_TTL_SECONDS };
+  const payload = base64UrlEncode(textEncoder.encode(JSON.stringify(body)));
+  return `${payload}.${await hmac(secret, payload)}`;
+}
+
+export async function verifySession(secret: string, token: unknown, now = Date.now()): Promise<SessionClaims | null> {
+  if (typeof token !== 'string' || token.length > 1_000) return null;
+  const [payload, signature, extra] = token.split('.');
+  if (!payload || !signature || extra !== undefined) return null;
+  if (!constantTimeEqual(await hmac(secret, payload), signature)) return null;
+  try {
+    const claims = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload))) as SessionClaims;
+    if (claims.v !== 1 || !isUuid(claims.ownerId) || !isUuid(claims.studentId) || typeof claims.name !== 'string') return null;
+    if (typeof claims.exp !== 'number' || claims.exp * 1000 <= now) return null;
+    return claims;
+  } catch {
+    return null;
+  }
 }
 
 export function normalizeName(value: unknown): string | null {

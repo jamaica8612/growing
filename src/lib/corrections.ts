@@ -1,11 +1,11 @@
 import { supabase } from './supabase';
-import { makeShortCode } from './exams';
 
 // ============================================================================
-// 해석/영작 첨삭
-//   테이블  growing_correction_sets / growing_correction_submissions (owner RLS)
-//   엣지함수 correction-public (무로그인 — 학생 제출·AI 첨삭·결과, regrade만 JWT)
-// 학생 제출은 선생님이 공개(published)하기 전까지 학생에게 보이지 않는다.
+// 해석/영작 첨삭 게시판
+//   테이블  growing_correction_sets / _students / _submissions (owner RLS)
+//   엣지함수 correction-public (무로그인 — 게시판·학생 로그인·제출·내 제출, regrade만 JWT)
+// 학생은 게시판 링크(#/board/<선생님 id>)에서 이름 + 4자리 비번으로 들어온다.
+// 첨삭은 선생님이 공개(published)하기 전까지 학생에게 보이지 않는다.
 // ============================================================================
 
 export type CorrectionMode = 'translate' | 'compose';
@@ -19,7 +19,6 @@ export interface CorrectionSet {
   title: string;
   sentences: string[];
   status: CorrectionSetStatus;
-  shortCode: string;
   createdAt: string;
 }
 
@@ -34,31 +33,53 @@ export interface CorrectionItem {
 export interface CorrectionSubmission {
   id: string;
   setId: string;
+  studentId: string;
   studentName: string;
   items: CorrectionItem[];
   completeness: number;
   accuracy: number;
   gradingStatus: 'graded' | 'failed';
   published: boolean;
-  resultToken: string;
   submittedAt: string;
 }
 
+export interface CorrectionStudent {
+  id: string;
+  name: string;
+  // 불러온 시점에 비번 오류로 잠겨 있었는지
+  locked: boolean;
+  createdAt: string;
+}
+
+export interface BoardSet {
+  id: string;
+  title: string;
+  mode: CorrectionMode;
+  sentenceCount: number;
+  createdAt: string;
+}
+
 export interface PublicCorrectionSet {
+  id: string;
   title: string;
   mode: CorrectionMode;
   sentences: string[];
 }
 
-export interface PublicCorrectionResult {
-  set: PublicCorrectionSet;
-  studentName: string;
+export interface MySubmission {
+  setId: string;
+  title: string;
+  mode: CorrectionMode;
+  sentences: string[];
+  answers: string[];
   submittedAt: string;
   published: boolean;
   completeness?: number;
   accuracy?: number;
   items?: CorrectionItem[];
 }
+
+export type LoginResult = { needsRegister: true } | { needsRegister: false; token: string; name: string; registered: boolean };
 
 export const MAX_SENTENCES = 40;
 
@@ -127,12 +148,20 @@ export function formatCorrectionForCopy(
   return [...header, '', blocks.join('\n\n')].join('\n');
 }
 
-export function correctionJoinUrl(code: string): string {
-  return `${window.location.origin}${window.location.pathname}#/c/${code}`;
+export function correctionBoardUrl(ownerId: string): string {
+  return `${window.location.origin}${window.location.pathname}#/board/${ownerId}`;
 }
 
-export function correctionResultUrl(token: string): string {
-  return `${window.location.origin}${window.location.pathname}#/c-result/${token}`;
+export function isValidPin(pin: string): boolean {
+  return /^\d{4}$/.test(pin);
+}
+
+const toHex = (bytes: ArrayBuffer | Uint8Array) =>
+  Array.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+
+// correction-public/logic.ts의 hashPin과 같은 방식 (선생님 비번 초기화용)
+export async function hashPin(salt: string, pin: string): Promise<string> {
+  return toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}:${pin}`)));
 }
 
 type Row = Record<string, unknown>;
@@ -154,37 +183,39 @@ const toSet = (r: Row): CorrectionSet => ({
   title: String(r.title ?? ''),
   sentences: Array.isArray(r.sentences) ? r.sentences.map(String) : [],
   status: r.status === 'closed' ? 'closed' : 'open',
-  shortCode: String(r.short_code ?? ''),
   createdAt: String(r.created_at ?? ''),
 });
 
 const toSubmission = (r: Row): CorrectionSubmission => ({
   id: String(r.id),
   setId: String(r.set_id),
+  studentId: String(r.student_id ?? ''),
   studentName: String(r.student_name ?? ''),
   items: toItems(r.items),
   completeness: Number(r.completeness ?? 0),
   accuracy: Number(r.accuracy ?? 0),
   gradingStatus: r.grading_status === 'failed' ? 'failed' : 'graded',
   published: Boolean(r.published),
-  resultToken: String(r.result_token ?? ''),
   submittedAt: String(r.submitted_at ?? ''),
 });
 
+const toMode = (value: unknown): CorrectionMode => (value === 'compose' ? 'compose' : 'translate');
+const toStrings = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : []);
+
+// 로그인 시간이 지나 다시 로그인해야 할 때 던지는 에러
+export class LoginRequiredError extends Error {}
+
 async function functionError(error: unknown, data: unknown, fallback: string): Promise<never> {
-  if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' && data.error) {
-    throw new Error(data.error);
-  }
+  let body = data as { error?: unknown; loginRequired?: unknown } | null;
   const context = error && typeof error === 'object' && 'context' in error ? error.context : null;
-  if (context instanceof Response) {
+  if (!(body && typeof body.error === 'string') && context instanceof Response) {
     try {
-      const body = await context.clone().json() as { error?: unknown };
-      if (typeof body.error === 'string' && body.error.trim()) throw new Error(body.error.trim());
-    } catch (e) {
-      if (e instanceof Error && e.message) throw e;
-    }
+      body = await context.clone().json() as { error?: unknown; loginRequired?: unknown };
+    } catch { /* fall through to the fallback message */ }
   }
-  throw new Error(fallback);
+  const message = body && typeof body.error === 'string' && body.error.trim() ? body.error.trim() : fallback;
+  if (body?.loginRequired === true) throw new LoginRequiredError(message);
+  throw new Error(message);
 }
 
 export const correctionsApi = {
@@ -199,17 +230,13 @@ export const correctionsApi = {
   },
 
   async createSet(input: { mode: CorrectionMode; title: string; sentences: string[] }): Promise<CorrectionSet> {
-    // 코드 충돌(unique) 시 몇 번 다시 시도한다.
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const { data, error } = await supabase
-        .from('growing_correction_sets')
-        .insert({ mode: input.mode, title: input.title, sentences: input.sentences, short_code: makeShortCode() })
-        .select('*')
-        .single();
-      if (!error) return toSet(data);
-      if (error.code !== '23505') throw error;
-    }
-    throw new Error('코드를 만들지 못했습니다. 다시 시도해 주세요.');
+    const { data, error } = await supabase
+      .from('growing_correction_sets')
+      .insert({ mode: input.mode, title: input.title, sentences: input.sentences })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return toSet(data);
   },
 
   async updateSet(id: string, patch: { title?: string; sentences?: string[]; status?: CorrectionSetStatus }): Promise<void> {
@@ -259,40 +286,89 @@ export const correctionsApi = {
     return { items: toItems(data.items), completeness: Number(data.completeness ?? 0), accuracy: Number(data.accuracy ?? 0) };
   },
 
-  // ---- 학생 (무로그인) ----
-  async publicGetSet(code: string): Promise<PublicCorrectionSet> {
-    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'get_set', code } });
+  async listStudents(): Promise<CorrectionStudent[]> {
+    const { data, error } = await supabase
+      .from('growing_correction_students')
+      .select('id, name, locked_until, created_at')
+      .order('name');
+    if (error) throw error;
+    return (data ?? []).map(r => ({
+      id: String(r.id),
+      name: String(r.name ?? ''),
+      locked: Boolean(r.locked_until && new Date(String(r.locked_until)).getTime() > Date.now()),
+      createdAt: String(r.created_at ?? ''),
+    }));
+  },
+
+  async resetStudentPin(id: string, pin: string): Promise<void> {
+    if (!isValidPin(pin)) throw new Error('비번은 숫자 4자리예요.');
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    const { error } = await supabase
+      .from('growing_correction_students')
+      .update({ pin_salt: salt, pin_hash: await hashPin(salt, pin), failed_attempts: 0, locked_until: null })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteStudent(id: string): Promise<void> {
+    const { error } = await supabase.from('growing_correction_students').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // ---- 학생 게시판 (무로그인) ----
+  async publicBoard(ownerId: string): Promise<BoardSet[]> {
+    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'board', ownerId } });
+    if (error || data?.error) await functionError(error, data, '게시판을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    return (Array.isArray(data.sets) ? data.sets as Row[] : []).map(set => ({
+      id: String(set.id),
+      title: String(set.title ?? ''),
+      mode: toMode(set.mode),
+      sentenceCount: Number(set.sentenceCount ?? 0),
+      createdAt: String(set.createdAt ?? ''),
+    }));
+  },
+
+  async publicGetSet(ownerId: string, setId: string): Promise<PublicCorrectionSet> {
+    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'get_set', ownerId, setId } });
     if (error || data?.error) await functionError(error, data, '과제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     const set = data.set as Row;
-    return {
-      title: String(set.title ?? ''),
-      mode: set.mode === 'compose' ? 'compose' : 'translate',
-      sentences: Array.isArray(set.sentences) ? set.sentences.map(String) : [],
-    };
+    return { id: String(set.id), title: String(set.title ?? ''), mode: toMode(set.mode), sentences: toStrings(set.sentences) };
   },
 
-  async publicSubmit(code: string, name: string, answers: string[]): Promise<{ resultToken: string }> {
-    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'submit', code, name, answers } });
+  async publicLogin(ownerId: string, name: string, pin: string, register = false): Promise<LoginResult> {
+    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'login', ownerId, name, pin, register } });
+    if (error || data?.error) await functionError(error, data, '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    if (data.needsRegister) return { needsRegister: true };
+    return { needsRegister: false, token: String(data.token), name: String(data.name), registered: Boolean(data.registered) };
+  },
+
+  async publicMySubmission(token: string, setId: string): Promise<{ answers: string[]; published: boolean } | null> {
+    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'my_submission', token, setId } });
+    if (error || data?.error) await functionError(error, data, '이전 답안을 불러오지 못했습니다.');
+    if (!data.submission) return null;
+    return { answers: toStrings(data.submission.answers), published: Boolean(data.submission.published) };
+  },
+
+  async publicSubmit(token: string, setId: string, answers: string[]): Promise<{ resubmitted: boolean }> {
+    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'submit', token, setId, answers } });
     if (error || data?.error) await functionError(error, data, '제출하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-    return { resultToken: String(data.resultToken) };
+    return { resubmitted: Boolean(data.resubmitted) };
   },
 
-  async publicGetResult(token: string): Promise<PublicCorrectionResult> {
-    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'get_result', token } });
-    if (error || data?.error) await functionError(error, data, '결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
-    const set = data.set as Row;
-    return {
-      set: {
-        title: String(set.title ?? ''),
-        mode: set.mode === 'compose' ? 'compose' : 'translate',
-        sentences: Array.isArray(set.sentences) ? set.sentences.map(String) : [],
-      },
-      studentName: String(data.studentName ?? ''),
-      submittedAt: String(data.submittedAt ?? ''),
-      published: Boolean(data.published),
-      completeness: data.published ? Number(data.completeness ?? 0) : undefined,
-      accuracy: data.published ? Number(data.accuracy ?? 0) : undefined,
-      items: data.published ? toItems(data.items) : undefined,
-    };
+  async publicMyList(token: string): Promise<MySubmission[]> {
+    const { data, error } = await supabase.functions.invoke('correction-public', { body: { action: 'my_list', token } });
+    if (error || data?.error) await functionError(error, data, '내 제출을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    return (Array.isArray(data.submissions) ? data.submissions as Row[] : []).map(item => ({
+      setId: String(item.setId),
+      title: String(item.title ?? ''),
+      mode: toMode(item.mode),
+      sentences: toStrings(item.sentences),
+      answers: toStrings(item.answers),
+      submittedAt: String(item.submittedAt ?? ''),
+      published: Boolean(item.published),
+      completeness: item.published ? Number(item.completeness ?? 0) : undefined,
+      accuracy: item.published ? Number(item.accuracy ?? 0) : undefined,
+      items: item.published ? toItems(item.items) : undefined,
+    }));
   },
 };
