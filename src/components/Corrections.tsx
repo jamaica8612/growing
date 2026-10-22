@@ -1125,7 +1125,7 @@ function SetAnswerView({
         <p>{session.name} · {filled}/{set.sentences.length}문장 작성</p>
         {submitError && <p className="cr-error" role="alert">{submitError}</p>}
         <button className="btn btn-primary" type="button" onClick={() => void submit()} disabled={submitting}>
-          <Send size={17} /> {submitting ? 'AI가 첨삭하는 중... (최대 1분)' : previous ? '다시 제출하기' : '제출하기'}
+          <Send size={17} /> {submitting ? '제출하는 중... (최대 1분)' : previous ? '다시 제출하기' : '제출하기'}
         </button>
       </footer>
     </>
