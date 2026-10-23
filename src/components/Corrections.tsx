@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   AlertTriangle,
@@ -171,9 +171,37 @@ const charLength = (value: string) => Array.from(value).length;
 
 // 첨삭 칸: 단어를 누르면 빨강/검정이 바뀌고, 드래그로 고른 부분은 버튼으로 칠한다.
 // ‘글 고치기’로 문장을 고치면 학생 답과 비교해 빨간색을 자동으로 다시 칠한다.
+// 휴대폰은 손잡이로 범위를 조정하고, 버튼을 누르면 선택이 풀리기도 해서
+// selectionchange로 마지막에 고른 범위를 기억해 둔다(버튼·단어 누르기·✕로 지운다).
 function MarkEditor({ answer, value, onChange }: { answer: string; value: string; onChange: (value: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onSelectionChange = () => {
+      const box = boxRef.current;
+      const selection = window.getSelection();
+      if (!box || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+      const position = (node: Node | null, nodeOffset: number) => {
+        const holder = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement | null;
+        const span = holder?.closest<HTMLElement>('[data-start]');
+        if (!span || !box.contains(span)) return null;
+        const before = node?.nodeType === Node.TEXT_NODE ? (node.textContent ?? '').slice(0, nodeOffset) : '';
+        return Number(span.dataset.start) + charLength(before);
+      };
+      const a = position(selection.anchorNode, selection.anchorOffset);
+      const b = position(selection.focusNode, selection.focusOffset);
+      if (a === null || b === null) {
+        // 다른 칸에서 글자를 고르면 이 칸의 선택은 잊는다.
+        if (!box.contains(selection.anchorNode) && !box.contains(selection.focusNode)) setRange(null);
+        return;
+      }
+      setRange(a === b ? null : { start: Math.min(a, b), end: Math.max(a, b) });
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, []);
 
   const tokens: ReactNode[] = [];
   let offset = 0;
@@ -190,6 +218,7 @@ function MarkEditor({ answer, value, onChange }: { answer: string; value: string
           className={`${segment.red ? 'cr-red' : ''}${word ? ' cr-word' : ''}`}
           onClick={word ? () => {
             if (window.getSelection()?.isCollapsed === false) return;
+            setRange(null);
             onChange(toggleMarkWord(value, start));
           } : undefined}
         >
@@ -198,25 +227,6 @@ function MarkEditor({ answer, value, onChange }: { answer: string; value: string
       );
     }
   });
-
-  // 드래그로 고른 부분을 글자 위치로 바꾼다.
-  const readSelection = (box: HTMLElement) => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      setRange(null);
-      return;
-    }
-    const position = (node: Node | null, nodeOffset: number) => {
-      const holder = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement | null;
-      const span = holder?.closest<HTMLElement>('[data-start]');
-      if (!span || !box.contains(span)) return null;
-      const before = node?.nodeType === Node.TEXT_NODE ? (node.textContent ?? '').slice(0, nodeOffset) : '';
-      return Number(span.dataset.start) + charLength(before);
-    };
-    const a = position(selection.anchorNode, selection.anchorOffset);
-    const b = position(selection.focusNode, selection.focusOffset);
-    setRange(a === null || b === null || a === b ? null : { start: Math.min(a, b), end: Math.max(a, b) });
-  };
 
   const paint = (red: boolean) => {
     if (!range) return;
@@ -244,20 +254,22 @@ function MarkEditor({ answer, value, onChange }: { answer: string; value: string
 
   return (
     <div className="cr-mark">
-      <div
-        className="cr-mark-box"
-        onMouseUp={event => readSelection(event.currentTarget)}
-        onTouchEnd={event => readSelection(event.currentTarget)}
-        onKeyUp={event => readSelection(event.currentTarget)}
-      >
+      <div ref={boxRef} className="cr-mark-box">
         {tokens.length > 0 ? tokens : <em className="cr-mark-empty">첨삭 없음</em>}
       </div>
       <div className="cr-mark-tools">
-        <span>단어를 누르면 빨강 ↔ 검정. 여러 글자는 드래그해서 고른 뒤 버튼을 누르세요.</span>
-        <button className="btn btn-secondary cr-red-btn" type="button" disabled={!range} onMouseDown={event => event.preventDefault()} onClick={() => paint(true)}>선택 → 빨간색</button>
-        <button className="btn btn-secondary" type="button" disabled={!range} onMouseDown={event => event.preventDefault()} onClick={() => paint(false)}>선택 → 검정</button>
-        <button className="btn btn-secondary" type="button" onClick={() => onChange(autoMarkCorrection(answer, value))}>자동 표시</button>
-        <button className="btn btn-secondary" type="button" onClick={() => setEditing(true)}><PenLine size={14} /> 글 고치기</button>
+        {range ? (
+          <span className="cr-mark-picked">
+            고른 글자: <b>‘{Array.from(stripMarks(value)).slice(range.start, range.end).join('')}’</b>
+            <button type="button" aria-label="고른 글자 지우기" onClick={() => setRange(null)}><X size={13} /></button>
+          </span>
+        ) : (
+          <span>단어를 누르면 빨강 ↔ 검정. 여러 글자는 드래그(휴대폰은 길게 눌러 고르기)한 뒤 버튼을 누르세요.</span>
+        )}
+        <button className="btn btn-secondary cr-red-btn" type="button" disabled={!range} onPointerDown={event => event.preventDefault()} onClick={() => paint(true)}>선택 → 빨간색</button>
+        <button className="btn btn-secondary" type="button" disabled={!range} onPointerDown={event => event.preventDefault()} onClick={() => paint(false)}>선택 → 검정</button>
+        <button className="btn btn-secondary" type="button" onClick={() => { setRange(null); onChange(autoMarkCorrection(answer, value)); }}>자동 표시</button>
+        <button className="btn btn-secondary" type="button" onClick={() => { setRange(null); setEditing(true); }}><PenLine size={14} /> 글 고치기</button>
       </div>
     </div>
   );
