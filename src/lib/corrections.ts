@@ -374,7 +374,7 @@ export function buildCorrectionPrintHtml(
   .logo { display: flex; align-items: center; gap: 2.6mm; }
   .mark { display: grid; place-items: center; width: 9mm; height: 9mm; border-radius: 2.6mm; background: linear-gradient(135deg, #1b4b36, #10b981); color: #fff; }
   .logo b, .doc b { display: block; font-size: 11pt; font-weight: 800; color: #0f3023; }
-  .logo span { display: block; font-family: 'Outfit', sans-serif; font-size: 7pt; font-weight: 700; letter-spacing: 0.14em; color: #10b981; }
+  .logo div span { display: block; font-family: 'Outfit', sans-serif; font-size: 7pt; font-weight: 700; letter-spacing: 0.14em; color: #10b981; }
   .doc { text-align: right; }
   .doc span { font-size: 8pt; color: #6b7280; }
   .band { display: flex; justify-content: space-between; align-items: center; gap: 5mm; padding: 3.2mm 4.5mm; border-radius: 3mm; background: #0f3023; color: #fff; }

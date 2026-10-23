@@ -89,6 +89,9 @@ describe('scores and copy text', () => {
     );
     expect(html.match(/<section class="sheet">/g)).toHaveLength(2);
     expect(html).toContain('.sheet + .sheet { break-before: page; }');
+    // 로고 네모(.mark)에 브랜드 글자 스타일이 덮이면 아이콘이 쏠리고 초록색에 묻힌다.
+    expect(html).toContain('.logo div span {');
+    expect(html).not.toContain('.logo span {');
     expect(html).toContain('영작 첨삭 결과지');
     expect(html).toContain('3과 &lt;본문&gt;');
     expect(html).toContain('He &lt;b&gt;kind&lt;/b&gt;.');
