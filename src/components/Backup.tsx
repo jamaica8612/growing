@@ -198,7 +198,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
   };
 
   // Export Data to JSON File
-  const handleExport = () => {
+  const handleExport = (): boolean => {
     try {
       const data = {
         schemaVersion: SCHEMA_VERSION,
@@ -218,9 +218,11 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      return true;
     } catch (error) {
       alert('데이터 백업 생성 중 오류가 발생했습니다.');
       console.error(error);
+      return false;
     }
   };
 
@@ -270,7 +272,12 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           throw new Error('휴강 설정 데이터 형식이 올바르지 않습니다.');
         }
 
-        if (window.confirm('클라우드에 저장된 기존 데이터가 모두 지워지고 백업 파일 데이터로 덮어씌워집니다. 진행하시겠습니까?')) {
+        if (window.confirm('클라우드에 저장된 학생·반·출결·수납·상담 데이터가 백업 파일 내용으로 바뀝니다.\n복원 전에 현재 데이터를 백업 파일로 먼저 내려받습니다. 진행하시겠습니까?')) {
+          // 복원이 잘못돼도 되돌릴 수 있게, 덮어쓰기 전 현재 상태를 먼저 내려받는다.
+          if (!handleExport()) {
+            setImportStatus({ success: false, message: '현재 데이터를 백업하지 못해 복원을 중단했습니다.' });
+            return;
+          }
           const restored = await onImportData({
             students: json.students,
             classes: json.classes,
@@ -446,7 +453,7 @@ export const Backup: React.FC<BackupProps> = ({ onImportData, onResetData, getAl
           <div className="set-tile-ic ok"><Download size={20} /></div>
           <div className="set-tile-t">데이터 백업하기</div>
           <div className="set-tile-d">학생, 반, 출결, 수납, 상담 데이터를 파일로 저장합니다.</div>
-          <button className="btn btn-primary set-w" onClick={handleExport}>컴퓨터에 백업 파일 다운로드 (.json)</button>
+          <button className="btn btn-primary set-w" onClick={() => handleExport()}>컴퓨터에 백업 파일 다운로드 (.json)</button>
         </div>
 
         <div className="gd-card set-tile">

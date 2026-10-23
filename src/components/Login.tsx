@@ -13,7 +13,6 @@ const IvyIcon = ({ size = 24 }: { size?: number }) => (
 // Email/password gate. Each academy owner/admin signs in with their own
 // account; RLS scopes academy data to that signed-in account.
 export const Login: React.FC = () => {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
@@ -27,28 +26,13 @@ export const Login: React.FC = () => {
     setError(null);
     setInfo(null);
     try {
-      if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (!data.session) {
-          setInfo('가입이 접수되었습니다. 이메일로 받은 확인 링크를 누른 뒤 로그인해 주세요.');
-          setMode('signin');
-        }
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
     } catch (err) {
       setError(err instanceof Error ? err.message : '요청을 처리하지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const switchMode = (next: 'signin' | 'signup') => {
-    setMode(next);
-    setError(null);
-    setInfo(null);
   };
 
   return (
@@ -92,31 +76,11 @@ export const Login: React.FC = () => {
           </div>
 
           <h1 className="lg-title">
-            {mode === 'signin' ? '다시 오신 걸 환영해요' : '관리자 계정 만들기'}
+            다시 오신 걸 환영해요
           </h1>
           <p className="lg-sub">
-            {mode === 'signin'
-              ? '교습소 운영 관리 시스템에 로그인하세요.'
-              : '이메일로 계정을 만들면 바로 시작할 수 있어요.'}
+            교습소 운영 관리 시스템에 로그인하세요.
           </p>
-
-          {/* 로그인 / 가입 세그먼트 토글 */}
-          <div className="lg-seg">
-            <button
-              type="button"
-              className={mode === 'signin' ? 'on' : ''}
-              onClick={() => switchMode('signin')}
-            >
-              로그인
-            </button>
-            <button
-              type="button"
-              className={mode === 'signup' ? 'on' : ''}
-              onClick={() => switchMode('signup')}
-            >
-              계정 만들기
-            </button>
-          </div>
 
           <form onSubmit={handleSubmit}>
             {/* 이메일 필드 */}
@@ -144,7 +108,7 @@ export const Login: React.FC = () => {
                 placeholder="6자 이상"
                 required
                 minLength={6}
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                autoComplete="current-password"
               />
             </div>
 
@@ -159,15 +123,13 @@ export const Login: React.FC = () => {
                 <span className="lg-box" />
                 로그인 유지
               </label>
-              {mode === 'signin' && (
-                <button
-                  type="button"
-                  className="lg-link"
-                  onClick={() => setInfo('비밀번호 재설정 이메일이 발송됩니다. 관리자에게 문의해 주세요.')}
-                >
-                  비밀번호 찾기
-                </button>
-              )}
+              <button
+                type="button"
+                className="lg-link"
+                onClick={() => setInfo('비밀번호 재설정 이메일이 발송됩니다. 관리자에게 문의해 주세요.')}
+              >
+                비밀번호 찾기
+              </button>
             </div>
 
             {/* 에러 / 안내 메시지 */}
@@ -177,21 +139,12 @@ export const Login: React.FC = () => {
             {/* 제출 버튼 */}
             <button type="submit" className="lg-submit" disabled={loading}>
               <LogIn size={17} />
-              {loading ? '처리 중...' : mode === 'signin' ? '로그인' : '가입하고 시작하기'}
+              {loading ? '처리 중...' : '로그인'}
             </button>
           </form>
 
-          {/* 모드 전환 푸터 */}
-          <p className="lg-foot">
-            {mode === 'signin' ? '계정이 없으신가요? ' : '이미 계정이 있으신가요? '}
-            <button
-              type="button"
-              className="lg-link"
-              onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-            >
-              {mode === 'signin' ? '계정 만들기' : '로그인'}
-            </button>
-          </p>
+          {/* 공유 Supabase 프로젝트라 가입은 막고, 승인된 계정만 사용한다. */}
+          <p className="lg-foot">계정은 관리자가 등록해 드려요.</p>
 
           <p className="lg-note">
             로그인하면 계정 기준으로 학원 데이터가 안전하게 분리·보관돼요.

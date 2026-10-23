@@ -18,6 +18,9 @@ interface MessagingProps {
   onClearAlerts: () => void;
   onDismissHomeworkAlert: (id: string) => void;
   onClearHomeworkAlerts: () => void;
+  // 아이비·출결 통계 등 다른 화면에서 넘겨받은 초안
+  initialDraft?: string | null;
+  onInitialDraftConsumed?: () => void;
 }
 
 type AlertFilter = 'all' | 'in' | 'out' | 'homework' | 'missing-contact';
@@ -107,6 +110,8 @@ export const Messaging: React.FC<MessagingProps> = ({
   onClearAlerts,
   onDismissHomeworkAlert,
   onClearHomeworkAlerts,
+  initialDraft,
+  onInitialDraftConsumed,
 }) => {
   const [mode, setMode] = useState<NoticeMode>('single');
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -115,7 +120,7 @@ export const Messaging: React.FC<MessagingProps> = ({
     homework: true,
     makeup: false,
   });
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(() => initialDraft ?? '');
   const [batchClassId, setBatchClassId] = useState('');
   const [batchDrafts, setBatchDrafts] = useState<BatchDraft[]>([]);
   const [singleDraftKey, setSingleDraftKey] = useState('');
@@ -261,6 +266,12 @@ export const Messaging: React.FC<MessagingProps> = ({
   const visibleAlertIds = filteredAlertRows.map(row => row.id);
   const selectedVisibleAlertIds = selectedAlertIds.filter(id => visibleAlertIds.includes(id));
   const hasAllVisibleSelected = visibleAlertIds.length > 0 && visibleAlertIds.every(id => selectedAlertIds.includes(id));
+
+  useEffect(() => {
+    if (initialDraft) onInitialDraftConsumed?.();
+    // 마운트 시 한 번만 초안을 넘겨받는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshLogs = async () => {
     const logs = await api.getMessageLogs(50).catch(() => messageLogs);
