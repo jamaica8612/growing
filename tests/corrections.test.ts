@@ -3,7 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/supabase', () => ({ supabase: {} }));
 
-import { averageScores, buildCorrectionPrintHtml, formatCorrectionForCopy, hashPin as appHashPin, splitSentences } from '../src/lib/corrections';
+import {
+  autoMarkCorrection,
+  averageScores,
+  buildCorrectionPrintHtml,
+  formatCorrectionForCopy,
+  hashPin as appHashPin,
+  parseMarks,
+  setMarkRange,
+  splitSentences,
+  stripMarks,
+  toggleMarkWord,
+  withAutoMarks,
+} from '../src/lib/corrections';
 import {
   SESSION_TTL_SECONDS,
   buildGradePrompt,
@@ -77,12 +89,15 @@ describe('scores and copy text', () => {
     );
     expect(html.match(/<section class="sheet">/g)).toHaveLength(2);
     expect(html).toContain('.sheet + .sheet { break-before: page; }');
+    // 로고 네모(.mark)에 브랜드 글자 스타일이 덮이면 아이콘이 쏠리고 초록색에 묻힌다.
+    expect(html).toContain('.logo div span {');
+    expect(html).not.toContain('.logo span {');
     expect(html).toContain('영작 첨삭 결과지');
     expect(html).toContain('3과 &lt;본문&gt;');
     expect(html).toContain('He &lt;b&gt;kind&lt;/b&gt;.');
     expect(html).not.toContain('<b>kind</b>');
     expect(html).toContain('<span class="pass">✓ 정답</span>');
-    expect(html).toContain('<p class="fix">He is kind.</p>');
+    expect(html).toContain('<p class="fix">He <span class="red">is kind.</span></p>');
     expect(html).toContain('<span class="draft">검토 전</span>');
     expect(html).toContain('<span>정확도</span><b>93</b>');
     expect(html).toContain('그로잉영어 교습소');
@@ -164,5 +179,45 @@ describe('correction migration', () => {
     expect(sql).toContain('unique (set_id, student_id)');
     expect(sql).not.toMatch(/pin text|pin_plain/);
     expect(sql).not.toContain("auth.role() = 'anon'");
+  });
+});
+
+describe('red correction marks', () => {
+  it('marks only the words that differ from the student answer', () => {
+    expect(autoMarkCorrection('He play soccer yesterday.', 'He played soccer yesterday.')).toBe('He ⟦played⟧ soccer yesterday.');
+    expect(autoMarkCorrection('그는 친구를 만났다.', '그는 거기서 친구를 만났다.')).toBe('그는 ⟦거기서⟧ 친구를 만났다.');
+    expect(autoMarkCorrection('I went to library', 'I went to the library to study.')).toBe('I went to ⟦the⟧ library ⟦to study.⟧');
+    expect(autoMarkCorrection('I am happy.', 'I am happy.')).toBe('I am happy.');
+    expect(autoMarkCorrection('', '너는 친절하다.')).toBe('⟦너는 친절하다.⟧');
+  });
+
+  it('joins neighbouring red words and re-marks from plain text', () => {
+    expect(autoMarkCorrection('그는 숙제를 끝냈다.', '그는 숙제를 끝낼 수 없었다.')).toBe('그는 숙제를 ⟦끝낼 수 없었다.⟧');
+    expect(autoMarkCorrection('a b', '⟦a⟧ c')).toBe('a ⟦c⟧');
+  });
+
+  it('paints ranges and toggles words by character offset', () => {
+    expect(setMarkRange('He played soccer.', 3, 9, true)).toBe('He ⟦played⟧ soccer.');
+    expect(setMarkRange('He ⟦played⟧ soccer.', 3, 6, false)).toBe('He pla⟦yed⟧ soccer.');
+    expect(toggleMarkWord('He played soccer.', 4)).toBe('He ⟦played⟧ soccer.');
+    expect(toggleMarkWord('He ⟦played⟧ soccer.', 4)).toBe('He played soccer.');
+    expect(toggleMarkWord('He played', 2)).toBe('He played');
+    expect(parseMarks('a ⟦b⟧ c')).toEqual([{ text: 'a ', red: false }, { text: 'b', red: true }, { text: ' c', red: false }]);
+    expect(stripMarks('a ⟦b⟧ c')).toBe('a b c');
+  });
+
+  it('auto-marks only items that were never marked', () => {
+    const base = { answer: 'a b', corrected: 'a c', explanation: '', completeness: 50, accuracy: 50 };
+    expect(withAutoMarks(base)).toMatchObject({ corrected: 'a ⟦c⟧', marked: true });
+    expect(withAutoMarks({ ...base, corrected: 'a c', marked: true }).corrected).toBe('a c');
+  });
+
+  it('prints red parts in red and copies them as plain text', () => {
+    const set = { title: '3과', mode: 'compose' as const, sentences: ['그는 축구를 했다.'] };
+    const items = [{ answer: 'He play soccer.', corrected: 'He ⟦played⟧ soccer.', explanation: '', completeness: 100, accuracy: 70, marked: true }];
+    const html = buildCorrectionPrintHtml(set, [{ studentName: '민지', items }]);
+    expect(html).toContain('He <span class="red">played</span> soccer.');
+    expect(html).not.toContain('⟦');
+    expect(formatCorrectionForCopy(set, { studentName: '민지', items })).toContain('- 첨삭: He played soccer.');
   });
 });

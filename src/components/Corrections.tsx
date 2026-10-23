@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   AlertTriangle,
   Check,
@@ -26,13 +27,19 @@ import {
   LoginRequiredError,
   MAX_SENTENCES,
   MODE_LABELS,
+  autoMarkCorrection,
   averageScores,
   buildCorrectionPrintHtml,
   correctionBoardUrl,
   correctionsApi,
   formatCorrectionForCopy,
   isValidPin,
+  parseMarks,
+  setMarkRange,
   splitSentences,
+  stripMarks,
+  toggleMarkWord,
+  withAutoMarks,
   type BoardSet,
   type CorrectionItem,
   type CorrectionMode,
@@ -152,6 +159,119 @@ function ScorePills({ completeness, accuracy }: { completeness: number; accuracy
       <span className="cr-score">완성도 <b>{completeness}%</b></span>
       <span className="cr-score accuracy">정확도 <b>{accuracy}%</b></span>
     </span>
+  );
+}
+
+// 첨삭 문장의 빨간 표시(⟦…⟧)를 색으로 보여 준다.
+function MarkedText({ value }: { value: string }) {
+  return <>{parseMarks(value).map((segment, index) => (segment.red ? <span key={index} className="cr-red">{segment.text}</span> : segment.text))}</>;
+}
+
+const charLength = (value: string) => Array.from(value).length;
+
+// 첨삭 칸: 단어를 누르면 빨강/검정이 바뀌고, 드래그로 고른 부분은 버튼으로 칠한다.
+// ‘글 고치기’로 문장을 고치면 학생 답과 비교해 빨간색을 자동으로 다시 칠한다.
+// 휴대폰은 손잡이로 범위를 조정하고, 버튼을 누르면 선택이 풀리기도 해서
+// selectionchange로 마지막에 고른 범위를 기억해 둔다(버튼·단어 누르기·✕로 지운다).
+function MarkEditor({ answer, value, onChange }: { answer: string; value: string; onChange: (value: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onSelectionChange = () => {
+      const box = boxRef.current;
+      const selection = window.getSelection();
+      if (!box || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+      const position = (node: Node | null, nodeOffset: number) => {
+        const holder = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement | null;
+        const span = holder?.closest<HTMLElement>('[data-start]');
+        if (!span || !box.contains(span)) return null;
+        const before = node?.nodeType === Node.TEXT_NODE ? (node.textContent ?? '').slice(0, nodeOffset) : '';
+        return Number(span.dataset.start) + charLength(before);
+      };
+      const a = position(selection.anchorNode, selection.anchorOffset);
+      const b = position(selection.focusNode, selection.focusOffset);
+      if (a === null || b === null) {
+        // 다른 칸에서 글자를 고르면 이 칸의 선택은 잊는다.
+        if (!box.contains(selection.anchorNode) && !box.contains(selection.focusNode)) setRange(null);
+        return;
+      }
+      setRange(a === b ? null : { start: Math.min(a, b), end: Math.max(a, b) });
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, []);
+
+  const tokens: ReactNode[] = [];
+  let offset = 0;
+  parseMarks(value).forEach(segment => {
+    for (const piece of segment.text.split(/(\s+)/)) {
+      if (!piece) continue;
+      const start = offset;
+      offset += charLength(piece);
+      const word = piece.trim() !== '';
+      tokens.push(
+        <span
+          key={`${start}-${piece}`}
+          data-start={start}
+          className={`${segment.red ? 'cr-red' : ''}${word ? ' cr-word' : ''}`}
+          onClick={word ? () => {
+            if (window.getSelection()?.isCollapsed === false) return;
+            setRange(null);
+            onChange(toggleMarkWord(value, start));
+          } : undefined}
+        >
+          {piece}
+        </span>,
+      );
+    }
+  });
+
+  const paint = (red: boolean) => {
+    if (!range) return;
+    onChange(setMarkRange(value, range.start, range.end, red));
+    window.getSelection()?.removeAllRanges();
+    setRange(null);
+  };
+
+  if (editing) {
+    return (
+      <div className="cr-mark">
+        <textarea
+          className="form-control"
+          value={stripMarks(value)}
+          autoFocus
+          onChange={event => onChange(autoMarkCorrection(answer, event.target.value))}
+        />
+        <div className="cr-mark-tools">
+          <span>문장을 고치면 학생 답과 다른 부분이 다시 빨갛게 칠해져요.</span>
+          <button className="btn btn-secondary" type="button" onClick={() => setEditing(false)}><Check size={14} /> 다 고침</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cr-mark">
+      <div ref={boxRef} className="cr-mark-box">
+        {tokens.length > 0 ? tokens : <em className="cr-mark-empty">첨삭 없음</em>}
+      </div>
+      <div className="cr-mark-tools">
+        {range ? (
+          <span className="cr-mark-picked">
+            고른 글자: <b>‘{Array.from(stripMarks(value)).slice(range.start, range.end).join('')}’</b>
+            <button type="button" aria-label="고른 글자 지우기" onClick={() => setRange(null)}><X size={13} /></button>
+          </span>
+        ) : (
+          <span>단어를 누르면 빨강 ↔ 검정. 여러 글자는 드래그(휴대폰은 길게 눌러 고르기)한 뒤 버튼을 누르세요.</span>
+        )}
+        <button className="btn btn-secondary cr-red-btn" type="button" disabled={!range} onPointerDown={event => event.preventDefault()} onClick={() => paint(true)}>선택 → 빨간색</button>
+        <button className="btn btn-secondary" type="button" disabled={!range} onPointerDown={event => event.preventDefault()} onClick={() => paint(false)}>선택 → 검정</button>
+        <button className="btn btn-secondary" type="button" onClick={() => { setRange(null); onChange(autoMarkCorrection(answer, value)); }}>자동 표시</button>
+        <button className="btn btn-secondary" type="button" onClick={() => { setRange(null); setEditing(true); }}><PenLine size={14} /> 글 고치기</button>
+      </div>
+    </div>
   );
 }
 
@@ -593,9 +713,9 @@ function SubmissionReview({
   onChange: (submission: CorrectionSubmission) => void;
   onDeleted: (id: string) => void;
 }) {
-  const [items, setItems] = useState<CorrectionItem[]>(() => set.sentences.map((_, index) => submission.items[index] ?? {
+  const [items, setItems] = useState<CorrectionItem[]>(() => set.sentences.map((_, index) => withAutoMarks(submission.items[index] ?? {
     answer: '', corrected: '', explanation: '', completeness: 0, accuracy: 0,
-  }));
+  })));
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const scores = averageScores(items);
@@ -627,7 +747,7 @@ function SubmissionReview({
     setBusy(true);
     try {
       const result = await correctionsApi.regrade(submission.id);
-      setItems(result.items);
+      setItems(result.items.map(withAutoMarks));
       setDirty(false);
       onChange({ ...submission, items: result.items, completeness: result.completeness, accuracy: result.accuracy, gradingStatus: 'graded' });
       onFeedback({ tone: 'success', message: 'AI 첨삭을 다시 받았습니다.' });
@@ -690,10 +810,14 @@ function SubmissionReview({
             <li key={index} className="cr-review-item">
               <p className="cr-source"><span>{index + 1}</span>{sentence}</p>
               <p className="cr-answer"><b>학생 답</b>{item.answer || <em>(빈칸)</em>}</p>
-              <label className="cr-field">
+              <div className="cr-field">
                 <b>첨삭</b>
-                <textarea className="form-control" value={item.corrected} onChange={event => updateItem(index, { corrected: event.target.value })} />
-              </label>
+                <MarkEditor
+                  answer={item.answer}
+                  value={item.corrected}
+                  onChange={corrected => updateItem(index, { corrected, marked: true })}
+                />
+              </div>
               <label className="cr-field">
                 <b>설명</b>
                 <textarea className="form-control" value={item.explanation} onChange={event => updateItem(index, { explanation: event.target.value })} />
@@ -1214,7 +1338,7 @@ function MySubmissionsView({ session, onExpired }: { session: StudentSession; on
                     <li key={index} className="cr-public-item">
                       <p className="cr-source"><span>{index + 1}</span>{sentence}</p>
                       <p className="cr-answer"><b>내 답</b>{answer || <em>(빈칸)</em>}</p>
-                      {correction?.corrected && <p className="cr-corrected"><b>첨삭</b>{correction.corrected}</p>}
+                      {correction?.corrected && <p className="cr-corrected"><b>첨삭</b><MarkedText value={correction.corrected} /></p>}
                       {correction?.explanation && <p className="cr-explanation"><b>설명</b>{correction.explanation}</p>}
                     </li>
                   );

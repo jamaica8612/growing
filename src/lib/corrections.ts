@@ -28,6 +28,8 @@ export interface CorrectionItem {
   explanation: string;
   completeness: number;
   accuracy: number;
+  // corrected에 빨간색 표시(⟦…⟧)를 한 번이라도 저장했는지. 없으면 고친 부분을 자동으로 칠한다.
+  marked?: boolean;
 }
 
 export interface CorrectionSubmission {
@@ -129,6 +131,135 @@ export function averageScores(items: Pick<CorrectionItem, 'completeness' | 'accu
 }
 
 // 카톡 등에 붙여넣을 첨삭 결과 텍스트
+// ---- 첨삭 빨간색 표시 ----
+// corrected 문자열 안에서 ⟦ … ⟧로 감싼 부분이 빨간 글씨다. 학생 답에는 쓰지 않는다.
+const MARK_OPEN = '⟦';
+const MARK_CLOSE = '⟧';
+
+export interface MarkSegment {
+  text: string;
+  red: boolean;
+}
+
+export function stripMarks(value: string): string {
+  return value.replaceAll(MARK_OPEN, '').replaceAll(MARK_CLOSE, '');
+}
+
+export function parseMarks(value: string): MarkSegment[] {
+  const segments: MarkSegment[] = [];
+  let red = false;
+  let text = '';
+  for (const char of value) {
+    if (char === MARK_OPEN || char === MARK_CLOSE) {
+      if (text) segments.push({ text, red });
+      text = '';
+      red = char === MARK_OPEN;
+      continue;
+    }
+    text += char;
+  }
+  if (text) segments.push({ text, red });
+  return segments;
+}
+
+// 글자마다 빨강 여부를 받아 ⟦…⟧ 문자열로 만든다. 공백만 빨간 부분은 표시하지 않는다.
+function serializeColors(text: string, colors: boolean[]): string {
+  let out = '';
+  let index = 0;
+  const chars = Array.from(text);
+  while (index < chars.length) {
+    const red = colors[index];
+    let end = index;
+    while (end < chars.length && colors[end] === red) end += 1;
+    const run = chars.slice(index, end).join('');
+    out += red && run.trim() ? `${MARK_OPEN}${run}${MARK_CLOSE}` : run;
+    index = end;
+  }
+  return out;
+}
+
+function colorsOf(value: string): { text: string; colors: boolean[] } {
+  const colors: boolean[] = [];
+  let text = '';
+  for (const segment of parseMarks(value)) {
+    for (const char of Array.from(segment.text)) {
+      text += char;
+      colors.push(segment.red);
+    }
+  }
+  return { text, colors };
+}
+
+// 글자 위치(start~end, 표시 없는 글 기준)를 빨강/검정으로 바꾼다.
+export function setMarkRange(value: string, start: number, end: number, red: boolean): string {
+  const { text, colors } = colorsOf(value);
+  const from = Math.max(0, Math.min(start, end));
+  const to = Math.min(colors.length, Math.max(start, end));
+  for (let i = from; i < to; i++) colors[i] = red;
+  return serializeColors(text, colors);
+}
+
+// 글자 위치가 들어 있는 단어(공백 사이)의 빨강을 켜고 끈다.
+export function toggleMarkWord(value: string, offset: number): string {
+  const { text, colors } = colorsOf(value);
+  const chars = Array.from(text);
+  if (offset < 0 || offset >= chars.length || /\s/.test(chars[offset])) return value;
+  let start = offset;
+  let end = offset + 1;
+  while (start > 0 && !/\s/.test(chars[start - 1])) start -= 1;
+  while (end < chars.length && !/\s/.test(chars[end])) end += 1;
+  const allRed = colors.slice(start, end).every(Boolean);
+  return setMarkRange(value, start, end, !allRed);
+}
+
+const normalizeWord = (word: string) => word.toLowerCase().replace(/[.,!?;:"'“”‘’()[\]]/g, '');
+
+// 학생 답과 비교해 첨삭에서 새로 들어가거나 바뀐 단어를 빨갛게 칠한다(단어 단위 LCS).
+export function autoMarkCorrection(answer: string, corrected: string): string {
+  const plain = stripMarks(corrected);
+  const tokens = plain.split(/(\s+)/);
+  const words = tokens.map((token, index) => ({ token, index })).filter(item => item.token.trim() !== '');
+  if (words.length === 0) return plain;
+  if (!answer.trim()) return `${MARK_OPEN}${plain}${MARK_CLOSE}`;
+
+  const a = answer.split(/\s+/).filter(Boolean).map(normalizeWord);
+  const b = words.map(item => normalizeWord(item.token));
+  const lcs: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const kept = new Set<number>();
+  for (let i = 0, j = 0; i < a.length && j < b.length;) {
+    if (a[i] === b[j]) {
+      kept.add(j);
+      i += 1;
+      j += 1;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      i += 1;
+    } else {
+      j += 1;
+    }
+  }
+  const redToken = new Set(words.filter((_, j) => !kept.has(j)).map(item => item.index));
+  // 빨간 단어 사이 공백도 빨강으로 이어 붙여 한 덩어리로 보이게 한다.
+  const text = tokens.join('');
+  const colors: boolean[] = [];
+  tokens.forEach((token, index) => {
+    const isSpace = token.trim() === '';
+    const red = isSpace ? redToken.has(index - 1) && redToken.has(index + 1) : redToken.has(index);
+    colors.push(...new Array<boolean>(Array.from(token).length).fill(red));
+  });
+  return serializeColors(text, colors);
+}
+
+// 빨간색을 한 번도 저장하지 않은 문항이면 자동 표시를 붙인다.
+export function withAutoMarks(item: CorrectionItem): CorrectionItem {
+  if (item.marked) return item;
+  return { ...item, corrected: autoMarkCorrection(item.answer, item.corrected), marked: true };
+}
+
 export function formatCorrectionForCopy(
   set: { title: string; mode: CorrectionMode; sentences: string[] },
   submission: { studentName: string; items: CorrectionItem[] },
@@ -141,7 +272,7 @@ export function formatCorrectionForCopy(
   const blocks = set.sentences.map((sentence, index) => {
     const item = submission.items[index];
     const lines = [`${index + 1}. ${sentence}`, `- 내 답: ${item?.answer || '(빈칸)'}`];
-    if (item?.corrected) lines.push(`- 첨삭: ${item.corrected}`);
+    if (item?.corrected) lines.push(`- 첨삭: ${stripMarks(item.corrected)}`);
     if (item?.explanation) lines.push(`- 설명: ${item.explanation}`);
     return lines.join('\n');
   });
@@ -150,6 +281,10 @@ export function formatCorrectionForCopy(
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
+
+// 빨간 표시(⟦…⟧)를 <span class="red">로 바꾼 HTML
+const markedHtml = (value: string) =>
+  parseMarks(value).map(segment => (segment.red ? `<span class="red">${escapeHtml(segment.text)}</span>` : escapeHtml(segment.text))).join('');
 
 const printDate = (value: string | Date | undefined, withYear = false) => {
   const date = value instanceof Date ? value : new Date(value ?? '');
@@ -182,15 +317,16 @@ export function buildCorrectionPrintHtml(
     const scores = averageScores(submission.items);
     let correctCount = 0;
     const rows = set.sentences.map((sentence, index) => {
-      const item = submission.items[index];
+      const raw = submission.items[index];
+      const item = raw ? withAutoMarks(raw) : undefined;
       const answer = item?.answer ?? '';
-      const corrected = item?.corrected ?? '';
+      const corrected = stripMarks(item?.corrected ?? '');
       const accuracy = answer ? item?.accuracy ?? 0 : 0;
       const ok = answer !== '' && corrected.trim() === answer.trim();
       if (ok) correctCount += 1;
       const fix = ok
         ? '<span class="pass">✓ 정답</span>'
-        : corrected ? `<p class="fix">${escapeHtml(corrected)}</p>` : '<p class="fix none">-</p>';
+        : corrected ? `<p class="fix">${markedHtml(item?.corrected ?? '')}</p>` : '<p class="fix none">-</p>';
       return `<li class="row${ok ? ' ok' : ''}">`
         + `<span class="no">${String(index + 1).padStart(2, '0')}</span>`
         + `<div class="mine"><p class="src">${escapeHtml(sentence)}</p>`
@@ -238,7 +374,7 @@ export function buildCorrectionPrintHtml(
   .logo { display: flex; align-items: center; gap: 2.6mm; }
   .mark { display: grid; place-items: center; width: 9mm; height: 9mm; border-radius: 2.6mm; background: linear-gradient(135deg, #1b4b36, #10b981); color: #fff; }
   .logo b, .doc b { display: block; font-size: 11pt; font-weight: 800; color: #0f3023; }
-  .logo span { display: block; font-family: 'Outfit', sans-serif; font-size: 7pt; font-weight: 700; letter-spacing: 0.14em; color: #10b981; }
+  .logo div span { display: block; font-family: 'Outfit', sans-serif; font-size: 7pt; font-weight: 700; letter-spacing: 0.14em; color: #10b981; }
   .doc { text-align: right; }
   .doc span { font-size: 8pt; color: #6b7280; }
   .band { display: flex; justify-content: space-between; align-items: center; gap: 5mm; padding: 3.2mm 4.5mm; border-radius: 3mm; background: #0f3023; color: #fff; }
@@ -269,6 +405,7 @@ export function buildCorrectionPrintHtml(
   .row.ok .right { border-left-color: #a7f3d0; }
   .fix { font-size: 10pt; font-weight: 700; color: #065f46; }
   .fix.none { color: #9ca3af; font-weight: 400; }
+  .fix .red { color: #dc2626; }
   .pass { display: inline-block; padding: 0.3mm 2.2mm; border-radius: 99px; background: #d1fae5; color: #047857; font-size: 9pt; font-weight: 700; }
   .src, .ans, .fix { text-wrap: balance; }
   .pts { font-family: 'Outfit', sans-serif; font-size: 13pt; font-weight: 800; line-height: 1.2; text-align: right; }
@@ -307,6 +444,7 @@ const toItems = (value: unknown): CorrectionItem[] => (Array.isArray(value) ? va
     explanation: String(item.explanation ?? ''),
     completeness: Number(item.completeness ?? 0),
     accuracy: Number(item.accuracy ?? 0),
+    marked: item.marked === true,
   };
 });
 
