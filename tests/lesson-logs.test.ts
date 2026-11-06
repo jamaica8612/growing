@@ -108,7 +108,7 @@ describe('absence and content suggestions', () => {
 });
 
 describe('lesson log migration', () => {
-  const sql = readFileSync(new URL('../supabase/migrations/20261106090000_growing_lesson_logs.sql', import.meta.url), 'utf8').toLowerCase();
+  const sql = readFileSync(new URL('../supabase/migrations/20261106075833_growing_lesson_logs.sql', import.meta.url), 'utf8').toLowerCase();
 
   it('keeps logs owner-scoped', () => {
     expect(sql).toContain('alter table growing_lesson_logs enable row level security');
