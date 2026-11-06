@@ -14,19 +14,20 @@ import {
   X,
 } from 'lucide-react';
 import type { Attendance, Class, EditableAttendanceStatus, HolidaySettings, Student } from '../types';
-import { localMonth, localToday } from '../lib/dateUtils';
+import { localToday } from '../lib/dateUtils';
 import { getClassSchedules } from '../lib/classSchedules';
 import {
   buildMonthRows,
   closedTitle,
   exportMonthToExcel,
+  formatDayTitle,
   formatRowDate,
   formatRowTime,
   isAbsent,
   lessonLogsApi,
   monthDates,
   publicHolidayNames,
-  shiftMonth,
+  shiftDay,
   suggestContents,
   toggleClosedDay,
   weekdayOf,
@@ -58,13 +59,13 @@ const errorMessage = (error: unknown) => {
 const DOUBLE_TAP_MS = 350;
 
 export function LessonLogs({ classes, students, attendance, holidaySettings, onSaveHolidaySettings, onSaveAttendance }: LessonLogsProps) {
-  const [month, setMonth] = useState(localMonth());
+  const [day, setDay] = useState(localToday());
+  const month = day.slice(0, 7);
   const [logs, setLogs] = useState<LessonLog[]>([]);
   const [history, setHistory] = useState<ContentHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [feedback, setFeedback] = useState<Feedback>(null);
-  const [classFilter, setClassFilter] = useState('');
   const [showHidden, setShowHidden] = useState(false);
   const [showHolidays, setShowHolidays] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -96,15 +97,21 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
     () => buildMonthRows({ month, classes, students, logs, holidaySettings }),
     [month, classes, students, logs, holidaySettings],
   );
-  const visibleRows = rows.filter(row => (!classFilter || row.classId === classFilter) && (showHidden || !row.hidden));
-  const hiddenCount = rows.filter(row => row.hidden && (!classFilter || row.classId === classFilter)).length;
+  // 하루씩 본다. 그 달 줄은 한 번에 불러 두고(엑셀·자동완성용), 화면에는 고른 날만.
+  const dayRows = rows.filter(row => row.date === day);
+  const visibleRows = dayRows.filter(row => showHidden || !row.hidden);
+  const hiddenCount = dayRows.filter(row => row.hidden).length;
+  const closedToday = closedDays.find(item => item.date === day);
   const today = localToday();
 
-  const changeMonth = (next: string) => {
-    setLoading(true);
-    setDrafts({});
-    setSaveStates({});
-    setMonth(next);
+  const changeDay = (next: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
+    if (next.slice(0, 7) !== month) {
+      setLoading(true);
+      setDrafts({});
+      setSaveStates({});
+    }
+    setDay(next);
   };
 
   const upsertLog = (saved: LessonLog) => {
@@ -159,40 +166,30 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
 
   const nameOf = (id: string) => students.find(student => student.id === id)?.name ?? '(삭제된 학생)';
 
-  // 휴강일 줄을 날짜 순서에 끼워 넣는다.
-  const closedByDate = new Map(closedDays.map(day => [day.date, day.title]));
-  const lines: ({ kind: 'closed'; date: string; title: string } | { kind: 'row'; row: LessonRow })[] = [];
-  const shownClosed = new Set<string>();
-  const pushClosedUntil = (date: string | null) => {
-    for (const day of closedDays) {
-      if (shownClosed.has(day.date) || (date !== null && day.date > date)) continue;
-      if (classFilter && !classes.find(cls => cls.id === classFilter && getClassSchedules(cls).some(s => s.day === weekdayOf(day.date)))) {
-        shownClosed.add(day.date);
-        continue;
-      }
-      shownClosed.add(day.date);
-      lines.push({ kind: 'closed', date: day.date, title: day.title });
-    }
-  };
-  const lineDate = (line: typeof lines[number]) => (line.kind === 'row' ? line.row.date : line.date);
-  for (const row of visibleRows) {
-    pushClosedUntil(row.date);
-    lines.push({ kind: 'row', row });
-  }
-  pushClosedUntil(null);
-
   return (
     <div className="ll-root">
       <section className="ll-toolbar">
         <div className="ll-month">
-          <button className="btn btn-secondary" type="button" aria-label="이전 달" onClick={() => changeMonth(shiftMonth(month, -1))}><ChevronLeft size={18} /></button>
-          <strong>{month.replace('-', '년 ')}월</strong>
-          <button className="btn btn-secondary" type="button" aria-label="다음 달" onClick={() => changeMonth(shiftMonth(month, 1))}><ChevronRight size={18} /></button>
+          <button className="btn btn-secondary" type="button" aria-label="전날" onClick={() => changeDay(shiftDay(day, -1))}><ChevronLeft size={18} /></button>
+          <label className="ll-day">
+            <input
+              type="date"
+              value={day}
+              onChange={event => changeDay(event.target.value)}
+              onClick={event => {
+                try {
+                  event.currentTarget.showPicker?.();
+                } catch {
+                  // showPicker를 못 쓰는 브라우저는 기본 동작(달력 아이콘)으로 연다.
+                }
+              }}
+              aria-label="날짜 고르기"
+            />
+            <strong>{formatDayTitle(day)}</strong>
+          </label>
+          <button className="btn btn-secondary" type="button" aria-label="다음 날" onClick={() => changeDay(shiftDay(day, 1))}><ChevronRight size={18} /></button>
+          {day !== today && <button className="btn btn-secondary ll-today-btn" type="button" onClick={() => changeDay(today)}>오늘</button>}
         </div>
-        <select className="form-control ll-filter" value={classFilter} onChange={event => setClassFilter(event.target.value)} aria-label="반 고르기">
-          <option value="">모든 반</option>
-          {classes.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
-        </select>
         <div className="ll-actions">
           <button className={`btn ${showHolidays ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => setShowHolidays(current => !current)}>
             <CalendarOff size={16} /> 휴강일 설정
@@ -200,8 +197,8 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
           <button className={`btn ${showAdd ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => setShowAdd(current => !current)}>
             <Plus size={16} /> 줄 추가
           </button>
-          <button className="btn btn-secondary" type="button" onClick={() => exportMonthToExcel(month, visibleRows, students, attendance)} disabled={visibleRows.length === 0}>
-            <Download size={16} /> 엑셀
+          <button className="btn btn-secondary" type="button" onClick={() => exportMonthToExcel(month, rows, students, attendance)} disabled={rows.length === 0} title={`${month.replace('-', '년 ')}월 전체를 엑셀로 받아요`}>
+            <Download size={16} /> {Number(month.slice(5))}월 엑셀
           </button>
         </div>
       </section>
@@ -220,12 +217,14 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
 
       {showAdd && (
         <AddRowForm
-          month={month}
+          key={day}
+          defaultDate={day}
           classes={classes}
           students={students}
           onAdded={saved => {
             upsertLog(saved);
             setShowAdd(false);
+            setDay(saved.date);
             setFeedback({ tone: 'success', message: `${formatRowDate(saved.date)} ${saved.className} 줄을 추가했습니다.` });
           }}
           onFeedback={setFeedback}
@@ -244,14 +243,17 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
             <span>{loadError}</span>
             <button className="btn btn-secondary" type="button" onClick={() => { setLoading(true); setReloadKey(key => key + 1); }}>다시 불러오기</button>
           </div>
-        ) : lines.length === 0 ? (
-          <div className="lm-empty"><b>이 달에 수업이 없어요.</b><span>반 / 시간표에 요일과 시간을 넣거나 ‘줄 추가’로 직접 넣어 주세요.</span></div>
+        ) : visibleRows.length === 0 ? (
+          closedToday ? (
+            <div className="lm-empty ll-closed-day"><b>휴강{closedToday.title === '휴강' ? '' : ` · ${closedToday.title}`}</b><span>이 날 수업을 하면 ‘줄 추가’로 넣어 주세요.</span></div>
+          ) : (
+            <div className="lm-empty"><b>이 날은 수업이 없어요.</b><span>시간표에 없는 수업은 ‘줄 추가’로 넣어 주세요.</span></div>
+          )
         ) : (
           <div className="ll-table-wrap">
             <table className="ll-table">
               <thead>
                 <tr>
-                  <th className="ll-col-date">날짜(요일)</th>
                   <th className="ll-col-time">시간대</th>
                   <th className="ll-col-class">클래스명</th>
                   <th className="ll-col-students">학생 이름</th>
@@ -260,30 +262,15 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
                 </tr>
               </thead>
               <tbody>
-                {lines.map((line, index) => {
-                  const prevDate = index > 0 ? lineDate(lines[index - 1]) : '';
-                  if (line.kind === 'closed') {
-                    return (
-                      <tr key={`closed-${line.date}`} className="ll-closed">
-                        <td className="ll-col-date">{formatRowDate(line.date)}</td>
-                        <td className="ll-closed-note" colSpan={5}>{line.title === '휴강' ? '휴강' : `휴강 · ${line.title}`}</td>
-                      </tr>
-                    );
-                  }
-                  const { row } = line;
+                {visibleRows.map(row => {
                   const state = saveStates[row.key];
                   return (
-                    <tr key={row.key} className={`${row.hidden ? 'll-hidden' : ''}${row.date === today ? ' ll-today' : ''}${prevDate !== row.date ? ' ll-newday' : ''}`}>
-                      <td className="ll-col-date">
-                        {/* 휴대폰 카드에서는 날짜를 매번 보여 주고, 표에서는 같은 날을 〃로 줄인다. */}
-                        <span className="ll-date-full">{formatRowDate(row.date)}</span>
-                        <span className="ll-date-table">{prevDate === row.date ? <span className="ll-same">〃</span> : formatRowDate(row.date)}</span>
-                      </td>
+                    <tr key={row.key} className={row.hidden ? 'll-hidden' : ''}>
                       <td className="ll-col-time">{formatRowTime(row)}</td>
                       <td className="ll-col-class">
                         {row.className}
                         {!row.fromSchedule && <span className="ll-tag">추가</span>}
-                        {closedByDate.has(row.date) && <span className="ll-tag warn">휴강일</span>}
+                        {closedToday && <span className="ll-tag warn">휴강일</span>}
                       </td>
                       <td className="ll-col-students">
                         {row.studentIds.length === 0 ? <span className="ll-muted">학생 없음</span> : row.studentIds.map(id => (
@@ -499,20 +486,19 @@ function HolidayPicker({
 }
 
 function AddRowForm({
-  month,
+  defaultDate,
   classes,
   students,
   onAdded,
   onFeedback,
 }: {
-  month: string;
+  defaultDate: string;
   classes: Class[];
   students: Student[];
   onAdded: (log: LessonLog) => void;
   onFeedback: (feedback: Feedback) => void;
 }) {
-  const today = localToday();
-  const [date, setDate] = useState(today.startsWith(month) ? today : `${month}-01`);
+  const [date, setDate] = useState(defaultDate);
   const [classId, setClassId] = useState(classes[0]?.id ?? '');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');

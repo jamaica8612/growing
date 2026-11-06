@@ -13,9 +13,12 @@
   box-shadow: var(--shadow-sm);
 }
 .ll-month { display: flex; align-items: center; gap: 0.4rem; }
-.ll-month strong { min-width: 7.5rem; text-align: center; color: var(--color-primary-dark); font-size: 1.05rem; }
+.ll-day { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 9.5rem; min-height: 38px; padding: 0 0.6rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: #fff; cursor: pointer; }
+.ll-day strong { color: var(--color-primary-dark); font-size: 1.02rem; white-space: nowrap; pointer-events: none; }
+.ll-day input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.ll-today-btn { font-size: 0.8rem; }
+.ll-closed-day { color: #b91c1c; }
 .ll-month .btn { min-height: 38px; padding: 0.35rem 0.55rem; }
-.ll-filter { width: auto; min-width: 9rem; min-height: 38px; }
 .ll-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
 .ll-actions .btn { min-height: 38px; padding: 0.4rem 0.75rem; font-size: 0.82rem; }
 
@@ -43,18 +46,11 @@
   white-space: nowrap;
 }
 .ll-table td { padding: 0.4rem 0.55rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
-.ll-table tr.ll-newday td { border-top: 1px solid #cfd8d3; }
-.ll-col-date { width: 8.5rem; white-space: nowrap; font-weight: 700; color: var(--color-primary-dark); }
 .ll-col-time { width: 7.5rem; white-space: nowrap; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
 .ll-col-class { width: 7rem; font-weight: 700; }
 .ll-col-students { width: 15rem; }
 .ll-col-act { width: 2.4rem; text-align: center; }
-.ll-same { color: var(--color-text-muted); font-weight: 400; }
-.ll-date-full { display: none; }
-.ll-today td { background: #f2faf6; }
 .ll-hidden td { opacity: 0.45; }
-.ll-closed td { background: #f7f7f7; color: var(--color-text-muted); font-size: 0.8rem; }
-.ll-closed .ll-col-date { color: var(--color-text-muted); }
 .ll-tag { margin-left: 0.3rem; padding: 0.05rem 0.4rem; border-radius: var(--radius-full); background: var(--color-info-light); color: #1e40af; font-size: 0.66rem; font-weight: 700; }
 .ll-tag.warn { background: var(--color-warning-light); color: #92400e; }
 
@@ -144,11 +140,11 @@
   .ll-table, .ll-table tbody { display: block; }
   .ll-table tr {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "date time class act"
-      "students students students students"
-      "content content content content";
+      "time class act"
+      "students students students"
+      "content content content";
     align-items: center;
     column-gap: 0.5rem;
     row-gap: 0.35rem;
@@ -158,35 +154,20 @@
     border-radius: var(--radius-md);
     background: #fff;
   }
-  .ll-table tr.ll-today { border-color: var(--color-accent-mint); }
-  .ll-table tr.ll-today td { background: transparent; }
-  .ll-table tr.ll-today { background: #f2faf6; }
   .ll-table td { display: block; width: auto; padding: 0; border: 0; }
-  .ll-table tr.ll-newday td { border-top: 0; }
-  .ll-col-date { grid-area: date; width: auto; }
-  .ll-date-full { display: inline; }
-  .ll-date-table { display: none; }
-  .ll-col-time { grid-area: time; width: auto; font-size: 0.8rem; }
+  .ll-col-time { grid-area: time; width: auto; font-size: 0.85rem; font-weight: 700; color: var(--color-primary-dark); }
   .ll-col-class { grid-area: class; width: auto; }
   .ll-col-act { grid-area: act; width: auto; }
   .ll-col-students { grid-area: students; width: auto; }
   .ll-col-content { grid-area: content; min-width: 0; }
   .ll-student { padding: 0.35rem 0.4rem; font-size: 0.95rem; }
   .ll-content input { min-height: 42px; font-size: 16px; }
-  .ll-table tr.ll-closed {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas: "date note";
-    padding: 0.45rem 0.75rem;
-    background: #f7f7f7;
-  }
-  .ll-table tr.ll-closed td { background: transparent; }
-  .ll-table tr.ll-closed .ll-col-date { display: block; }
-  .ll-closed-note { grid-area: note; }
 }
 
 @media (max-width: 600px) {
   .ll-actions { margin-left: 0; width: 100%; }
   .ll-actions .btn { flex: 1 1 auto; justify-content: center; }
-  .ll-filter { flex: 1 1 auto; }
+  .ll-month { width: 100%; }
+  .ll-day { flex: 1 1 auto; }
   .ll-card { padding: 0.75rem; }
 }

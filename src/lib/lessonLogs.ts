@@ -65,6 +65,12 @@ export const shiftMonth = (month: string, amount: number): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 };
 
+export const shiftDay = (date: string, amount: number): string => {
+  const [year, mon, dayOfMonth] = date.split('-').map(Number);
+  const next = new Date(year, mon - 1, dayOfMonth + amount);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+};
+
 export const publicHolidayNames = (date: string): string[] => FALLBACK_HOLIDAYS[date.slice(0, 4)]?.[date] ?? [];
 
 // 학원 휴원일 규칙: 직접 정한 날(휴강/수업)이 먼저, 그다음 공휴일(자동 휴강 켜짐일 때).
@@ -187,6 +193,7 @@ export function suggestContents(history: ContentHistoryItem[], query: string, cl
 }
 
 export const formatRowDate = (date: string) => `${date}(${weekdayOf(date)})`;
+export const formatDayTitle = (date: string) => `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일 (${weekdayOf(date)})`;
 export const formatRowTime = (row: { startTime: string; endTime: string }) =>
   row.startTime && row.endTime ? `${row.startTime}-${row.endTime}` : row.startTime || row.endTime;
 
