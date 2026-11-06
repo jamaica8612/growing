@@ -50,6 +50,7 @@
 .ll-col-students { width: 15rem; }
 .ll-col-act { width: 2.4rem; text-align: center; }
 .ll-same { color: var(--color-text-muted); font-weight: 400; }
+.ll-date-full { display: none; }
 .ll-today td { background: #f2faf6; }
 .ll-hidden td { opacity: 0.45; }
 .ll-closed td { background: #f7f7f7; color: var(--color-text-muted); font-size: 0.8rem; }
@@ -134,6 +135,54 @@
 .ll-add .form-control { min-height: 38px; }
 .ll-add .btn { min-height: 38px; }
 .ll-add p { flex-basis: 100%; margin: 0; }
+
+/* 휴대폰: 표 대신 카드 — 날짜·시간·반 / 학생 / 수업내용 */
+@media (max-width: 700px) {
+  .ll-table-wrap { overflow: visible; }
+  .ll-table { min-width: 0; }
+  .ll-table thead { display: none; }
+  .ll-table, .ll-table tbody { display: block; }
+  .ll-table tr {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "date time class act"
+      "students students students students"
+      "content content content content";
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.35rem;
+    margin-bottom: 0.6rem;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #fff;
+  }
+  .ll-table tr.ll-today { border-color: var(--color-accent-mint); }
+  .ll-table tr.ll-today td { background: transparent; }
+  .ll-table tr.ll-today { background: #f2faf6; }
+  .ll-table td { display: block; width: auto; padding: 0; border: 0; }
+  .ll-table tr.ll-newday td { border-top: 0; }
+  .ll-col-date { grid-area: date; width: auto; }
+  .ll-date-full { display: inline; }
+  .ll-date-table { display: none; }
+  .ll-col-time { grid-area: time; width: auto; font-size: 0.8rem; }
+  .ll-col-class { grid-area: class; width: auto; }
+  .ll-col-act { grid-area: act; width: auto; }
+  .ll-col-students { grid-area: students; width: auto; }
+  .ll-col-content { grid-area: content; min-width: 0; }
+  .ll-student { padding: 0.35rem 0.4rem; font-size: 0.95rem; }
+  .ll-content input { min-height: 42px; font-size: 16px; }
+  .ll-table tr.ll-closed {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "date note";
+    padding: 0.45rem 0.75rem;
+    background: #f7f7f7;
+  }
+  .ll-table tr.ll-closed td { background: transparent; }
+  .ll-table tr.ll-closed .ll-col-date { display: block; }
+  .ll-closed-note { grid-area: note; }
+}
 
 @media (max-width: 600px) {
   .ll-actions { margin-left: 0; width: 100%; }
