@@ -54,6 +54,8 @@ describe('Oracle root-domain hosting configuration', () => {
     expect(deployWorkflow).toContain("${ORACLE_HOST#$'\\xEF\\xBB\\xBF'}");
     expect(deployWorkflow).not.toContain('actions/deploy-pages');
     expect(edgeDeployWorkflow.match(/--use-api/g)).toHaveLength(8);
+    // 새 Supabase CLI는 CI에서 --yes 없이는 배포를 확인 대기로 멈추고 실패한다.
+    expect(edgeDeployWorkflow.match(/functions deploy [^\n]*--yes/g)).toHaveLength(8);
   });
 
   it('keeps a GitHub Pages fallback at the legacy PWA scope', () => {
