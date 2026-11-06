@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   MessageCircle,
   MessageSquare,
+  NotebookPen,
   Monitor,
   RefreshCw,
   Settings,
@@ -34,7 +35,8 @@ export type TabId =
   | 'kiosk'
   | 'backup'
   | 'exams'
-  | 'corrections';
+  | 'corrections'
+  | 'lessonlog';
 
 export type NavItem = {
   id: TabId;
@@ -68,6 +70,7 @@ export const PRIMARY_NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'students', label: '학생 관리', icon: Users, mobile: true },
       { id: 'classes', label: '반 / 시간표', icon: BookOpen },
+      { id: 'lessonlog', label: '수업 일지', icon: NotebookPen },
       { id: 'listening', label: '듣기 자료', icon: Headphones },
       { id: 'exams', label: '평가 관리', icon: ClipboardList },
       { id: 'corrections', label: '해석·영작 첨삭', icon: Languages },
@@ -116,6 +119,7 @@ export const SCREEN_ACTIONS: Record<TabId, ScreenAction[]> = {
   listening: [{ to: 'exams', label: '평가 만들기', primary: true }],
   exams: [{ to: 'messaging', label: '시험 결과 안내', primary: true }],
   corrections: [{ to: 'exams', label: '평가 관리' }],
+  lessonlog: [{ to: 'attendance', label: '출결 입력' }],
   payments: [
     { to: 'messaging', label: '미납 안내 보내기', primary: true },
     { to: 'students', label: '학생별 이력' },
@@ -187,9 +191,10 @@ export const FLOW_TAB_GROUPS: FlowTabGroup[] = [
   },
   {
     parentId: 'classes',
-    ids: ['classes', 'attendance', 'makeup', 'listening', 'exams', 'corrections', 'stats'],
+    ids: ['classes', 'lessonlog', 'attendance', 'makeup', 'listening', 'exams', 'corrections', 'stats'],
     tabs: [
       { id: 'classes', label: '반/시간표', icon: BookOpen },
+      { id: 'lessonlog', label: '수업 일지', icon: NotebookPen },
       { id: 'attendance', label: '출결 입력', icon: CalendarCheck },
       { id: 'makeup', label: '보강/보충', icon: CalendarCheck },
       { id: 'listening', label: '듣기 자료', icon: Headphones },
@@ -230,6 +235,7 @@ export const TAB_TITLES: Record<TabId, string> = {
   backup: '설정',
   exams: '평가 관리',
   corrections: '해석·영작 첨삭',
+  lessonlog: '수업 일지',
 };
 
 export const TAB_DESCRIPTIONS: Record<TabId, string> = {
@@ -248,6 +254,7 @@ export const TAB_DESCRIPTIONS: Record<TabId, string> = {
   kiosk: '학생이 직접 등하원을 기록하는 단말 모드입니다.',
   backup: '연동, 백업, 키오스크 PIN, AI 설정, 데이터 관리 도구를 모았습니다.',
   exams: '시험 제작, 배포, 제출 현황, 결과 안내를 관리합니다.',
+  lessonlog: '반 시간표로 그 달 수업 줄이 자동으로 생겨요. 수업내용을 적고, 결석은 학생 이름을 두 번 눌러 표시해요.',
   corrections: '학생이 문장마다 해석·영작을 적으면 AI가 첨삭하고, 선생님이 검토해 공개합니다.',
 };
 

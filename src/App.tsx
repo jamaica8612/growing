@@ -24,6 +24,7 @@ import { KakaoManager } from './components/KakaoManager';
 import { Exams, PublicExamRoute, PublicResultRoute } from './components/Exams';
 import { ListeningMaterials } from './components/ListeningMaterials';
 import { Corrections, PublicCorrectionBoardRoute } from './components/Corrections';
+import { LessonLogs } from './components/LessonLogs';
 import {
   MOBILE_QUICK_NAV_ITEMS,
   PRIMARY_NAV_GROUPS,
@@ -299,6 +300,18 @@ function AcademyApp({ session }: { session: Session }) {
         return <ListeningMaterials key={session.user.id} ownerId={session.user.id} />;
       case 'exams':
         return <Exams ownerId={session.user.id} classes={classes} students={students} onSendGuideToMessaging={handleAssistantDraftToMessaging} />;
+      case 'lessonlog':
+        return (
+          <LessonLogs
+            key={session.user.id}
+            classes={classes}
+            students={students}
+            attendance={attendance}
+            holidaySettings={data.holidaySettings}
+            onSaveHolidaySettings={data.handleSaveHolidaySettings}
+            onSaveAttendance={data.handleSaveAttendance}
+          />
+        );
       case 'corrections':
         return <Corrections key={session.user.id} ownerId={session.user.id} />;
       case 'attendance':
