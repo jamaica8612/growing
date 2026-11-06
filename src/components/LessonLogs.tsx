@@ -266,7 +266,7 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
                     return (
                       <tr key={`closed-${line.date}`} className="ll-closed">
                         <td className="ll-col-date">{formatRowDate(line.date)}</td>
-                        <td colSpan={5}>{line.title === '휴강' ? '휴강' : `휴강 · ${line.title}`}</td>
+                        <td className="ll-closed-note" colSpan={5}>{line.title === '휴강' ? '휴강' : `휴강 · ${line.title}`}</td>
                       </tr>
                     );
                   }
@@ -274,7 +274,11 @@ export function LessonLogs({ classes, students, attendance, holidaySettings, onS
                   const state = saveStates[row.key];
                   return (
                     <tr key={row.key} className={`${row.hidden ? 'll-hidden' : ''}${row.date === today ? ' ll-today' : ''}${prevDate !== row.date ? ' ll-newday' : ''}`}>
-                      <td className="ll-col-date">{prevDate === row.date ? <span className="ll-same">〃</span> : formatRowDate(row.date)}</td>
+                      <td className="ll-col-date">
+                        {/* 휴대폰 카드에서는 날짜를 매번 보여 주고, 표에서는 같은 날을 〃로 줄인다. */}
+                        <span className="ll-date-full">{formatRowDate(row.date)}</span>
+                        <span className="ll-date-table">{prevDate === row.date ? <span className="ll-same">〃</span> : formatRowDate(row.date)}</span>
+                      </td>
                       <td className="ll-col-time">{formatRowTime(row)}</td>
                       <td className="ll-col-class">
                         {row.className}
