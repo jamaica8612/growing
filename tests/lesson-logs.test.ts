@@ -8,7 +8,9 @@ import {
   buildMonthRows,
   closedTitle,
   isAbsent,
+  formatDayTitle,
   monthDates,
+  shiftDay,
   shiftMonth,
   suggestContents,
   toggleClosedDay,
@@ -82,6 +84,9 @@ describe('closed days', () => {
     expect(monthDates('2026-02')).toHaveLength(28);
     expect(shiftMonth('2026-12', 1)).toBe('2027-01');
     expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+    expect(shiftDay('2026-11-30', 1)).toBe('2026-12-01');
+    expect(shiftDay('2026-03-01', -1)).toBe('2026-02-28');
+    expect(formatDayTitle('2026-11-06')).toBe('11월 6일 (금)');
   });
 });
 
